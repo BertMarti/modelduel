@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import textwrap
 
 _FENCE_RE = re.compile(
     r"^[ \t]*(?P<fence>`{3,}|~{3,})[ \t]*(?P<lang>[\w+#.-]*)[^\n]*\n"
@@ -22,7 +23,8 @@ def find_code_blocks(text: str) -> list[tuple[str, str]]:
         body = match.group("body")
         if body.endswith("\n"):
             body = body[:-1]
-        blocks.append((match.group("lang").lower(), body))
+        # Un bloque dentro de una lista viene sangrado entero: se quita la sangría común.
+        blocks.append((match.group("lang").lower(), textwrap.dedent(body)))
     return blocks
 
 
@@ -33,7 +35,7 @@ def extract_code(text: str) -> str | None:
     """
     if not text:
         return None
-    blocks = find_code_blocks(text)
+    blocks = [(lang, body) for lang, body in find_code_blocks(text) if body.strip()]
     code: str | None = None
     for lang, body in blocks:
         if lang in PYTHON_LANGS:
