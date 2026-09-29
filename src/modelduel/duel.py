@@ -70,8 +70,9 @@ def run_attempt(
 ) -> dict:
     try:
         response = provider.complete(prompt, task_id=task.id)
-    except ProviderError as exc:
-        test_run = TestRun(status="provider_error", total=task.expected_tests, message=str(exc))
+    except Exception as exc:  # noqa: BLE001 - un intento fallido no debe tumbar todo el duelo
+        message = str(exc) if isinstance(exc, ProviderError) else _unexpected(exc)
+        test_run = TestRun(status="provider_error", total=task.expected_tests, message=message)
         attempt = test_run.to_dict()
         attempt.update(
             latency_s=None,
@@ -82,7 +83,8 @@ def run_attempt(
             response="",
         )
         return attempt
-    code = extract_code(response.text)
+    text = clean_text(response.text)
+    code = extract_code(text)
     test_run = run_tests(code, task, timeout=timeout)
     attempt = test_run.to_dict()
     attempt.update(
@@ -91,9 +93,20 @@ def run_attempt(
         output_tokens=response.output_tokens,
         cost=compute_cost(price, response.input_tokens, response.output_tokens),
         code=code,
-        response=response.text if code is None else "",
+        response=text if code is None else "",
     )
     return attempt
+
+
+def clean_text(text: str | None) -> str:
+    """Sustituye los sustitutos UTF-16 sueltos (válidos en JSON, no en UTF-8) por «?»."""
+    if not text:
+        return ""
+    return text.encode("utf-8", errors="replace").decode("utf-8")
+
+
+def _unexpected(exc: Exception) -> str:
+    return f"Error inesperado del proveedor ({type(exc).__name__}): {exc}"
 
 
 def _progress_line(task: Task, side: str, run: int, runs: int, attempt: dict) -> str:
