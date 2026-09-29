@@ -190,7 +190,7 @@ tests/                  # pytest, sin llamadas de red
 
 ## Cómo se ha construido
 
-Este proyecto lo ha desarrollado un **equipo de agentes de IA** —Claude Code (lead, builder y qa) y OpenCode (documentación)— trabajando cada uno en su rama y con pull requests, **supervisado por Alberto Martínez**. Las decisiones y el estado del proyecto están en [`MEMORY.md`](MEMORY.md) y las reglas del equipo en [`AGENTS.md`](AGENTS.md).
+Este proyecto lo ha desarrollado un **equipo de agentes de IA** —Claude Code: lead y builder (Opus), qa (Opus) y docs (Sonnet); OpenCode estaba previsto para la documentación pero no pudo ejecutarse en modo autónomo— trabajando cada uno en su rama y con pull requests, **supervisado por Alberto Martínez**. Las decisiones y el estado del proyecto están en [`MEMORY.md`](MEMORY.md) y las reglas del equipo en [`AGENTS.md`](AGENTS.md).
 
 ## Licencia
 
