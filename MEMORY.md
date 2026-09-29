@@ -1,5 +1,5 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por qa
+Última actualización: 2026-09-30 por docs
 
 ## Estado actual
 MVP completo en la rama `agent/builder` (PR #1 a `main`, sin fusionar) y revisión QA en `agent/qa` (PR #2 a `agent/builder`, se fusiona después de #1):
@@ -11,6 +11,7 @@ MVP completo en la rama `agent/builder` (PR #1 a `main`, sin fusionar) y revisi�
 - Tres tareas originales (`slugify`, `merge_intervals`, `parse_duration`) y respuestas grabadas de `alfa` (falla 1 caso límite de `parse_duration`) y `beta` (falla 2 tests de `slugify`).
 - Web estática en `site/index.html` con metadatos Open Graph y favicon en línea; la demo `site/demo/` se genera en el CI (está en `.gitignore`).
 - 132 tests pytest sin red (cobertura ~94 %); CI en Ubuntu y Windows con `pytest --cov` (mínimo 90 %); despliegue a Pages en `deploy.yml`.
+- Documentación en `agent/docs` (PR a `agent/qa`, se fusiona después de #1 y #2): `docs/USO.md` (guía de uso en español, con un ejemplo de tarea nuevo, `es_palindromo`, probado con respuestas grabadas), `CONTRIBUTING.md` y enlaces a ambos desde el README y `site/index.html` (apuntan a `blob/main`, así que funcionan cuando se fusione en `main`).
 
 ## Decisiones (por qué)
 - 2026-09-29: Proveedor `replay` con respuestas grabadas para que la demo y los tests funcionen sin claves ni coste.
@@ -37,11 +38,13 @@ MVP completo en la rama `agent/builder` (PR #1 a `main`, sin fusionar) y revisi�
 - 2026-09-30 (qa): códigos de salida: 0 duelo completado (aunque los modelos fallen), 1 no se pudo escribir la salida, 2 uso/configuración, 130 Ctrl+C. `--out` se comprueba antes de llamar a las APIs.
 - 2026-09-30 (qa): el valor «perdedor» del informe se atenúa con `opacity: .8` solo en el número (`.num`): el `.55` anterior dejaba el rosa en 3,7:1 y el texto secundario en 2,6:1. Un test calcula el contraste AA de los acentos, del texto y del atenuado en pantalla e impresión.
 - 2026-09-30 (qa): se añade `pytest-cov` SOLO al extra `dev` (no es dependencia de ejecución) para medir cobertura en el CI con un mínimo del 90 %. El subproceso de las tareas no carga el plugin porque tiene desactivada la autocarga.
+- 2026-09-30 (docs): la documentación la escribe Claude Code (subagente, Sonnet) en `agent/docs`, no OpenCode, porque el sistema de permisos no permite lanzar OpenCode en modo autónomo. `AGENTS.md` lo refleja; OpenCode volverá a ser el agente docs cuando se permita su ejecución autónoma.
+- 2026-09-30 (docs): los enlaces de la web a `docs/USO.md` y `CONTRIBUTING.md` apuntan a `github.com/BertMarti/modelduel/blob/main/...` (el test de la web solo admite enlaces a ese repositorio); no funcionarán hasta que la rama se fusione en `main`.
 
 ## Siguiente paso
 1. lead: fusionar #1 en `main` y después #2 (cambiar su base a `main` si GitHub no lo hace solo al borrar `agent/builder`); comprobar que Pages publica la web y `demo/`.
 2. lead: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
-3. docs (`agent/opencode-docs`): escribir `docs/USO.md` a partir del README (instalación, crear tareas, proveedores, precios, cómo leer el informe, códigos de salida).
+3. lead: fusionar el PR de `agent/docs` después de #1 y #2 y comprobar que los enlaces «Guía de uso» y «Contribuir» de la web abren los archivos en GitHub.
 4. Opcional: reintentos con espera para HTTP 429/5xx y guardado incremental de `results.json` durante el duelo.
 
 ## Problemas conocidos
@@ -56,3 +59,4 @@ MVP completo en la rama `agent/builder` (PR #1 a `main`, sin fusionar) y revisi�
 - 2026-09-29 lead (main): creación del repositorio y reparto del equipo.
 - 2026-09-29 builder (agent/builder): MVP completo (CLI, proveedores, runner, costes, informe, tareas, web, tests, CI y Pages) y PR a main.
 - 2026-09-30 qa (agent/qa): revisión QA en PR #2: runner (árbol de procesos, salida acotada, UTF-8/CRLF, tareas sin tests), tareas (BOM, tests rotos, parametrize), proveedores (errores de red/HTTP, respuestas vacías), duelo resiliente, informe (escapado, `--runs`, accesibilidad AA, impresión), CLI en español con códigos coherentes, web (meta, favicon, accesibilidad) y cobertura en CI. 68 → 132 tests.
+- 2026-09-30 docs · Claude Code Sonnet (agent/docs): `docs/USO.md` (guía completa en español, comprobada contra el código y ejecutando la demo y un ejemplo de tarea nuevo con respuestas grabadas), `CONTRIBUTING.md`, enlaces desde README y web, y fila docs de `AGENTS.md` actualizada.
