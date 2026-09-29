@@ -2,7 +2,9 @@ import json
 import subprocess
 import sys
 
-from modelduel.cli import main
+import pytest
+
+from modelduel.cli import EXIT_ERROR, EXIT_USAGE, main
 
 
 def test_run_de_extremo_a_extremo_con_replay(examples_dir, tmp_path, capsys):
@@ -97,3 +99,82 @@ def test_modulo_ejecutable():
     )
     assert proc.returncode == 0
     assert "modelduel" in proc.stdout
+
+
+# ---------------------------------------------------------------- revisión qa
+
+
+def _usage_error(argv, capsys) -> str:
+    with pytest.raises(SystemExit) as info:
+        main(argv)
+    assert info.value.code == EXIT_USAGE
+    return capsys.readouterr().err
+
+
+def test_errores_de_argumentos_en_espanol(capsys):
+    err = _usage_error(["run"], capsys)
+    assert err.startswith("uso: modelduel run")
+    assert "faltan argumentos obligatorios: tasks, --a, --b, --out" in err
+    err = _usage_error(["run", "t", "--a", "x", "--b", "y", "--out", "o", "--runs", "dos"], capsys)
+    assert "argumento --runs: valor no válido: 'dos'" in err
+    err = _usage_error(["duelo"], capsys)
+    assert "orden no válida: 'duelo'" in err
+    err = _usage_error(["list-tasks", "x", "--sobra"], capsys)
+    assert "argumentos no reconocidos: --sobra" in err
+    assert "the following" not in err and "invalid" not in err
+
+
+def test_ayuda_en_espanol(capsys):
+    with pytest.raises(SystemExit) as info:
+        main(["run", "--help"])
+    assert info.value.code == 0
+    out = capsys.readouterr().out
+    assert out.startswith("uso: ")
+    assert "opciones:" in out and "argumentos posicionales:" in out
+    assert "muestra esta ayuda y sale" in out
+    assert "usage" not in out and "show this help" not in out
+
+
+def test_timeout_no_finito_se_rechaza(examples_dir, tmp_path, capsys):
+    base = ["run", str(examples_dir / "tasks"), "--a", "replay:alfa", "--b", "replay:beta"]
+    for bad in ("nan", "inf"):
+        assert main([*base, "--timeout", bad, "--out", str(tmp_path / bad)]) == EXIT_USAGE
+        assert "--timeout" in capsys.readouterr().err
+        assert not (tmp_path / bad).exists()
+
+
+def test_salida_que_no_se_puede_escribir(examples_dir, tmp_path, capsys):
+    ocupado = tmp_path / "soy-un-archivo"
+    ocupado.write_text("x", encoding="utf-8")
+    args = ["run", str(examples_dir / "tasks" / "slugify"), "--a", "replay:alfa"]
+    assert main([*args, "--b", "replay:beta", "--out", str(ocupado)]) == EXIT_ERROR
+    err = capsys.readouterr().err
+    assert err.startswith("modelduel: error: no se pudo escribir")
+    assert "Traceback" not in err
+
+
+def test_report_con_results_mal_formado(tmp_path, capsys):
+    raro = tmp_path / "results.json"
+    raro.write_text(
+        json.dumps({"contenders": {"a": {}, "b": {}}, "tasks": [{"id": "x"}]}), encoding="utf-8"
+    )
+    assert main(["report", str(raro), "--out", str(tmp_path / "o")]) == EXIT_USAGE
+    assert "no parece un results.json" in capsys.readouterr().err
+
+
+def test_list_tasks_con_un_archivo(tmp_path, capsys):
+    archivo = tmp_path / "x.txt"
+    archivo.write_text("x", encoding="utf-8")
+    assert main(["list-tasks", str(archivo)]) == EXIT_USAGE
+    assert "no es una carpeta" in capsys.readouterr().err
+
+
+def test_precios_y_results_con_bom(examples_dir, tmp_path):
+    precios = tmp_path / "precios.json"
+    precios.write_text('﻿{"replay:alfa": {"input": 1, "output": 2}}', encoding="utf-8")
+    out = tmp_path / "o"
+    args = ["run", str(examples_dir / "tasks" / "slugify"), "--a", "replay:alfa"]
+    assert main([*args, "--b", "replay:beta", "--prices", str(precios), "--out", str(out)]) == 0
+    results = out / "results.json"
+    results.write_text("﻿" + results.read_text(encoding="utf-8"), encoding="utf-8")
+    assert main(["report", str(results), "--out", str(tmp_path / "r")]) == 0
