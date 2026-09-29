@@ -1,16 +1,16 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-29 por builder
+Última actualización: 2026-09-30 por qa
 
 ## Estado actual
-MVP completo en la rama `agent/builder` (PR abierto a `main`, sin fusionar):
-- CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar.
-- Proveedores `replay`, `gemini` (REST `generateContent`) y `openai` (Chat Completions compatible: OpenAI, OpenRouter, Ollama).
-- Runner: extrae el bloque de código, ejecuta pytest en un directorio temporal con límite de tiempo y lee el XML JUnit. Distingue `ok`, `no_code`, `import_error`, `timeout`, `error` y `provider_error`.
+MVP completo en la rama `agent/builder` (PR #1 a `main`, sin fusionar) y revisión QA en `agent/qa` (PR #2 a `agent/builder`, se fusiona después de #1):
+- CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
+- Proveedores `replay`, `gemini` (REST `generateContent`) y `openai` (Chat Completions compatible: OpenAI, OpenRouter, Ollama). Errores de red, HTTP y respuestas vacías o raras se convierten en `ProviderError` con mensaje en español.
+- Runner: extrae el bloque de código, ejecuta pytest en un directorio temporal con límite de tiempo y lee el XML JUnit. Mata el árbol de procesos al terminar, acota la salida y distingue `ok`, `no_code`, `import_error`, `timeout`, `error` y `provider_error`.
 - Costes con tabla ampliable (`--prices`); solo hay precios ficticios integrados para `replay:alfa` y `replay:beta`.
-- Informe HTML «duelo editorial oscuro» (`string.Template`, CSS en línea, SVG, sin JavaScript, hoja de impresión).
-- Tres tareas originales (`slugify`, `merge_intervals`, `parse_duration`) y respuestas grabadas de `alfa` (falla 1 caso límite de `parse_duration`: no exige el orden de unidades) y `beta` (falla 2 tests de `slugify`: borra `.` y `/` en vez de separar).
-- Web estática en `site/index.html`; la demo `site/demo/` se genera en el CI (está en `.gitignore`).
-- 68 tests pytest sin red; CI en Ubuntu y Windows; despliegue a Pages en `deploy.yml`.
+- Informe HTML «duelo editorial oscuro» (`string.Template`, CSS en línea, SVG con `<title>` y `aria-label`, sin JavaScript, hoja de impresión). Con `--runs` > 1 muestra «Intentos resueltos» y «suma de N ejecuciones».
+- Tres tareas originales (`slugify`, `merge_intervals`, `parse_duration`) y respuestas grabadas de `alfa` (falla 1 caso límite de `parse_duration`) y `beta` (falla 2 tests de `slugify`).
+- Web estática en `site/index.html` con metadatos Open Graph y favicon en línea; la demo `site/demo/` se genera en el CI (está en `.gitignore`).
+- 132 tests pytest sin red (cobertura ~94 %); CI en Ubuntu y Windows con `pytest --cov` (mínimo 90 %); despliegue a Pages en `deploy.yml`.
 
 ## Decisiones (por qué)
 - 2026-09-29: Proveedor `replay` con respuestas grabadas para que la demo y los tests funcionen sin claves ni coste.
@@ -25,17 +25,34 @@ MVP completo en la rama `agent/builder` (PR abierto a `main`, sin fusionar):
 - 2026-09-29 (builder): con `--runs N`, «tareas resueltas» cuenta solo las tareas con todos los tests en verde en todas las ejecuciones; tests, tiempo, tokens y coste se suman.
 - 2026-09-29 (builder): el orden de las tareas sale de `order` en `meta.toml` (después, del nombre de la carpeta).
 - 2026-09-29 (builder): números en formato español en el informe y la consola (coma decimal, punto de miles).
+- 2026-09-30 (qa): el runner escribe la salida de pytest en un archivo en vez de usar tuberías. Con tuberías, un proceso nieto que las heredaba obligaba a esperar a que terminase (en Windows, `subprocess.run` podía colgarse pasado el límite). Del archivo se leen como mucho 256 KB (principio y final) y el recorte final conserva el final, donde está el resumen de pytest.
+- 2026-09-30 (qa): el árbol de procesos se mata SIEMPRE al acabar (también tras un final normal): en Windows con un Job Object vía `ctypes` (biblioteca estándar; `taskkill /T` de respaldo) y en POSIX con `start_new_session` + `killpg`. No hace falta ninguna dependencia.
+- 2026-09-30 (qa): `TMP`/`TEMP`/`TMPDIR` del subproceso apuntan a un temporal propio de la ejecución, que se borra (con reintentos en Windows).
+- 2026-09-30 (qa): código de pytest 5 (sin tests) → estado `error` con mensaje claro. Un `test_task.py` con error de sintaxis se rechaza al cargar la tarea (`TaskError`) para no culpar a los modelos ni gastar llamadas.
+- 2026-09-30 (qa): todos los archivos que edita el usuario (`task.md`, `test_task.py`, `meta.toml`, `--prices`, `results.json`) se leen con `utf-8-sig` para aceptar el BOM de Windows.
+- 2026-09-30 (qa): `run_attempt` convierte cualquier excepción del proveedor en `provider_error` (con el tipo en el mensaje): un duelo largo y de pago no debe perderse por una respuesta rara. Los sustitutos UTF-16 sueltos (válidos en JSON) se sustituyen antes de guardar.
+- 2026-09-30 (qa): respuestas sin texto de Gemini/OpenAI son `provider_error` con `finishReason`/`finish_reason`/`refusal` en el mensaje, en vez de un «sin bloque de código» engañoso.
+- 2026-09-30 (qa): `MODELDUEL_HTTP_TIMEOUT` se lee y valida en cada petición (antes, un valor no numérico rompía la importación del paquete).
+- 2026-09-30 (qa): argparse no trae traducciones; `SpanishArgumentParser` traduce la ayuda y los errores más habituales con una tabla de expresiones regulares, sin tocar el `gettext` global.
+- 2026-09-30 (qa): códigos de salida: 0 duelo completado (aunque los modelos fallen), 1 no se pudo escribir la salida, 2 uso/configuración, 130 Ctrl+C. `--out` se comprueba antes de llamar a las APIs.
+- 2026-09-30 (qa): el valor «perdedor» del informe se atenúa con `opacity: .8` solo en el número (`.num`): el `.55` anterior dejaba el rosa en 3,7:1 y el texto secundario en 2,6:1. Un test calcula el contraste AA de los acentos, del texto y del atenuado en pantalla e impresión.
+- 2026-09-30 (qa): se añade `pytest-cov` SOLO al extra `dev` (no es dependencia de ejecución) para medir cobertura en el CI con un mínimo del 90 %. El subproceso de las tareas no carga el plugin porque tiene desactivada la autocarga.
 
 ## Siguiente paso
-1. lead: revisar y fusionar el PR de `agent/builder`; comprobar que `deploy.yml` publica la web y `demo/` en Pages.
-2. qa (`agent/qa`): revisar el runner (límite de tiempo en Windows con procesos hijos, salidas enormes, soluciones que escriben fuera del temporal), añadir tests de casos límite de `extract_code` y del informe con `--runs` > 1, y revisar accesibilidad del informe (contraste del texto atenuado, navegación con teclado de `<details>`).
-3. docs (`agent/opencode-docs`): escribir `docs/USO.md` a partir del README (instalación, crear tareas, proveedores, precios, cómo leer el informe).
+1. lead: fusionar #1 en `main` y después #2 (cambiar su base a `main` si GitHub no lo hace solo al borrar `agent/builder`); comprobar que Pages publica la web y `demo/`.
+2. lead: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
+3. docs (`agent/opencode-docs`): escribir `docs/USO.md` a partir del README (instalación, crear tareas, proveedores, precios, cómo leer el informe, códigos de salida).
+4. Opcional: reintentos con espera para HTTP 429/5xx y guardado incremental de `results.json` durante el duelo.
 
 ## Problemas conocidos
-- El aislamiento es solo un directorio temporal + subproceso con límite + entorno sin secretos: el código del modelo puede leer y escribir en el resto del disco. Está advertido en README y web; lo ideal es usar un contenedor o VM.
-- Si un proceso hijo lanzado por la solución sobrevive al `kill` del límite de tiempo, podría seguir en ejecución (no se mata el árbol de procesos).
-- Los proveedores `gemini` y `openai` solo se prueban con respuestas simuladas (sin red); no se han probado contra las APIs reales en este MVP.
+- El aislamiento es solo un directorio temporal + subproceso con límite + entorno sin secretos + muerte del árbol de procesos: el código del modelo puede leer y escribir en el resto del disco. Está advertido en README y web; lo ideal es usar un contenedor o VM.
+- Un proceso que se desligue a propósito del árbol (`setsid`/doble fork en POSIX, `CREATE_BREAKAWAY_FROM_JOB` si el Job lo permitiera) puede sobrevivir. En Windows hay una ventana de milisegundos entre crear pytest y meterlo en el Job Object (Popen no permite crear el proceso suspendido).
+- El disco que pueda llenar una solución que imprime sin parar está acotado solo por el límite de tiempo (va al temporal de la ejecución, que se borra).
+- `<details>` cerrados no se despliegan al imprimir en navegadores sin `::details-content` (p. ej. Firefox antiguo); sin JavaScript no hay alternativa fiable.
+- Sin reintentos ante HTTP 429/5xx: el intento queda como «error del proveedor».
+- Los proveedores `gemini` y `openai` solo se prueban con respuestas simuladas (sin red); no se han probado contra las APIs reales.
 
 ## Registro de sesiones
 - 2026-09-29 lead (main): creación del repositorio y reparto del equipo.
 - 2026-09-29 builder (agent/builder): MVP completo (CLI, proveedores, runner, costes, informe, tareas, web, tests, CI y Pages) y PR a main.
+- 2026-09-30 qa (agent/qa): revisión QA en PR #2: runner (árbol de procesos, salida acotada, UTF-8/CRLF, tareas sin tests), tareas (BOM, tests rotos, parametrize), proveedores (errores de red/HTTP, respuestas vacías), duelo resiliente, informe (escapado, `--runs`, accesibilidad AA, impresión), CLI en español con códigos coherentes, web (meta, favicon, accesibilidad) y cobertura en CI. 68 → 132 tests.
