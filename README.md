@@ -20,7 +20,7 @@
 ```
 
 > [!WARNING]
-> **El código generado por los modelos se ejecuta en tu máquina.** modelduel lo ejecuta siempre en un directorio temporal, en un subproceso con límite de tiempo y sin tus variables de entorno secretas, pero eso **no es un aislamiento real**. Úsalo solo con tareas de confianza e, idealmente, dentro de un contenedor o una máquina virtual.
+> **El código generado por los modelos se ejecuta en tu máquina.** modelduel lo ejecuta siempre en un directorio temporal, en un subproceso con límite de tiempo y sin tus variables de entorno secretas, y al terminar mata todos los procesos que haya lanzado (Job Object en Windows, grupo de procesos en Linux/macOS), pero eso **no es un aislamiento real**: el código puede leer y escribir en el resto del disco, y un proceso que se desligue a propósito (`setsid`, `CREATE_BREAKAWAY_FROM_JOB`) puede sobrevivir. Úsalo solo con tareas de confianza e, idealmente, dentro de un contenedor o una máquina virtual.
 
 ## Por qué
 
@@ -42,7 +42,7 @@ cd modelduel
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-ruff check . && ruff format --check . && pytest
+ruff check . && ruff format --check . && pytest --cov
 ```
 
 ## Uso rápido
@@ -70,7 +70,9 @@ modelduel list-tasks examples/tasks
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
 | `--prices f.json` | Tabla de precios adicional (ver «Coste»). |
 | `--replays DIR` | Carpeta de respuestas grabadas para `replay` (por defecto, `replays/` junto a la carpeta de tareas). |
-| `--out DIR` | Carpeta donde se escriben `results.json` e `index.html`. |
+| `--out DIR` | Carpeta donde se escriben `results.json` e `index.html`. Se comprueba antes de llamar a las APIs. |
+
+Códigos de salida: `0` duelo completado (aunque los modelos fallen tests), `1` no se pudieron escribir los resultados, `2` error de uso o de configuración (argumentos, tareas, proveedores, precios, `results.json`) y `130` interrumpido con Ctrl+C.
 
 El informe `index.html` es un único archivo autocontenido: CSS en línea, gráficas SVG, sin JavaScript y con hoja de impresión clara.
 
@@ -101,7 +103,9 @@ difficulty = "fácil"
 order = 1
 ```
 
-modelduel añade al enunciado la instrucción de responder con un único bloque de código Python, extrae el primer bloque `python` (o el único bloque de la respuesta), lo guarda como `solution.py` junto a una copia de `test_task.py` en un directorio temporal y ejecuta `python -m pytest` con límite de tiempo. Los resultados se leen del XML JUnit de pytest. Se distinguen estos casos: tests ejecutados, sin bloque de código, error al importar, tiempo agotado y error del proveedor.
+modelduel añade al enunciado la instrucción de responder con un único bloque de código Python, extrae el primer bloque `python` (o el único bloque de la respuesta), lo guarda como `solution.py` junto a una copia de `test_task.py` en un directorio temporal y ejecuta `python -m pytest` con límite de tiempo. Los resultados se leen del XML JUnit de pytest. Se distinguen estos casos: tests ejecutados, sin bloque de código, error al importar, tiempo agotado, error al ejecutar (p. ej. una tarea en la que pytest no encuentra tests) y error del proveedor. La salida de pytest se recorta conservando el principio y el final, donde está el resumen.
+
+Los archivos de la tarea se leen en UTF-8 (se acepta el BOM de los editores de Windows) y un `test_task.py` con errores de sintaxis se rechaza antes de llamar a los modelos.
 
 Las tres tareas de ejemplo son originales y de dificultad creciente: `slugify`, `merge_intervals` y `parse_duration`.
 
