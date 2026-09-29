@@ -11,3 +11,6 @@ runs/
 
 # Demo generada en el CI
 site/demo/
+.coverage
+.coverage.*
+htmlcov/
