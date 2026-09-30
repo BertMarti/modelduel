@@ -1,12 +1,12 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por builder (v0.2.0 · #6)
+Última actualización: 2026-09-30 por builder (v0.2.0 · #7)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
 - #4 reintentos ante 429/5xx (rama `agent/builder/4-reintentos`): HECHO, en PR.
 - #5 guardado incremental y `--resume` (rama `agent/builder/5-guardado-incremental`, parte de la de #4): HECHO, en PR.
 - #6 liga de 2 a 6 contendientes (rama `agent/builder/6-liga`, parte de la de #5): HECHO, en PR.
-- #7 publicación en PyPI: pendiente.
+- #7 publicación en PyPI (rama `agent/builder/7-pypi`, parte de la de #6): HECHO, en PR. La publicación real la dispara Alberto tras registrar el «trusted publisher» (ver PR y `CONTRIBUTING.md`).
 
 Base heredada de v0.1.0:
 - CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
@@ -17,6 +17,8 @@ Base heredada de v0.1.0:
 - Liga (#6): `--model/-m SPEC` repetible (2 a 6 en total, contando `--a`/`--b`, que van primero); cada contendiente recibe una letra `a`-`f` (`results.ALL_SIDES`) y `results.json` sigue con la misma estructura (`contenders`/`results` por letra), así que los de v0.1.0 se leen igual. `rank_sides` clasifica por tareas resueltas, tests y coste (el coste solo si todos tienen precio en la misma moneda); los empates comparten posición. Nombres repetidos = error.
 - Informe (#6): con 2 contendientes, el duelo enfrentado de siempre (`report/html.py`, `template.html`); con 3-6, la liga (`report/league.py`, `league.html`): clasificación, comparativa con barras finas, matriz por tarea y detalle en rejilla. El CSS vive en `report/style.css` y se incrusta en ambas plantillas. Paleta AA: A lima `#b5e853`, B rosa `#ff7eb6`, C cian `#4fd1e5`, D ámbar `#ffb833`, E violeta `#b79cff`, F coral `#ff8a65` (en impresión `#4d7c0f #be185d #0e7490 #a15c00 #6d3fd6 #c2410c`).
 - Demo (#6): CI, deploy y AGENTS.md generan `site/demo` con una liga de tres (`replay:alfa`, `replay:beta` y el nuevo `replay:gamma`, con precio ficticio); el CI comprueba además que `--a/--b` sigue dando un «Informe de duelo».
+- Paquete (#7): versión 0.2.0 con fuente única en `src/modelduel/__init__.py` (`pyproject.toml` la lee vía hatch); metadatos completos (clasificadores, URLs, `license-files`); extra opcional `modelduel[pytest]`. Los ejemplos (`examples/`) viajan dentro de la wheel como `modelduel/examples` (`force-include`) y `modelduel demo` los localiza con `demo.py` (paquete o clon). `modelduel demo [--out DIR | --copy DIR]`: liga de tres replay sin claves, o copia de las tareas y respuestas para usarlas de plantilla.
+- Publicación (#7): `.github/workflows/release.yml` (al publicar una Release: comprueba que la etiqueta `vX.Y.Z` coincide con la versión, `python -m build`, `twine check --strict`, prueba la wheel en un venv limpio y publica con `pypa/gh-action-pypi-publish@release/v1` en el environment `pypi`, con `id-token: write` solo en el job de publicación; sin tokens). El CI tiene un job `package` con los mismos pasos de construcción y comprobación. El nombre `modelduel` estaba libre en PyPI el 2026-09-30 (`/pypi/modelduel/json` daba 404).
 - Runner: extrae el bloque de código, ejecuta pytest en un directorio temporal con límite de tiempo y lee el XML JUnit. Mata el árbol de procesos al terminar, acota la salida y distingue `ok`, `no_code`, `import_error`, `timeout`, `error` y `provider_error`.
 - Costes con tabla ampliable (`--prices`); solo hay precios ficticios integrados para `replay:alfa` y `replay:beta`.
 - Informe HTML «duelo editorial oscuro» (`string.Template`, CSS en línea, SVG con `<title>` y `aria-label`, sin JavaScript, hoja de impresión). Con `--runs` > 1 muestra «Intentos resueltos» y «suma de N ejecuciones».
@@ -63,11 +65,15 @@ Base heredada de v0.1.0:
 - 2026-09-30 (builder): #6 la matriz por tarea muestra tests superados y un estado escrito («resuelta», «no resuelta», «sin hacer»…) para no depender del color; en móvil tiene desplazamiento horizontal propio (`.table-wrap`), sin desbordar la página.
 - 2026-09-30 (builder): #6 el resumen de consola pasa a ser una tabla de clasificación (una fila por contendiente) también con dos; cambia el formato impreso respecto a v0.1.0, no el contrato de la CLI ni los códigos de salida.
 - 2026-09-30 (builder): #6 `replay:gamma` (respuestas originales y ficticias, precio ficticio 0,10/0,40 USD): resuelve `slugify` y `parse_duration` y falla 2 tests de `merge_intervals`. Empata con `beta` en tareas y tests y queda por delante por coste, lo que enseña el desempate.
+- 2026-09-30 (builder): #7 `pytest` NO pasa a ser dependencia obligatoria (se mantiene «solo biblioteca estándar»); se añade el extra opcional `modelduel[pytest]` para instalarlo de una vez. Los ejemplos se empaquetan con `force-include` en vez de moverlos a `src/`, para no duplicar ni cambiar rutas de docs, tests y CI.
+- 2026-09-30 (builder): #7 los enlaces del README son absolutos (`blob/main`) porque PyPI no resuelve rutas relativas; un test lo vigila. Ojo: apuntan a `main`, no a la etiqueta.
+- 2026-09-30 (builder): #7 `twine check` no se pudo ejecutar en local (Windows bloquea la DLL `nh3` por una directiva de control de aplicaciones); sí se construyeron sdist y wheel con `python -m build` y se instaló la wheel en un venv limpio (`modelduel demo` en verde). `twine check --strict` corre en el CI (job `package`) y en `release.yml`.
 
 ## Siguiente paso
 1. Alberto: fusionar los PR de v0.2.0 en orden (#4, #5, #6, #7) con «Create a merge commit».
+   - Para publicar en PyPI: registrar el *trusted publisher* (PyPI > Your projects > Publishing > "Add a new pending publisher": proyecto `modelduel`, propietario `BertMarti`, repositorio `modelduel`, workflow `release.yml`, environment `pypi`), crear el environment `pypi` en GitHub (Settings > Environments) y crear la Release `v0.2.0`.
 2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
-3. builder: continuar con #7 (publicación en PyPI).
+3. Tras fusionar y publicar: comprobar `pip install "modelduel[pytest]"` y `modelduel demo` desde un entorno limpio, y actualizar enlaces (README/web) con el badge de PyPI si se desea.
 
 ## Problemas conocidos
 - El aislamiento es solo un directorio temporal + subproceso con límite + entorno sin secretos + muerte del árbol de procesos: el código del modelo puede leer y escribir en el resto del disco. Está advertido en README y web; lo ideal es usar un contenedor o VM.
@@ -84,3 +90,4 @@ Base heredada de v0.1.0:
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/4-reintentos): #4 reintentos con espera exponencial y jitter ante 429/5xx y cortes de conexión, `--retries`, avisos en consola, tests sin red ni esperas; AGENTS.md con el flujo por issues de v0.2.0.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/5-guardado-incremental): #5 guardado incremental atómico de `results.json`, `--resume`, informe parcial al cortar con Ctrl+C y tests de corte y reanudación.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/6-liga): #6 liga de 2 a 6 contendientes con `--model`, clasificación e informe de liga (paleta AA ampliada), demo de tres en CI y web, tercer contendiente `replay:gamma`.
+- 2026-09-30 builder · Claude Code Sonnet (agent/builder/7-pypi): #7 paquete listo para PyPI (v0.2.0, metadatos, ejemplos dentro de la wheel, `modelduel demo`), `release.yml` con Trusted Publishing, job `package` en el CI y guía de publicación.

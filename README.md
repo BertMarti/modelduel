@@ -3,12 +3,12 @@
 **Dos modelos, una tarea, los mismos tests.** `modelduel` enfrenta a dos modelos de IA (o a una liga de hasta seis) con un problema de programación, ejecuta tus tests sobre el código de cada uno y te da un informe con quién acierta, cuánto tarda y cuánto cuesta.
 
 [![CI](https://github.com/BertMarti/modelduel/actions/workflows/ci.yml/badge.svg)](https://github.com/BertMarti/modelduel/actions/workflows/ci.yml)
-[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-b5e853.svg)](LICENSE)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-b5e853.svg)](https://github.com/BertMarti/modelduel/blob/main/LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-ff7eb6.svg)
 
 **Web:** <https://bertmarti.github.io/modelduel/> · **Informe de demostración:** <https://bertmarti.github.io/modelduel/demo/>
 
-**Documentación:** [Guía de uso](docs/USO.md) (instalación, duelos reales, crear tus tareas, leer el informe) · [Cómo contribuir](CONTRIBUTING.md)
+**Documentación:** [Guía de uso](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md) (instalación, duelos reales, crear tus tareas, leer el informe) · [Cómo contribuir](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md)
 
 ```text
   #   Contendiente     Tareas   Tests   Tiempo   Tokens (ent/sal)        Coste
@@ -31,8 +31,11 @@ Los rankings de modelos miden tareas que no son las tuyas. La forma honesta de e
 Necesitas Python 3.12 o superior. modelduel solo usa la biblioteca estándar; pytest hace falta para ejecutar los tests de las tareas.
 
 ```bash
-pip install git+https://github.com/BertMarti/modelduel pytest
+pip install "modelduel[pytest]"     # o: pip install modelduel pytest
+modelduel demo                       # prueba sin claves ni coste, con los ejemplos incluidos
 ```
+
+`modelduel demo` enfrenta a tres modelos ficticios (respuestas grabadas) y escribe el informe en `modelduel-demo/`; `modelduel demo --copy MIS-EJEMPLOS` copia las tareas y respuestas de ejemplo para que las uses como plantilla. Desde el repositorio también puedes instalar la última versión con `pip install git+https://github.com/BertMarti/modelduel pytest`.
 
 Para desarrollar:
 
@@ -164,8 +167,8 @@ Se busca primero por `proveedor:modelo` y después solo por `modelo`. Si un mode
 
 ## Más documentación
 
-- [`docs/USO.md`](docs/USO.md): guía para personas usuarias, paso a paso y con solución de problemas.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md): entorno, comandos, ramas, commits y cómo añadir un proveedor o una tarea de ejemplo.
+- [`docs/USO.md`](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md): guía para personas usuarias, paso a paso y con solución de problemas.
+- [`CONTRIBUTING.md`](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md): entorno, comandos, ramas, commits y cómo añadir un proveedor o una tarea de ejemplo.
 
 ## Estructura
 
@@ -177,6 +180,7 @@ src/modelduel/
 ├── runner.py           # prompt + ejecución de pytest en temporal con límite
 ├── duel.py             # orquestación del duelo
 ├── resume.py           # reanudación de un duelo interrumpido
+├── demo.py             # localiza los ejemplos incluidos (modelduel demo)
 ├── results.py          # results.json y resumen del marcador
 ├── pricing.py          # tarifas y fórmula de coste
 ├── providers/          # replay, gemini, openai_compat
@@ -196,8 +200,8 @@ tests/                  # pytest, sin llamadas de red
 
 ## Cómo se ha construido
 
-Este proyecto lo ha desarrollado un **equipo de agentes de IA** —Claude Code: lead y builder (Opus), qa (Opus) y docs (Sonnet); OpenCode estaba previsto para la documentación pero no pudo ejecutarse en modo autónomo— trabajando cada uno en su rama y con pull requests, **supervisado por Alberto Martínez**. Las decisiones y el estado del proyecto están en [`MEMORY.md`](MEMORY.md) y las reglas del equipo en [`AGENTS.md`](AGENTS.md).
+Este proyecto lo ha desarrollado un **equipo de agentes de IA** —Claude Code: lead y builder (Opus), qa (Opus) y docs (Sonnet); OpenCode estaba previsto para la documentación pero no pudo ejecutarse en modo autónomo— trabajando cada uno en su rama y con pull requests, **supervisado por Alberto Martínez**. Las decisiones y el estado del proyecto están en [`MEMORY.md`](https://github.com/BertMarti/modelduel/blob/main/MEMORY.md) y las reglas del equipo en [`AGENTS.md`](https://github.com/BertMarti/modelduel/blob/main/AGENTS.md).
 
 ## Licencia
 
-[MIT](LICENSE).
+[MIT](https://github.com/BertMarti/modelduel/blob/main/LICENSE).
