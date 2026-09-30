@@ -80,7 +80,9 @@ def _rank_key(summary: dict[str, dict]):
 
     def key(side: str) -> tuple:
         data = summary[side]
-        return (-data["tasks_solved"], -data["tests_passed"], data["cost"] if use_cost else 0.0)
+        # Coste redondeado: dos costes que el informe muestra iguales (0,1 + 0,2 y 0,3) empatan.
+        cost = round(data["cost"], 6) if use_cost else 0.0
+        return (-data["tasks_solved"], -data["tests_passed"], cost)
 
     return key
 

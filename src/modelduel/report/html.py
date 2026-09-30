@@ -414,7 +414,7 @@ def _verdict(summary: dict, runs: int = 1) -> str:
     summed = f" (suma de {runs} ejecuciones)" if runs > 1 else ""
     if winner is None:
         if costs_comparable(summary):
-            return "empate en tareas resueltas, tests y coste"
+            return "empate en tareas resueltas, tests y coste" + summed
         return "empate en tareas resueltas y tests (sin coste comparable)" + summed
     loser = "b" if winner == "a" else "a"
     win, lose = summary[winner], summary[loser]

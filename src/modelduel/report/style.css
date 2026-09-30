@@ -60,7 +60,7 @@ h2 {
 .big { font: 700 clamp(56px, 12vw, 128px)/.9 var(--mono); letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .big small { font-size: .28em; color: var(--muted); letter-spacing: 0; font-weight: 400; }
 .colon { font: 300 clamp(40px, 8vw, 88px)/.9 var(--mono); color: var(--muted); text-align: center; }
-.verdict-caption { grid-column: 1 / -1; text-align: center; font: 12px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.verdict-caption { grid-column: 1 / -1; text-align: center; font: 12px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -6px; }
 .verdict { grid-column: 1 / -1; text-align: center; font: 14px/1.4 var(--mono); color: var(--muted); }
 .verdict strong { font-weight: 600; }
 
