@@ -128,6 +128,12 @@ def load_results(path: Path) -> dict:
         raise ResultsError(f"{path} no es JSON válido: {exc}") from exc
     if not isinstance(data, dict) or "tasks" not in data or "contenders" not in data:
         raise ResultsError(f"{path} no parece un results.json de modelduel.")
+    schema = data.get("schema", SCHEMA_VERSION)
+    if not isinstance(schema, int) or schema > SCHEMA_VERSION:
+        raise ResultsError(
+            f"{path} tiene el formato {schema!r}, que esta versión de modelduel no entiende "
+            f"(conoce hasta el {SCHEMA_VERSION}). Actualiza modelduel: pip install -U modelduel."
+        )
     try:
         data["summary"] = summarize(data)
     except (KeyError, TypeError, ValueError, AttributeError) as exc:

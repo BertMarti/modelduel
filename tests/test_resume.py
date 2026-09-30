@@ -403,3 +403,98 @@ def test_cli_si_falla_el_guardado_intermedio_el_duelo_sigue(cli_args, cut, capsy
     printed = capsys.readouterr().out
     assert printed.count("no se pudo guardar") == 1  # avisa una sola vez
     assert json.loads((out / "results.json").read_text(encoding="utf-8"))["status"] == "complete"
+
+
+# ---------------------------------------------------------------- QA: casos límite
+
+
+def _partial(cli_args, cut):
+    args, out = cli_args
+    cut.cut_at = 2
+    assert main(args) == 130
+    cut.calls, cut.cut_at = 0, None
+    return args, out
+
+
+def _edit(out, mutate):
+    path = out / "results.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    mutate(data)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_resume_rechaza_un_results_json_de_un_formato_mas_nuevo(cli_args, cut, capsys):
+    args, out = _partial(cli_args, cut)
+    _edit(out, lambda d: d.update(schema=99))
+    capsys.readouterr()
+    assert main([*args, "--resume"]) == 2
+    err = capsys.readouterr().err
+    assert "formato 99" in err and "Actualiza modelduel" in err
+    assert cut.calls == 0  # no se gasta ninguna llamada
+
+
+def test_resume_avisa_si_el_duelo_es_de_otra_version(cli_args, cut, capsys):
+    args, out = _partial(cli_args, cut)
+    _edit(out, lambda d: d.update(version="0.0.1"))
+    capsys.readouterr()
+    assert main([*args, "--resume"]) == 0
+    assert "se hizo con modelduel 0.0.1" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda d: d["tasks"][0]["results"]["a"][0].pop("status"),
+        lambda d: d.update(timeout_s="20"),
+    ],
+)
+def test_resume_con_un_results_json_manipulado_no_da_traza(cli_args, cut, capsys, mutate):
+    args, out = _partial(cli_args, cut)
+    _edit(out, mutate)
+    capsys.readouterr()
+    code = main([*args, "--resume"])
+    assert code in (0, 2)  # sigue o explica; nunca una traza de Python
+    assert "Traceback" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("raw", ["", '{"schema": 1, "tasks": [', "[]", "null"])
+def test_resume_con_un_results_json_corrupto_explica_y_no_gasta_llamadas(
+    cli_args, cut, capsys, raw
+):
+    args, out = cli_args
+    out.mkdir(parents=True)
+    (out / "results.json").write_text(raw, encoding="utf-8")
+    assert main([*args, "--resume"]) == 2
+    assert "results.json" in capsys.readouterr().err
+    assert cut.calls == 0
+
+
+def test_un_error_del_proveedor_con_sustituto_suelto_no_tumba_el_guardado(make_task, tmp_path):
+    """Un detalle de error con ``\ud800`` (válido en JSON) rompía ``save_results`` a mitad."""
+    task = make_task(ADD_TESTS)
+    boom = ProviderError("fallo \ud800 raro")
+    path = tmp_path / "results.json"
+    results = run_duel(
+        [task], {"a": Provider("fake:a", answer=boom), "b": Provider("fake:b")}, {},
+        on_update=lambda r: save_results(r, path),
+    )  # fmt: skip
+    assert results["status"] == "complete"
+    assert "fallo" in load_results(path)["tasks"][0]["results"]["a"][0]["message"]
+
+
+def test_save_results_no_deja_el_temporal_si_el_json_no_se_puede_escribir(tmp_path):
+    path = tmp_path / "results.json"
+    save_results({"tasks": [], "contenders": {}}, path)
+    with pytest.raises((TypeError, ValueError, UnicodeEncodeError)):
+        save_results({"x": object()}, path)
+    assert not list(tmp_path.glob("*.tmp"))
+    assert json.loads(path.read_text(encoding="utf-8")) == {"tasks": [], "contenders": {}}
+
+
+def test_save_results_usa_os_replace_de_verdad_sobre_un_archivo_existente(tmp_path):
+    """Sin simulaciones: en Windows ``os.replace`` sobre un destino existente debe funcionar."""
+    path = tmp_path / "results.json"
+    for i in range(3):
+        save_results({"tasks": [], "contenders": {}, "n": i}, path)
+    assert json.loads(path.read_text(encoding="utf-8"))["n"] == 2
+    assert [p.name for p in tmp_path.iterdir()] == ["results.json"]

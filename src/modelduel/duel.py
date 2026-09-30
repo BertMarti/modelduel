@@ -118,7 +118,7 @@ def run_attempt(
     try:
         response = provider.complete(prompt, task_id=task.id)
     except Exception as exc:  # noqa: BLE001 - un intento fallido no debe tumbar todo el duelo
-        message = str(exc) if isinstance(exc, ProviderError) else _unexpected(exc)
+        message = clean_text(str(exc) if isinstance(exc, ProviderError) else _unexpected(exc))
         test_run = TestRun(status="provider_error", total=task.expected_tests, message=message)
         attempt = test_run.to_dict()
         attempt.update(
