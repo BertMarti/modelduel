@@ -1,7 +1,7 @@
 # AGENTS.md · modelduel
 
 ## Qué es
-CLI que enfrenta a dos modelos de IA con la misma tarea de programación: les pide el código, ejecuta los tests de la tarea sobre cada respuesta y genera un informe HTML con aciertos, tiempo, tokens y coste estimado. Convierte en herramienta el ejercicio «tu propia comparativa» de la guía de modelos del curso.
+CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma tarea de programación: les pide el código, ejecuta los tests de la tarea sobre cada respuesta y genera un informe HTML con aciertos, tiempo, tokens y coste estimado. Convierte en herramienta el ejercicio «tu propia comparativa» de la guía de modelos del curso.
 
 ## Tecnología (propia de este proyecto)
 - **Python 3.12**, paquete instalable con `pyproject.toml` (backend `hatchling`).
@@ -13,13 +13,14 @@ CLI que enfrenta a dos modelos de IA con la misma tarea de programación: les pi
 - Entorno: `python -m venv .venv` y `pip install -e ".[dev]"`
 - Lint: `ruff check . && ruff format --check .`
 - Tests: `pytest`
-- Demo: `modelduel run examples/tasks --a replay:alfa --b replay:beta --out site/demo`
+- Demo: `modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo`
 
 ## Estructura
 - `src/modelduel/cli.py` punto de entrada.
 - `src/modelduel/providers/` proveedores: `replay` (grabado), `gemini` (API de Google), `openai` (cualquier API compatible con OpenAI: OpenRouter, Ollama…).
 - `src/modelduel/runner.py` extrae el código de la respuesta y ejecuta los tests en un directorio temporal con límite de tiempo.
-- `src/modelduel/report/` informe HTML y JSON.
+- `src/modelduel/report/` informe HTML: duelo de dos (`html.py`, `template.html`) y liga de 3 a 6 (`league.py`, `league.html`); el CSS común está en `style.css`.
+- `src/modelduel/resume.py` reanudación de duelos cortados (`--resume`).
 - `examples/tasks/` tareas de ejemplo originales (enunciado + tests) y `examples/replays/` respuestas grabadas.
 - `site/` web estática del proyecto.
 
@@ -29,7 +30,7 @@ El código generado por un modelo se ejecuta en local: siempre en un directorio 
 ## Diseño: «duelo editorial oscuro»
 Minimalista, oscuro y tipográfico, como un informe de laboratorio.
 - Fondo `#0f0f11`, texto `#e8e8ea`, líneas `#2a2a2f`.
-- **Dos acentos, uno por contendiente:** A lima `#b5e853`, B rosa `#ff7eb6`. Nada más de color.
+- **Un acento por contendiente:** A lima `#b5e853`, B rosa `#ff7eb6`. En una liga (hasta 6) se amplía con C cian `#4fd1e5`, D ámbar `#ffb833`, E violeta `#b79cff` y F coral `#ff8a65`, todos con contraste AA sobre el fondo, y siempre acompañados de su letra. Nada más de color.
 - Titulares en monoespaciada grande; cuerpo en sans del sistema.
 - Gráficas de barras SVG finas, sin bordes ni leyendas recargadas.
 - Legible también al imprimir (hoja de estilos de impresión clara).

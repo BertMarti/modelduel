@@ -32,7 +32,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Generar el informe de demostración
-        run: modelduel run examples/tasks --a replay:alfa --b replay:beta --out site/demo
+        run: modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo
 
       - uses: actions/configure-pages@v5
 

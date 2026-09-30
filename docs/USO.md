@@ -92,10 +92,10 @@ Así tendrás la orden `modelduel`, pero no las tareas y respuestas de ejemplo (
 
 ## Tu primer duelo con la demo
 
-La demo no necesita claves ni cuesta nada: usa respuestas **grabadas y ficticias** de dos «modelos» llamados `alfa` y `beta` (proveedor `replay`). Desde la carpeta `modelduel` con el entorno activado:
+La demo no necesita claves ni cuesta nada: usa respuestas **grabadas y ficticias** de tres «modelos» llamados `alfa`, `beta` y `gamma` (proveedor `replay`): es una liga de tres contendientes. Desde la carpeta `modelduel` con el entorno activado:
 
 ```bash
-modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo
+modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out runs/demo
 ```
 
 (En Windows, la misma orden; las barras de las rutas también funcionan.) Verás algo así:
@@ -104,32 +104,36 @@ modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo
 modelduel 0.1.0 · 3 tareas · 1 ejecución por tarea
   A  replay:alfa
   B  replay:beta
+  C  replay:gamma
   Aviso: el código de los modelos se ejecuta en esta máquina (temporal + límite).
 
   ok  slugify                  A  8/8
   --  slugify                  B  6/8
+  ok  slugify                  C  8/8
   ok  merge_intervals          A  8/8
   ok  merge_intervals          B  8/8
+  --  merge_intervals          C  6/8
   --  parse_duration           A  15/16
   ok  parse_duration           B  16/16
+  ok  parse_duration           C  16/16
 
-                          A replay:alfa   B replay:beta
-  -----------------------------------------------------
-  Tests superados                 31/32           30/32
-  Tareas resueltas                  2/3             2/3
-  Tiempo del modelo              10,1 s          28,1 s
-  Tokens entrada/salida       1.401/703     1.373/2.132
-  Coste estimado             0,0017 USD      0,0248 USD
+  #   Contendiente     Tareas   Tests   Tiempo   Tokens (ent/sal)        Coste
+  ----------------------------------------------------------------------------
+  1   A replay:alfa       2/3   31/32   10,1 s          1.401/703   0,0017 USD
+  2   C replay:gamma      2/3   30/32    3,7 s          1.314/426   0,0003 USD
+  3   B replay:beta       2/3   30/32   28,1 s        1.373/2.132   0,0248 USD
   (precios ficticios de demostración)
 
   Resultados  runs\demo\results.json
   Informe     runs\demo\index.html
 ```
 
-Cada línea `ok` o `--` es un intento: `ok` significa que superó **todos** los tests de la tarea, `--` que falló alguno (el número es «tests superados/tests totales»). Al final tienes el marcador y dos archivos en `runs/demo`:
+Cada línea `ok` o `--` es un intento: `ok` significa que superó **todos** los tests de la tarea, `--` que falló alguno (el número es «tests superados/tests totales»). Al final tienes la clasificación (tareas resueltas, luego tests superados y luego coste) y dos archivos en `runs/demo`:
 
 - `index.html`: el informe. Ábrelo con doble clic en cualquier navegador.
 - `results.json`: todos los datos en bruto.
+
+`gamma` empata con `beta` en tareas y en tests, pero es mucho más barato, así que queda por delante: ese es el desempate por coste. Con `--a` y `--b` sigues teniendo el duelo de dos de siempre (`modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo`).
 
 Otras dos órdenes útiles:
 
@@ -158,7 +162,7 @@ Un contendiente se escribe como `proveedor:modelo`. Hay tres proveedores:
 Antes de empezar, ten en cuenta:
 
 - Las **claves** se leen **solo de variables de entorno**, nunca de archivos. Nunca las escribas dentro del proyecto ni las subas a GitHub.
-- **Cada llamada a una API real puede costar dinero.** El número de llamadas es `tareas × ejecuciones × 2` (una por contendiente). Con las tres tareas de ejemplo y `--runs 3` son 18 llamadas.
+- **Cada llamada a una API real puede costar dinero.** El número de llamadas es `tareas × ejecuciones × contendientes`. Con las tres tareas de ejemplo, dos contendientes y `--runs 3` son 18 llamadas (en una liga de seis, 54).
 - El nombre del `<modelo>` es el que use el proveedor (consulta su documentación). En esta guía se escribe `<modelo>` para que pongas el tuyo.
 - Las variables de entorno solo valen para la terminal donde las defines y desaparecen al cerrarla. Cambia `PEGA_AQUI_TU_CLAVE` por tu clave real.
 - Los dos contendientes `openai:` de una misma orden comparten `OPENAI_BASE_URL` y `OPENAI_API_KEY`. Si quieres comparar dos modelos de OpenRouter, usa `openai:` para los dos; si quieres comparar Gemini con uno de OpenRouter, usa `gemini:` y `openai:`.
@@ -447,7 +451,7 @@ Puedes pasar a `run` la carpeta con todas las tareas (`mis-tareas`) o la carpeta
 
 ## Leer el informe
 
-`index.html` es un único archivo: no necesita conexión, no usa JavaScript y se imprime bien. De arriba abajo:
+`index.html` es un único archivo: no necesita conexión, no usa JavaScript y se imprime bien. Con **dos** contendientes es un duelo enfrentado (lo que describe la lista de abajo); con **tres a seis** es una **liga**: cabecera con quién va primero, una **clasificación** (tareas resueltas, después tests superados y después coste, menos es mejor; los empates comparten posición), una comparativa con una barra fina por contendiente y métrica, una **matriz por tarea** (tests superados y si la tarea quedó resuelta) y el mismo desplegable de código y salida. Cada contendiente lleva una letra (`A` a `F`) junto a su color: la letra es la pista principal y el color, un refuerzo. En el duelo de dos, de arriba abajo:
 
 1. **Cabecera:** los nombres de los contendientes, el número de tareas, de ejecuciones por tarea y el límite de tiempo.
 2. **Marcador:** los tests superados por cada uno (`A` en lima, `B` en rosa) y quién gana y por cuánto (o «empate»).
@@ -480,10 +484,11 @@ Un «error del proveedor» no detiene el duelo: se anota y se sigue con el resto
 
 ## Opciones: `--runs`, `--timeout`, `--resume` y `--prices`
 
-Además de `--a`, `--b` y `--out` (obligatorias), la orden `run` acepta estas opciones:
+La orden `run` necesita `--out` y al menos dos contendientes (`--a` y `--b`, o `--model` varias veces); acepta además estas opciones:
 
 | Opción | Qué hace |
 |---|---|
+| `--model SPEC`, `-m SPEC` | Contendiente `proveedor:modelo`; repítelo para una liga de 2 a 6 (además de, o en lugar de, `--a` y `--b`). |
 | `--runs N` | Ejecuciones por tarea (1 por defecto). |
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
 | `--resume` | Continúa el duelo de `--out` saltando los intentos ya terminados. |
@@ -497,7 +502,7 @@ Los modelos no responden siempre lo mismo. `--runs 3` pide **tres respuestas** p
 
 - «Tests superados», tiempo, tokens y coste son **la suma** de todas las ejecuciones.
 - Una tarea cuenta como «resuelta» solo si **todas** las ejecuciones superan todos los tests.
-- Las llamadas son `tareas × runs × 2`, así que el coste crece en la misma proporción.
+- Las llamadas son `tareas × runs × contendientes`, así que el coste crece en la misma proporción.
 
 Debe ser 1 o más; con `--runs 0` la orden termina con un error.
 

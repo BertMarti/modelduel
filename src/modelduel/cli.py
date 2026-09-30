@@ -15,7 +15,16 @@ from modelduel.providers import ProviderError, get_provider
 from modelduel.providers.base import DEFAULT_RETRIES
 from modelduel.report import write_report
 from modelduel.report.html import fmt_cost, fmt_int, fmt_seconds, plural
-from modelduel.results import ResultsError, load_results, save_results, summarize
+from modelduel.results import (
+    ALL_SIDES,
+    MAX_CONTENDERS,
+    MIN_CONTENDERS,
+    ResultsError,
+    load_results,
+    rank_sides,
+    save_results,
+    summarize,
+)
 from modelduel.resume import ResumeError, plan_resume
 from modelduel.runner import DEFAULT_TIMEOUT, RunnerError, ensure_pytest_available
 from modelduel.tasks import TaskError, discover_tasks, is_task_dir
@@ -93,10 +102,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True, metavar="orden")
 
-    run = sub.add_parser("run", help="enfrenta a dos modelos y genera el informe")
+    run = sub.add_parser("run", help="enfrenta de 2 a 6 modelos y genera el informe")
     run.add_argument("tasks", type=Path, help="carpeta de tareas o carpeta de una tarea")
-    run.add_argument("--a", required=True, metavar="PROVEEDOR:MODELO", help="contendiente A")
-    run.add_argument("--b", required=True, metavar="PROVEEDOR:MODELO", help="contendiente B")
+    run.add_argument("--a", metavar="PROVEEDOR:MODELO", help="contendiente A")
+    run.add_argument("--b", metavar="PROVEEDOR:MODELO", help="contendiente B")
+    run.add_argument(
+        "--model",
+        "-m",
+        action="append",
+        default=[],
+        metavar="PROVEEDOR:MODELO",
+        help=f"contendiente de una liga; repítelo ({MIN_CONTENDERS} a {MAX_CONTENDERS} en total, "
+        "contando --a y --b)",
+    )
     run.add_argument("--runs", type=int, default=1, metavar="N", help="ejecuciones por tarea (1)")
     run.add_argument(
         "--timeout",
@@ -154,6 +172,32 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_INTERRUPTED
 
 
+def collect_specs(args: argparse.Namespace) -> list[str]:
+    """Contendientes en orden: ``--a``, ``--b`` y después cada ``--model``."""
+    if args.b and not args.a:
+        raise TaskError("--b necesita también --a (o usa --model para cada contendiente).")
+    specs = [spec for spec in (args.a, args.b) if spec] + list(args.model)
+    if len(specs) < MIN_CONTENDERS:
+        raise TaskError(
+            f"hacen falta al menos {MIN_CONTENDERS} contendientes: usa --a y --b, "
+            "o --model varias veces."
+        )
+    if len(specs) > MAX_CONTENDERS:
+        raise TaskError(f"como máximo {MAX_CONTENDERS} contendientes (has puesto {len(specs)}).")
+    return specs
+
+
+def _reject_duplicates(providers: dict) -> None:
+    seen: dict[str, str] = {}
+    for side, provider in providers.items():
+        if provider.spec in seen:
+            raise TaskError(
+                f"«{provider.spec}» aparece dos veces ({seen[provider.spec].upper()} y "
+                f"{side.upper()}). Para repetir un mismo modelo usa --runs."
+            )
+        seen[provider.spec] = side
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     if args.runs < 1:
         raise TaskError("--runs debe ser 1 o más.")
@@ -161,6 +205,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         raise TaskError("--timeout debe ser un número de segundos mayor que 0.")
     if args.retries < 0:
         raise TaskError("--retries debe ser 0 o más.")
+    specs = collect_specs(args)
     tasks = discover_tasks(args.tasks)
     prices = load_prices(args.prices)
     # examples/tasks[/<tarea>] -> examples/replays
@@ -176,8 +221,9 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     providers = {
         side: get_provider(spec, replay_dirs, retries=args.retries, on_retry=on_retry)
-        for side, spec in (("a", args.a), ("b", args.b))
+        for side, spec in zip(ALL_SIDES, specs, strict=False)
     }
+    _reject_duplicates(providers)
     ensure_pytest_available()
     # Antes de gastar llamadas a las APIs: la carpeta de salida tiene que poder crearse.
     _prepare_out(args.out)
@@ -325,36 +371,35 @@ def cmd_list_tasks(args: argparse.Namespace) -> int:
 
 
 def scoreboard(results: dict) -> str:
-    s = results["summary"]
-    a, b = s["a"], s["b"]
-    specs = (results["contenders"]["a"]["spec"], results["contenders"]["b"]["spec"])
-    rows = [
-        ("", f"A {specs[0]}", f"B {specs[1]}"),
-        (
-            "Tests superados",
-            f"{a['tests_passed']}/{a['tests_total']}",
-            f"{b['tests_passed']}/{b['tests_total']}",
-        ),
-        (
-            "Tareas resueltas",
-            f"{a['tasks_solved']}/{a['tasks_total']}",
-            f"{b['tasks_solved']}/{b['tasks_total']}",
-        ),
-        ("Tiempo del modelo", fmt_seconds(a["latency_s"]), fmt_seconds(b["latency_s"])),
-        (
-            "Tokens entrada/salida",
-            f"{fmt_int(a['input_tokens'])}/{fmt_int(a['output_tokens'])}",
-            f"{fmt_int(b['input_tokens'])}/{fmt_int(b['output_tokens'])}",
-        ),
-        ("Coste estimado", fmt_cost(a["cost"], a["currency"]), fmt_cost(b["cost"], b["currency"])),
+    """Clasificación en texto: una fila por contendiente, de mejor a peor."""
+    summary = results["summary"]
+    header = ("#", "Contendiente", "Tareas", "Tests", "Tiempo", "Tokens (ent/sal)", "Coste")
+    rows = [header]
+    for rank, side in rank_sides(summary):
+        data = summary[side]
+        rows.append(
+            (
+                str(rank),
+                f"{side.upper()} {results['contenders'][side]['spec']}",
+                f"{data['tasks_solved']}/{data['tasks_total']}",
+                f"{data['tests_passed']}/{data['tests_total']}",
+                fmt_seconds(data["latency_s"]),
+                f"{fmt_int(data['input_tokens'])}/{fmt_int(data['output_tokens'])}",
+                fmt_cost(data["cost"], data["currency"]),
+            )
+        )
+    widths = [max(len(row[col]) for row in rows) for col in range(len(header))]
+    left = {1}  # solo «Contendiente» va alineada a la izquierda
+    lines = [
+        "  "
+        + "   ".join(
+            f"{cell:<{widths[col]}}" if col in left else f"{cell:>{widths[col]}}"
+            for col, cell in enumerate(row)
+        )
+        for row in rows
     ]
-    w0 = max(len(r[0]) for r in rows)
-    w1 = max(len(r[1]) for r in rows)
-    w2 = max(len(r[2]) for r in rows)
-    lines = [f"  {r[0]:<{w0}}   {r[1]:>{w1}}   {r[2]:>{w2}}" for r in rows]
-    rule = "  " + "-" * (w0 + w1 + w2 + 6)
-    lines.insert(1, rule)
-    if a["fictitious_price"] or b["fictitious_price"]:
+    lines.insert(1, "  " + "-" * (sum(widths) + 3 * (len(widths) - 1)))
+    if any(data["fictitious_price"] for data in summary.values()):
         lines.append("  (precios ficticios de demostración)")
     return "\n".join(lines)
 

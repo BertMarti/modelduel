@@ -26,7 +26,7 @@ def test_sin_precio_o_sin_tokens_es_sin_datos():
 
 def test_precios_de_replay_son_ficticios():
     assert all(price.fictitious for price in BUILTIN_PRICES.values())
-    assert set(BUILTIN_PRICES) == {"replay:alfa", "replay:beta"}
+    assert set(BUILTIN_PRICES) == {"replay:alfa", "replay:beta", "replay:gamma"}
 
 
 def test_load_prices_amplia_la_tabla(tmp_path):

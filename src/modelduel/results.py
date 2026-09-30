@@ -8,18 +8,26 @@ import time
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-SIDES = ("a", "b")
+# Un contendiente por letra, en el orden en que se dan en la línea de órdenes.
+ALL_SIDES = ("a", "b", "c", "d", "e", "f")
+MIN_CONTENDERS = 2
+MAX_CONTENDERS = len(ALL_SIDES)
 
 
 class ResultsError(Exception):
     """``results.json`` ilegible o con formato inesperado."""
 
 
+def sides_of(results: dict) -> list[str]:
+    """Letras de los contendientes de un ``results.json`` (``a`` y ``b`` en los de v0.1.0)."""
+    return [side for side in ALL_SIDES if side in results.get("contenders", {})]
+
+
 def summarize(results: dict) -> dict[str, dict]:
     """Totales por contendiente a partir de los intentos registrados."""
     summary: dict[str, dict] = {}
     tasks = results.get("tasks", [])
-    for side in SIDES:
+    for side in sides_of(results):
         attempts = [a for task in tasks for a in task["results"].get(side, [])]
         runs = results.get("runs", 1)
         solved_tasks = sum(
@@ -49,6 +57,30 @@ def summarize(results: dict) -> dict[str, dict]:
             "fictitious_price": bool(price and price.get("fictitious")),
         }
     return summary
+
+
+def rank_sides(summary: dict[str, dict]) -> list[tuple[int, str]]:
+    """Clasificación ``[(posición, contendiente)]``, de mejor a peor.
+
+    Criterios, por este orden: tareas resueltas, tests superados y coste (menos es mejor). El
+    coste solo cuenta si todos tienen precio y en la misma moneda. Los empates completos
+    comparten posición y conservan el orden de la línea de órdenes.
+    """
+    sides = list(summary)
+    use_cost = all(summary[s]["cost"] is not None for s in sides) and (
+        len({summary[s]["currency"] for s in sides}) == 1
+    )
+
+    def key(side: str) -> tuple:
+        data = summary[side]
+        return (-data["tasks_solved"], -data["tests_passed"], data["cost"] if use_cost else 0.0)
+
+    ordered = sorted(sides, key=key)
+    ranking: list[tuple[int, str]] = []
+    for index, side in enumerate(ordered):
+        tied = index > 0 and key(side) == key(ordered[index - 1])
+        ranking.append((ranking[-1][0] if tied else index + 1, side))
+    return ranking
 
 
 def _sum_known(values: list[int | None]) -> int | None:

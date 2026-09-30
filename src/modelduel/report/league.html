@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="modelduel $version">
+<title>$page_title</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230f0f11'/%3E%3Crect x='2' y='4' width='5' height='8' fill='%23b5e853'/%3E%3Crect x='9' y='4' width='5' height='8' fill='%23ff7eb6'/%3E%3C/svg%3E">
+<style>
+$css</style>
+</head>
+<body>
+<div class="wrap league">
+<header>
+  <div class="eyebrow"><span>modelduel</span><span>Informe de liga</span><span>$date_human</span><span>v$version</span></div>
+  <h1>$title</h1>
+  <p class="lede">$lede</p>
+</header>
+
+<main>
+<p class="podium">$podium</p>
+
+<h2>Clasificación</h2>
+<div class="table-wrap">
+<table class="ranking">
+  <caption>$ranking_caption</caption>
+  <thead>
+    <tr><th scope="col" class="lft">Pos.</th><th scope="col" class="lft">Contendiente</th><th scope="col">Tareas</th><th scope="col">Tests</th><th scope="col">Tiempo</th><th scope="col">Tokens ent. / sal.</th><th scope="col">Coste</th></tr>
+  </thead>
+  <tbody>
+$ranking_rows
+  </tbody>
+</table>
+</div>
+
+<h2>Comparativa</h2>
+<section class="metrics" aria-label="Métricas por contendiente">
+$metrics
+</section>
+
+<aside class="warn" role="note">
+  $warning
+</aside>
+
+<h2>Matriz por tarea</h2>
+<div class="table-wrap">
+<table class="matrix">
+  <caption>$matrix_caption</caption>
+$matrix
+</table>
+</div>
+
+<h2>Código y salida de los tests</h2>
+$details
+</main>
+
+<footer>
+  <span>Generado por modelduel $version · $date_iso</span>
+  <span>$price_note</span>
+  <span><a href="https://github.com/BertMarti/modelduel">github.com/BertMarti/modelduel</a></span>
+</footer>
+</div>
+</body>
+</html>

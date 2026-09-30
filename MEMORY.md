@@ -1,11 +1,11 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por builder (v0.2.0 · #5)
+Última actualización: 2026-09-30 por builder (v0.2.0 · #6)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
 - #4 reintentos ante 429/5xx (rama `agent/builder/4-reintentos`): HECHO, en PR.
 - #5 guardado incremental y `--resume` (rama `agent/builder/5-guardado-incremental`, parte de la de #4): HECHO, en PR.
-- #6 liga de 2 a 6 contendientes: pendiente.
+- #6 liga de 2 a 6 contendientes (rama `agent/builder/6-liga`, parte de la de #5): HECHO, en PR.
 - #7 publicación en PyPI: pendiente.
 
 Base heredada de v0.1.0:
@@ -14,6 +14,9 @@ Base heredada de v0.1.0:
 - Reintentos (#4): `post_json` reintenta HTTP 429/500/502/503/504 y cortes de conexión (`--retries N`, 3 por defecto, `0` los desactiva) con espera exponencial (1 s × 2^n, tope 30 s) y jitter (50-100 %), respetando `Retry-After` (segundos o fecha; si pide más de 120 s no se espera). Cada reintento se avisa en consola (`~~  openai:modelo: reintento 1/3 en 1.2 s: HTTP 429 ...`).
 - Guardado incremental (#5): `run_duel` llama a `on_update` tras cada intento y la CLI reescribe `results.json` de forma atómica (`.tmp` + `os.replace`, con reintentos por si Windows lo tiene abierto). `results.json` lleva `status` (`in_progress`/`complete`), `updated_at` y una huella (`fingerprint`) por tarea. Ctrl+C escribe además un informe parcial con el aviso «Duelo incompleto».
 - `--resume` (`src/modelduel/resume.py`): reutiliza los intentos terminados de tareas sin cambios y repite los `provider_error`; contendientes distintos = error (exit 2); tarea cambiada, otro `--timeout` u otro `--runs` = aviso. Sin `--resume` no se sobrescribe un duelo incompleto (sí uno completo o ilegible, como en v0.1.0).
+- Liga (#6): `--model/-m SPEC` repetible (2 a 6 en total, contando `--a`/`--b`, que van primero); cada contendiente recibe una letra `a`-`f` (`results.ALL_SIDES`) y `results.json` sigue con la misma estructura (`contenders`/`results` por letra), así que los de v0.1.0 se leen igual. `rank_sides` clasifica por tareas resueltas, tests y coste (el coste solo si todos tienen precio en la misma moneda); los empates comparten posición. Nombres repetidos = error.
+- Informe (#6): con 2 contendientes, el duelo enfrentado de siempre (`report/html.py`, `template.html`); con 3-6, la liga (`report/league.py`, `league.html`): clasificación, comparativa con barras finas, matriz por tarea y detalle en rejilla. El CSS vive en `report/style.css` y se incrusta en ambas plantillas. Paleta AA: A lima `#b5e853`, B rosa `#ff7eb6`, C cian `#4fd1e5`, D ámbar `#ffb833`, E violeta `#b79cff`, F coral `#ff8a65` (en impresión `#4d7c0f #be185d #0e7490 #a15c00 #6d3fd6 #c2410c`).
+- Demo (#6): CI, deploy y AGENTS.md generan `site/demo` con una liga de tres (`replay:alfa`, `replay:beta` y el nuevo `replay:gamma`, con precio ficticio); el CI comprueba además que `--a/--b` sigue dando un «Informe de duelo».
 - Runner: extrae el bloque de código, ejecuta pytest en un directorio temporal con límite de tiempo y lee el XML JUnit. Mata el árbol de procesos al terminar, acota la salida y distingue `ok`, `no_code`, `import_error`, `timeout`, `error` y `provider_error`.
 - Costes con tabla ampliable (`--prices`); solo hay precios ficticios integrados para `replay:alfa` y `replay:beta`.
 - Informe HTML «duelo editorial oscuro» (`string.Template`, CSS en línea, SVG con `<title>` y `aria-label`, sin JavaScript, hoja de impresión). Con `--runs` > 1 muestra «Intentos resueltos» y «suma de N ejecuciones».
@@ -56,11 +59,15 @@ Base heredada de v0.1.0:
 - 2026-09-30 (builder): #5 `--resume` NO mezcla contendientes distintos (error) pero sí tolera cambios de timeout/runs/tareas con aviso; los `provider_error` se repiten porque el motivo de reanudar suele ser precisamente un fallo del proveedor. El coste de los intentos reutilizados se recalcula con la tabla de precios actual.
 - 2026-09-30 (builder): #5 `tasks_solved` exige tantos intentos como `runs` para contar una tarea como resuelta: en un `results.json` parcial no cuenta como resuelta una tarea con ejecuciones sin hacer.
 - 2026-09-30 (builder): #5 si falla el guardado intermedio (disco lleno) el duelo continúa con un único aviso; el guardado final sí es un error (exit 1).
+- 2026-09-30 (builder): #6 el color nunca es la única pista: cada contendiente lleva su letra (etiqueta `A`-`F`) en clasificación, comparativa, matriz y detalle. Seis acentos sobre un fondo oscuro son distinguibles pero no infinitos; las letras compensan a `D` (ámbar) y `F` (coral) frente a `B` (rosa).
+- 2026-09-30 (builder): #6 la matriz por tarea muestra tests superados y un estado escrito («resuelta», «no resuelta», «sin hacer»…) para no depender del color; en móvil tiene desplazamiento horizontal propio (`.table-wrap`), sin desbordar la página.
+- 2026-09-30 (builder): #6 el resumen de consola pasa a ser una tabla de clasificación (una fila por contendiente) también con dos; cambia el formato impreso respecto a v0.1.0, no el contrato de la CLI ni los códigos de salida.
+- 2026-09-30 (builder): #6 `replay:gamma` (respuestas originales y ficticias, precio ficticio 0,10/0,40 USD): resuelve `slugify` y `parse_duration` y falla 2 tests de `merge_intervals`. Empata con `beta` en tareas y tests y queda por delante por coste, lo que enseña el desempate.
 
 ## Siguiente paso
 1. Alberto: fusionar los PR de v0.2.0 en orden (#4, #5, #6, #7) con «Create a merge commit».
 2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
-3. builder: continuar con #6 (liga de 2 a 6 contendientes).
+3. builder: continuar con #7 (publicación en PyPI).
 
 ## Problemas conocidos
 - El aislamiento es solo un directorio temporal + subproceso con límite + entorno sin secretos + muerte del árbol de procesos: el código del modelo puede leer y escribir en el resto del disco. Está advertido en README y web; lo ideal es usar un contenedor o VM.
@@ -76,3 +83,4 @@ Base heredada de v0.1.0:
 - 2026-09-30 docs · Claude Code Sonnet (agent/docs): `docs/USO.md` (guía completa en español, comprobada contra el código y ejecutando la demo y un ejemplo de tarea nuevo con respuestas grabadas), `CONTRIBUTING.md`, enlaces desde README y web, y fila docs de `AGENTS.md` actualizada.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/4-reintentos): #4 reintentos con espera exponencial y jitter ante 429/5xx y cortes de conexión, `--retries`, avisos en consola, tests sin red ni esperas; AGENTS.md con el flujo por issues de v0.2.0.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/5-guardado-incremental): #5 guardado incremental atómico de `results.json`, `--resume`, informe parcial al cortar con Ctrl+C y tests de corte y reanudación.
+- 2026-09-30 builder · Claude Code Sonnet (agent/builder/6-liga): #6 liga de 2 a 6 contendientes con `--model`, clasificación e informe de liga (paleta AA ampliada), demo de tres en CI y web, tercer contendiente `replay:gamma`.
