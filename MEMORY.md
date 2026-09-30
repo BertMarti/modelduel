@@ -1,5 +1,5 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por qa (v0.2.0 · #8)
+Última actualización: 2026-09-30 por docs (v0.2.0 · #9)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
@@ -9,6 +9,8 @@ v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** e
 - #7 publicación en PyPI (rama `agent/builder/7-pypi`, parte de la de #6): HECHO, en PR. La publicación real la dispara Alberto tras registrar el «trusted publisher» (ver PR y `CONTRIBUTING.md`).
 
 - #8 revisión QA de v0.2.0 (rama `agent/qa/8-revision-v0.2`, parte de la de #7, PR #14): HECHA, en PR. Se fusiona después de #13.
+- #9 documentación de v0.2.0 (rama `agent/docs/9-documentacion-v0.2`, parte de la de #8, PR #16): HECHA, en PR. Se fusiona después de #14. Trae `CHANGELOG.md` (v0.1.0 y v0.2.0, Keep a Changelog), `docs/USO.md` al día (PyPI, `demo`, `--retries`, `--resume`, liga, límites), README, web, `CONTRIBUTING.md` (publicar una versión y añadir un color a la paleta) y este archivo.
+- #15 (unificar el veredicto del duelo de dos con la clasificación) queda para v0.3.0; está documentado como limitación conocida.
 
 Base heredada de v0.1.0:
 - CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
@@ -27,7 +29,7 @@ Base heredada de v0.1.0:
 - Tres tareas originales (`slugify`, `merge_intervals`, `parse_duration`) y respuestas grabadas de `alfa` y `beta`.
 - Web estática en `site/index.html`; la demo `site/demo/` se genera en el CI (está en `.gitignore`).
 - Tests pytest sin red (cobertura > 90 % exigida en el CI Ubuntu y Windows); despliegue a Pages en `deploy.yml`.
-- Documentación: `docs/USO.md`, `CONTRIBUTING.md`.
+- Documentación: `docs/USO.md`, `CONTRIBUTING.md`, `CHANGELOG.md` (en español, formato Keep a Changelog).
 
 ## Decisiones (por qué)
 - 2026-09-29: Proveedor `replay` con respuestas grabadas para que la demo y los tests funcionen sin claves ni coste.
@@ -76,15 +78,19 @@ Base heredada de v0.1.0:
 - 2026-09-30 (qa): #8 los mensajes de error del proveedor se limpian de sustitutos UTF-16 sueltos al crear el intento (uno en el JSON de error del servidor rompía `save_results` con `UnicodeEncodeError`, que `on_update` no captura).
 - 2026-09-30 (qa): #8 en móvil (<= 720 px) cada fila de la comparativa de la liga pasa a nombre, valor y barra en filas (con 6 nombres largos la barra medía 0 px); `.table-wrap` es una región enfocable (`tabindex="0"`, `role="region"`, `aria-label`) con anillo de foco, para poder desplazar las tablas con el teclado.
 - 2026-09-30 (qa): #8 `release.yml` comprueba que el commit de la Release está en `main` (`merge-base --is-ancestor`) y no guarda credenciales de git en el checkout; los permisos ya eran mínimos (`contents: read`; `id-token: write` solo al publicar) y no hay tokens.
+- 2026-09-30 (docs): la fecha de v0.1.0 y v0.2.0 en `CHANGELOG.md` es 2026-09-30 (la indicada por el lead). Los enlaces de comparación apuntan a las etiquetas `v0.1.0` y `v0.2.0`, que aún no existen: funcionarán cuando Alberto cree las releases.
+- 2026-09-30 (docs): la documentación dice que `pip install modelduel` funciona cuando se cree la release `v0.2.0` (hasta entonces, instalar desde GitHub). Cuando se publique, conviene retirar esos avisos de README, `docs/USO.md` y la web.
+- 2026-09-30 (docs): la web no enlaza a PyPI (su test solo admite enlaces a `github.com/BertMarti/modelduel`); el badge o enlace de PyPI se añadirá tras publicar, ampliando antes ese test.
+- 2026-09-30 (docs): «Cómo se ha hecho» (README y web): v0.1.0 con lead, builder y qa en Claude Opus y docs en Sonnet; toda la v0.2.0 en Sonnet; OpenCode previsto pero sin poder ejecutarse en modo autónomo; Alberto supervisa y fusiona.
 
 ## Siguiente paso
-1. Alberto: fusionar los PR de v0.2.0 en orden (#10, #11, #12, #13 y por último el #14 de QA) con «Create a merge commit».
+1. Alberto: fusionar los PR de v0.2.0 en orden (#10, #11, #12, #13, #14 de QA y por último el #16 de documentación) con «Create a merge commit».
    - Para publicar en PyPI: registrar el *trusted publisher* (PyPI > Your projects > Publishing > "Add a new pending publisher": proyecto `modelduel`, propietario `BertMarti`, repositorio `modelduel`, workflow `release.yml`, environment `pypi`), crear el environment `pypi` en GitHub (Settings > Environments) y crear la Release `v0.2.0`.
 2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
-3. Tras fusionar y publicar: comprobar `pip install "modelduel[pytest]"` y `modelduel demo` desde un entorno limpio, y actualizar enlaces (README/web) con el badge de PyPI si se desea.
+3. Tras fusionar y publicar: quitar de README, `docs/USO.md` y la web el aviso «se publica al crear la release», comprobar `pip install "modelduel[pytest]"` y `modelduel demo` desde un entorno limpio, y actualizar enlaces (README/web) con el badge de PyPI si se desea.
 
 ## Problemas conocidos
-- El veredicto del duelo de dos (`gana A por N`) cuenta tests superados, pero la clasificación de la consola y de la liga ordena primero por tareas resueltas: con pocas tareas pueden discrepar (decisión pendiente del lead: unificar criterio).
+- El veredicto del duelo de dos (`gana A por N`) cuenta tests superados, pero la clasificación de la consola y de la liga ordena primero por tareas resueltas: con pocas tareas pueden discrepar. Issue #15 (v0.3.0): unificar el criterio con una única función de ordenación. Documentado en `docs/USO.md`, README y `CHANGELOG.md`.
 - Sin `--resume`, un `results.json` ilegible o de un formato más nuevo se sobrescribe sin aviso (comportamiento de v0.1.0); solo se protege un duelo `in_progress` legible.
 - El sdist incluye `tests/`, pero esos tests necesitan `.github/` y `site/` (no van en el sdist), así que no se pueden ejecutar desde él.
 - Un Retry-After entre 30 y 120 s se respeta entero en cada reintento: con `--retries 3` un proveedor saturado puede costar hasta 6 min por intento.
@@ -104,3 +110,4 @@ Base heredada de v0.1.0:
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/6-liga): #6 liga de 2 a 6 contendientes con `--model`, clasificación e informe de liga (paleta AA ampliada), demo de tres en CI y web, tercer contendiente `replay:gamma`.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/7-pypi): #7 paquete listo para PyPI (v0.2.0, metadatos, ejemplos dentro de la wheel, `modelduel demo`), `release.yml` con Trusted Publishing, job `package` en el CI y guía de publicación.
 - 2026-09-30 qa · Claude Code Sonnet (agent/qa/8-revision-v0.2): #8 revisión de v0.2.0: Retry-After absurdo y desbordes, tests sin esperas reales, `--resume` ante formatos nuevos/dañados, sustitutos UTF-16 en errores, liga legible en móvil, tablas con teclado, contraste AA de toda la paleta, escapado con 2/3/6 y `release.yml` solo desde `main`. 222 → 258 tests.
+- 2026-09-30 docs · Claude Code Sonnet (agent/docs/9-documentacion-v0.2): #9 `CHANGELOG.md` (v0.1.0 y v0.2.0), guía de uso con PyPI, `demo`, `--retries`, `--resume` (avisos y errores comprobados ejecutando la herramienta con `replay`), liga y límites conocidos, README, web, `CONTRIBUTING.md` (publicar una versión, añadir un color a la paleta) y `MEMORY.md`.
