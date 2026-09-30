@@ -8,3 +8,6 @@ build/
 *.egg-info/
 .env
 runs/
+
+# Demo generada en el CI
+site/demo/

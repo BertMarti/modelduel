@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>modelduel · dos modelos, una tarea, los mismos tests</title>
+<meta name="description" content="CLI que enfrenta a dos modelos de IA con la misma tarea de programación, ejecuta los tests y genera un informe HTML con aciertos, tiempo, tokens y coste.">
+<style>
+:root {
+  --bg: #0f0f11; --panel: #151518; --text: #e8e8ea; --muted: #8d8d96; --line: #2a2a2f;
+  --a: #b5e853; --b: #ff7eb6;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); color: var(--text); }
+body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+a { color: inherit; text-decoration-color: var(--muted); text-underline-offset: 3px; }
+a:hover { text-decoration-color: currentColor; }
+a:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.a { color: var(--a); } .b { color: var(--b); } .muted { color: var(--muted); }
+nav { display: flex; justify-content: space-between; align-items: center; padding: 26px 0; border-bottom: 1px solid var(--line); font: 13px var(--mono); }
+nav .links { display: flex; gap: 22px; flex-wrap: wrap; }
+nav .links a { text-decoration: none; color: var(--muted); }
+nav .links a:hover { color: var(--text); }
+.brand { font-weight: 700; letter-spacing: -.02em; }
+.hero { padding: 88px 0 64px; }
+.eyebrow { font: 12px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 clamp(44px, 9vw, 96px)/.98 var(--mono); letter-spacing: -.05em; margin: 20px 0 26px; }
+h1 .vs { color: var(--muted); font-weight: 400; font-size: .42em; letter-spacing: 0; vertical-align: .45em; padding: 0 .2em; }
+.lede { font-size: 20px; max-width: 640px; margin: 0 0 34px; color: var(--text); }
+.lede em { font-style: normal; color: var(--muted); }
+.duel-bars { display: grid; gap: 10px; max-width: 520px; margin: 0 0 40px; }
+.duel-bars div { display: grid; grid-template-columns: 1fr 58px; gap: 14px; align-items: center; font: 12px var(--mono); }
+.duel-bars svg { width: 100%; height: 6px; display: block; }
+.duel-bars span { text-align: right; }
+.cta { display: flex; gap: 14px; flex-wrap: wrap; }
+.btn { font: 600 14px var(--mono); padding: 13px 20px; border: 1px solid var(--line); text-decoration: none; display: inline-block; }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.primary:hover { background: var(--a); border-color: var(--a); }
+.btn:not(.primary):hover { border-color: var(--text); }
+section { padding: 56px 0; border-top: 1px solid var(--line); }
+h2 { font: 600 13px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 22px; }
+h3 { font: 600 17px/1.4 var(--mono); margin: 0 0 8px; }
+p { margin: 0 0 16px; }
+pre { margin: 0 0 20px; padding: 16px 18px; background: var(--panel); border: 1px solid var(--line); font: 13.5px/1.6 var(--mono); overflow-x: auto; }
+code { font-family: var(--mono); font-size: .9em; }
+p code, li code, td code { background: var(--panel); border: 1px solid var(--line); padding: 1px 5px; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; counter-reset: s; }
+.steps div { border-top: 2px solid var(--line); padding-top: 16px; }
+.steps div::before { counter-increment: s; content: "0" counter(s); font: 12px var(--mono); color: var(--muted); display: block; margin-bottom: 8px; }
+.steps div:nth-child(1) { border-color: var(--a); }
+.steps div:nth-child(3) { border-color: var(--b); }
+.steps p { color: var(--muted); font-size: 15px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+td:first-child { font-family: var(--mono); white-space: nowrap; }
+.table-wrap { overflow-x: auto; }
+.warning { border: 1px solid var(--line); border-left: 3px solid var(--b); background: var(--panel); padding: 22px 24px; }
+.warning h2 { color: var(--b); margin-bottom: 12px; }
+.warning p:last-child { margin: 0; }
+.formula { font: 15px/1.6 var(--mono); padding: 18px; border: 1px solid var(--line); margin-bottom: 16px; }
+.tree { color: var(--muted); }
+footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8 var(--mono); color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 24px; }
+@media (max-width: 720px) {
+  .wrap { padding: 0 16px; }
+  .hero { padding: 56px 0 44px; }
+  .steps { grid-template-columns: 1fr; }
+  nav .links { gap: 14px; }
+  .lede { font-size: 18px; }
+}
+@media print {
+  :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; }
+  html, body { background: #fff; color: #111; }
+  nav .links, .cta { display: none; }
+  .duel-bars svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav aria-label="Principal">
+  <span class="brand">modelduel</span>
+  <span class="links">
+    <a href="#instalar">Instalar</a>
+    <a href="#tareas">Tareas</a>
+    <a href="#proveedores">Proveedores</a>
+    <a href="demo/">Demo</a>
+    <a href="https://github.com/BertMarti/modelduel">GitHub</a>
+  </span>
+</nav>
+
+<header class="hero">
+  <div class="eyebrow">CLI · Python 3.12 · sin dependencias</div>
+  <h1><span class="a">modelo</span><span class="vs">vs</span><span class="b">modelo</span></h1>
+  <p class="lede">Dos modelos, una tarea, los mismos tests. <strong>modelduel</strong> pide el código a dos modelos de IA, ejecuta tus tests sobre cada respuesta y te da un informe con quién acierta, cuánto tarda y cuánto cuesta. <em>Tu propia comparativa, sin fiarte de rankings ajenos.</em></p>
+  <div class="duel-bars" aria-hidden="true">
+    <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="97" height="6" fill="#b5e853"/></svg><span class="a">31/32</span></div>
+    <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="94" height="6" fill="#ff7eb6"/></svg><span class="b">30/32</span></div>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="demo/">Ver el informe de demostración</a>
+    <a class="btn" href="https://github.com/BertMarti/modelduel">Código en GitHub</a>
+  </div>
+</header>
+
+<main>
+<section aria-labelledby="que">
+  <h2 id="que">Qué hace</h2>
+  <div class="steps">
+    <div><h3>Pregunta</h3><p>Envía el mismo enunciado a los dos modelos y les pide un único bloque de código Python.</p></div>
+    <div><h3>Ejecuta</h3><p>Guarda cada respuesta como <code>solution.py</code> en un directorio temporal y pasa los tests de la tarea con pytest y un límite de tiempo.</p></div>
+    <div><h3>Compara</h3><p>Genera <code>results.json</code> y un informe HTML con marcador, tiempos, tokens, coste estimado y el código de cada modelo.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="instalar">
+  <h2 id="instalar">Instalación y uso</h2>
+  <p>Necesitas Python 3.12 o superior. modelduel no tiene dependencias; pytest hace falta para ejecutar los tests de las tareas.</p>
+  <pre><code>pip install git+https://github.com/BertMarti/modelduel pytest
+
+# Demo sin claves, con respuestas grabadas
+git clone https://github.com/BertMarti/modelduel
+cd modelduel
+modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo
+
+# Dos modelos reales
+modelduel run examples/tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo
+
+# Otras órdenes
+modelduel list-tasks examples/tasks
+modelduel report runs/duelo/results.json --out runs/duelo</code></pre>
+</section>
+
+<section aria-labelledby="tareas">
+  <h2 id="tareas">Crear una tarea</h2>
+  <p>Una tarea es una carpeta con tres archivos. El enunciado debe pedir una función concreta con nombre y firma; los tests la importan de <code>solution</code>.</p>
+  <pre class="tree"><code>mis-tareas/
+└── invertir_palabras/
+    ├── task.md        # enunciado para el modelo
+    ├── test_task.py   # tests pytest: from solution import invertir_palabras
+    └── meta.toml      # opcional: title, difficulty, order</code></pre>
+  <pre><code># test_task.py
+from solution import invertir_palabras
+
+
+def test_basico():
+    assert invertir_palabras("hola mundo") == "mundo hola"</code></pre>
+  <p>Consejo: incluye casos límite. Son los que separan a un modelo que entiende el enunciado de uno que solo se parece a la respuesta correcta.</p>
+</section>
+
+<section aria-labelledby="proveedores">
+  <h2 id="proveedores">Proveedores</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Especificación</th><th scope="col">Qué usa</th><th scope="col">Variables de entorno</th></tr></thead>
+    <tbody>
+      <tr><td>replay:&lt;nombre&gt;</td><td>Respuestas grabadas en <code>examples/replays/&lt;nombre&gt;/&lt;tarea&gt;.md</code>. Sin red ni coste.</td><td>—</td></tr>
+      <tr><td>gemini:&lt;modelo&gt;</td><td>API REST <code>generateContent</code> de Google.</td><td><code>GEMINI_API_KEY</code></td></tr>
+      <tr><td>openai:&lt;modelo&gt;</td><td>Cualquier API compatible con Chat Completions: OpenAI, OpenRouter, Ollama…</td><td><code>OPENAI_API_KEY</code>, <code>OPENAI_BASE_URL</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="margin-top:16px">Las claves se leen solo de variables de entorno y nunca aparecen en el informe. Con Ollama en local basta con <code>OPENAI_BASE_URL=http://localhost:11434/v1</code>.</p>
+</section>
+
+<section aria-labelledby="coste">
+  <h2 id="coste">Coste estimado</h2>
+  <div class="formula">coste = entrada / 1e6 × tarifa_entrada + salida / 1e6 × tarifa_salida</div>
+  <p>Las tarifas van por millón de tokens y las pones tú con <code>--prices precios.json</code>, porque cambian a menudo. Si un modelo no tiene precio, el informe dice «sin datos»: nunca se inventa. Los precios de <code>replay</code> son ficticios y así se indica.</p>
+</section>
+
+<section aria-labelledby="seguridad">
+  <div class="warning">
+    <h2 id="seguridad">Seguridad</h2>
+    <p><strong>El código generado por los modelos se ejecuta en tu máquina.</strong> modelduel lo hace siempre en un directorio temporal, en un subproceso con límite de tiempo y sin tus variables de entorno secretas, pero eso no es un aislamiento real. Úsalo con tareas de confianza e, idealmente, dentro de un contenedor o una máquina virtual.</p>
+  </div>
+</section>
+
+<section aria-labelledby="aviso">
+  <h2 id="aviso">Una sola ejecución es una señal débil</h2>
+  <p>Los modelos no son deterministas. Repite el duelo con <code>--runs N</code>, usa tareas de tu propio trabajo y lee el código, no solo el marcador.</p>
+</section>
+</main>
+
+<footer>
+  <span>modelduel · licencia MIT</span>
+  <span>Construido por un equipo de agentes de IA (Claude Code + OpenCode) supervisado por Alberto Martínez</span>
+  <span><a href="https://github.com/BertMarti/modelduel">github.com/BertMarti/modelduel</a></span>
+</footer>
+</div>
+</body>
+</html>

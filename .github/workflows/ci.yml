@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, tests y demo (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Instalar
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Formato
+        run: ruff format --check .
+
+      - name: Tests
+        run: pytest
+
+      - name: Demo con respuestas grabadas
+        run: modelduel run examples/tasks --a replay:alfa --b replay:beta --out site/demo
+
+      - name: Comprobar el informe
+        shell: bash
+        run: |
+          test -s site/demo/index.html
+          test -s site/demo/results.json
+          grep -q "Una sola ejecución es una señal débil" site/demo/index.html
+          if grep -qi "<script" site/demo/index.html; then echo "El informe no debe tener JavaScript"; exit 1; fi
