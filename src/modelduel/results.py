@@ -59,28 +59,56 @@ def summarize(results: dict) -> dict[str, dict]:
     return summary
 
 
-def rank_sides(summary: dict[str, dict]) -> list[tuple[int, str]]:
-    """Clasificación ``[(posición, contendiente)]``, de mejor a peor.
+# Criterios de la clasificación, por orden de importancia (uno por posición de la clave).
+CRITERIA = ("tasks", "tests", "cost")
 
-    Criterios, por este orden: tareas resueltas, tests superados y coste (menos es mejor). El
-    coste solo cuenta si todos tienen precio y en la misma moneda. Los empates completos
-    comparten posición y conservan el orden de la línea de órdenes.
-    """
-    sides = list(summary)
-    use_cost = all(summary[s]["cost"] is not None for s in sides) and (
-        len({summary[s]["currency"] for s in sides}) == 1
+
+def costs_comparable(summary: dict[str, dict]) -> bool:
+    """El coste solo cuenta si todos tienen precio y en la misma moneda."""
+    return all(s["cost"] is not None for s in summary.values()) and (
+        len({s["currency"] for s in summary.values()}) == 1
     )
+
+
+def _rank_key(summary: dict[str, dict]):
+    """Clave de ordenación común a la clasificación y al veredicto del duelo de dos.
+
+    Criterios, por este orden: tareas resueltas, tests superados y coste (menos es mejor, solo si
+    ``costs_comparable``).
+    """
+    use_cost = costs_comparable(summary)
 
     def key(side: str) -> tuple:
         data = summary[side]
         return (-data["tasks_solved"], -data["tests_passed"], data["cost"] if use_cost else 0.0)
 
-    ordered = sorted(sides, key=key)
+    return key
+
+
+def rank_sides(summary: dict[str, dict]) -> list[tuple[int, str]]:
+    """Clasificación ``[(posición, contendiente)]``, de mejor a peor.
+
+    Usa ``_rank_key``. Los empates completos comparten posición y conservan el orden de la línea
+    de órdenes.
+    """
+    key = _rank_key(summary)
+    ordered = sorted(summary, key=key)
     ranking: list[tuple[int, str]] = []
     for index, side in enumerate(ordered):
         tied = index > 0 and key(side) == key(ordered[index - 1])
         ranking.append((ranking[-1][0] if tied else index + 1, side))
     return ranking
+
+
+def decide(summary: dict[str, dict]) -> tuple[str | None, str | None]:
+    """Veredicto de un duelo de dos: ``(ganador, criterio que decide)`` o ``(None, None)``.
+
+    El criterio es el primero de ``CRITERIA`` en el que el ganador y el segundo difieren.
+    """
+    (_, first), (_, second) = rank_sides(summary)[:2]
+    key = _rank_key(summary)
+    differing = [i for i, (x, y) in enumerate(zip(key(first), key(second), strict=True)) if x != y]
+    return (first, CRITERIA[differing[0]]) if differing else (None, None)
 
 
 def _sum_known(values: list[int | None]) -> int | None:

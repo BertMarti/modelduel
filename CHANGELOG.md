@@ -6,7 +6,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
-Previsto para v0.3.0: unificar el criterio del veredicto del duelo de dos con el de la clasificación ([#15](https://github.com/BertMarti/modelduel/issues/15)).
+### Cambiado
+
+- El veredicto del duelo de dos usa ahora la misma ordenación que la clasificación (tareas resueltas, luego tests superados y luego coste) y dice qué criterio decide: «gana A por tareas resueltas (2 frente a 1)», «gana A por tests superados (…, con las mismas tareas resueltas)», «gana B por coste (…)» o «empate en tareas resueltas, tests y coste». Antes solo contaba tests superados y podía discrepar de la clasificación ([#15](https://github.com/BertMarti/modelduel/issues/15)).
 
 ## [0.2.0] - 2026-09-30
 

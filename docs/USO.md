@@ -513,7 +513,7 @@ Con tres o más contendientes, el informe HTML añade, debajo de la clasificaci�
 `index.html` es un único archivo: no necesita conexión, no usa JavaScript y se imprime bien. Con **dos** contendientes es un duelo enfrentado (lo que describe la lista de abajo); con **tres a seis** es una **liga**: cabecera con quién va primero, una **clasificación** (tareas resueltas, después tests superados y después coste, menos es mejor; los empates comparten posición), una comparativa con una barra fina por contendiente y métrica, una **matriz por tarea** (tests superados y si la tarea quedó resuelta) y el mismo desplegable de código y salida. Cada contendiente lleva una letra (`A` a `F`) junto a su color: la letra es la pista principal y el color, un refuerzo. En el duelo de dos, de arriba abajo:
 
 1. **Cabecera:** los nombres de los contendientes, el número de tareas, de ejecuciones por tarea y el límite de tiempo.
-2. **Marcador:** los tests superados por cada uno (`A` en lima, `B` en rosa) y quién gana y por cuánto (o «empate»).
+2. **Marcador:** los tests superados por cada uno (`A` en lima, `B` en rosa) y, debajo, el veredicto: quién gana **y qué criterio decide**. Es el mismo orden que la clasificación: primero las tareas resueltas, si empatan los tests superados y, si también empatan, el coste (solo si los dos tienen precio en la misma moneda). Por ejemplo, «gana A por tareas resueltas (2 frente a 1)» o «gana B por coste (…, con las mismas tareas resueltas y tests)»; si no hay diferencia, «empate en tareas resueltas, tests y coste». Como el criterio que manda puede no ser el de los números grandes (un modelo con menos tests pero más tareas resueltas gana), el veredicto lo dice siempre.
 3. **Métricas enfrentadas**, una fila por medida:
    - **Tareas resueltas:** tareas con **todos** los tests en verde **en todas las ejecuciones**.
    - **Intentos resueltos** (solo si usas `--runs` mayor que 1): ejecuciones con todos los tests en verde.
@@ -677,7 +677,6 @@ Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelo
 
 ## Límites conocidos
 
-- **El veredicto del duelo de dos puede discrepar de la clasificación.** El texto «gana A por N» del informe de un duelo de dos cuenta **tests superados**, mientras que la clasificación (consola e informe de liga) ordena primero por **tareas resueltas**. Con pocas tareas pueden no coincidir: por ejemplo, un modelo supera más tests pero resuelve menos tareas por completo. Mira siempre las dos cosas y el código de cada respuesta. Está previsto unificar el criterio en v0.3.0 ([issue #15](https://github.com/BertMarti/modelduel/issues/15)).
 - Sin `--resume`, un `results.json` ilegible o de un formato más nuevo se sobrescribe sin aviso; solo se protege un duelo incompleto legible.
 - Un `Retry-After` de entre 30 y 120 s se respeta entero en cada reintento: con `--retries 3`, un proveedor saturado puede costar varios minutos por intento. Baja `--retries` si prefieres rendirte antes.
 - Los proveedores `gemini` y `openai` solo se han probado con respuestas simuladas, no contra las APIs reales.

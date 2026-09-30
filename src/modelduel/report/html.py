@@ -8,7 +8,7 @@ from importlib import resources
 from string import Template
 
 from modelduel import __version__
-from modelduel.results import sides_of
+from modelduel.results import costs_comparable, decide, sides_of
 
 STATUS_LABELS = {
     "ok": "tests ejecutados",
@@ -409,12 +409,27 @@ def build_incomplete(results: dict) -> str:
 
 
 def _verdict(summary: dict, runs: int = 1) -> str:
-    a, b = summary["a"]["tests_passed"], summary["b"]["tests_passed"]
+    """Quién gana y qué criterio decide: el mismo orden que la clasificación (``decide``)."""
+    winner, criterion = decide(summary)
     summed = f" (suma de {runs} ejecuciones)" if runs > 1 else ""
-    if a == b:
-        return "empate" + summed
-    side = "a" if a > b else "b"
-    return f'gana <strong class="{side}">{side.upper()}</strong> por {abs(a - b)}{summed}'
+    if winner is None:
+        if costs_comparable(summary):
+            return "empate en tareas resueltas, tests y coste"
+        return "empate en tareas resueltas y tests (sin coste comparable)" + summed
+    loser = "b" if winner == "a" else "a"
+    win, lose = summary[winner], summary[loser]
+    who = f'gana <strong class="{winner}">{winner.upper()}</strong>'
+    if criterion == "tasks":
+        return f"{who} por tareas resueltas ({win['tasks_solved']} frente a {lose['tasks_solved']})"
+    if criterion == "tests":
+        return (
+            f"{who} por tests superados ({win['tests_passed']} frente a {lose['tests_passed']}, "
+            f"con las mismas tareas resueltas){summed}"
+        )
+    return (
+        f"{who} por coste ({fmt_cost(win['cost'], win['currency'])} frente a "
+        f"{fmt_cost(lose['cost'], lose['currency'])}, con las mismas tareas resueltas y tests)"
+    )
 
 
 def _short_label(spec: str) -> str:

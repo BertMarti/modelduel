@@ -183,8 +183,6 @@ Se busca primero por `proveedor:modelo` y después solo por `modelo`. Si un mode
 - [`CHANGELOG.md`](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md): qué trae cada versión.
 - [`CONTRIBUTING.md`](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md): entorno, comandos, ramas, commits, cómo añadir un proveedor, una tarea o un color a la liga, y cómo publicar una versión.
 
-Limitación conocida: el veredicto del duelo de dos («gana A por N») cuenta tests superados, mientras que la clasificación ordena primero por tareas resueltas, así que pueden discrepar con pocas tareas ([#15](https://github.com/BertMarti/modelduel/issues/15), previsto para v0.3.0).
-
 ## Estructura
 
 ```text
