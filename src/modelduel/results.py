@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 
 SCHEMA_VERSION = 1
@@ -19,10 +21,12 @@ def summarize(results: dict) -> dict[str, dict]:
     tasks = results.get("tasks", [])
     for side in SIDES:
         attempts = [a for task in tasks for a in task["results"].get(side, [])]
+        runs = results.get("runs", 1)
         solved_tasks = sum(
             1
             for task in tasks
-            if task["results"].get(side) and all(a["solved"] for a in task["results"][side])
+            if len(task["results"].get(side, [])) >= runs
+            and all(a["solved"] for a in task["results"][side])
         )
         costs = [a.get("cost") for a in attempts]
         inputs = [a.get("input_tokens") for a in attempts]
@@ -53,8 +57,34 @@ def _sum_known(values: list[int | None]) -> int | None:
 
 
 def save_results(results: dict, path: Path) -> None:
+    """Escritura atómica: archivo temporal en la misma carpeta y reemplazo.
+
+    Si el proceso muere a mitad, ``results.json`` sigue siendo la versión anterior completa.
+    """
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temp = path.with_name(path.name + ".tmp")
+    text = json.dumps(results, ensure_ascii=False, indent=2) + "\n"
+    try:
+        with open(temp, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        _replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def _replace(source: Path, target: Path) -> None:
+    # En Windows el reemplazo falla un instante si un antivirus o un visor tiene el archivo abierto.
+    for attempt in range(5):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def load_results(path: Path) -> dict:

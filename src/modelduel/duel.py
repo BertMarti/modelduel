@@ -9,11 +9,13 @@ from modelduel import __version__
 from modelduel.extract import extract_code
 from modelduel.pricing import Price, compute_cost, find_price
 from modelduel.providers import Provider, ProviderError
-from modelduel.results import SCHEMA_VERSION, SIDES, summarize
+from modelduel.results import SCHEMA_VERSION, summarize
+from modelduel.resume import Key, task_fingerprint
 from modelduel.runner import DEFAULT_TIMEOUT, TestRun, build_prompt, run_tests
 from modelduel.tasks import Task
 
 Progress = Callable[[str], None]
+Update = Callable[[dict], None]
 
 
 def run_duel(
@@ -23,14 +25,25 @@ def run_duel(
     runs: int = 1,
     timeout: float = DEFAULT_TIMEOUT,
     progress: Progress | None = None,
+    on_update: Update | None = None,
+    reuse: dict[Key, dict] | None = None,
+    created_at: str | None = None,
 ) -> dict:
+    """Enfrenta a los contendientes. ``on_update`` recibe los resultados tras cada intento.
+
+    ``reuse`` son intentos ya hechos (de ``plan_resume``) que se copian en lugar de repetirse.
+    """
     progress = progress or (lambda _msg: None)
-    contender_prices = {side: find_price(providers[side].spec, prices) for side in SIDES}
+    on_update = on_update or (lambda _results: None)
+    reuse = reuse or {}
+    sides = list(providers)
+    contender_prices = {side: find_price(providers[side].spec, prices) for side in sides}
     results: dict = {
         "schema": SCHEMA_VERSION,
         "tool": "modelduel",
         "version": __version__,
-        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "created_at": created_at or datetime.now(UTC).isoformat(timespec="seconds"),
+        "status": "in_progress",
         "runs": runs,
         "timeout_s": timeout,
         "contenders": {
@@ -38,31 +51,65 @@ def run_duel(
                 "spec": providers[side].spec,
                 "price": contender_prices[side].to_dict() if contender_prices[side] else None,
             }
-            for side in SIDES
+            for side in sides
         },
         "tasks": [],
     }
+    entries = {}
     for task in tasks:
-        prompt = build_prompt(task)
         entry = {
             "id": task.id,
             "title": task.title,
             "difficulty": task.difficulty,
             "statement": task.statement,
+            "fingerprint": task_fingerprint(task),
             "tests_expected": task.expected_tests,
-            "results": {side: [] for side in SIDES},
+            "results": {side: [] for side in sides},
         }
+        results["tasks"].append(entry)
+        entries[task.id] = entry
+    # Los intentos reutilizables entran ya en el primer guardado: una interrupción temprana
+    # no debe hacer perder lo que se había conseguido antes.
+    for (task_id, side, _run), attempt in sorted(reuse.items(), key=lambda kv: kv[0][2]):
+        if task_id in entries and side in providers:
+            done = _reused(attempt, contender_prices[side])
+            entries[task_id]["results"][side].append(done)
+    _refresh(results, on_update)
+
+    for task in tasks:
+        prompt = build_prompt(task)
+        entry = entries[task.id]
         for run in range(1, runs + 1):
-            for side in SIDES:
+            for side in sides:
+                key = (task.id, side, run)
+                if key in reuse:
+                    progress(_progress_line(task, side, run, runs, reuse[key], reused=True))
+                    continue
                 attempt = run_attempt(
                     task, prompt, providers[side], contender_prices[side], timeout
                 )
                 attempt["run"] = run
-                entry["results"][side].append(attempt)
+                attempts = entry["results"][side]
+                attempts.append(attempt)
+                attempts.sort(key=lambda a: a["run"])
                 progress(_progress_line(task, side, run, runs, attempt))
-        results["tasks"].append(entry)
-    results["summary"] = summarize(results)
+                _refresh(results, on_update)
+    results["status"] = "complete"
+    _refresh(results, on_update)
     return results
+
+
+def _refresh(results: dict, on_update: Update) -> None:
+    results["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+    results["summary"] = summarize(results)
+    on_update(results)
+
+
+def _reused(attempt: dict, price: Price | None) -> dict:
+    """Copia de un intento anterior con el coste recalculado con la tabla de precios actual."""
+    copy = dict(attempt)
+    copy["cost"] = compute_cost(price, copy.get("input_tokens"), copy.get("output_tokens"))
+    return copy
 
 
 def run_attempt(
@@ -109,10 +156,14 @@ def _unexpected(exc: Exception) -> str:
     return f"Error inesperado del proveedor ({type(exc).__name__}): {exc}"
 
 
-def _progress_line(task: Task, side: str, run: int, runs: int, attempt: dict) -> str:
+def _progress_line(
+    task: Task, side: str, run: int, runs: int, attempt: dict, reused: bool = False
+) -> str:
     run_label = f" #{run}" if runs > 1 else ""
-    mark = "ok" if attempt["solved"] else "--"
+    mark = "==" if reused else ("ok" if attempt["solved"] else "--")
     detail = f"{attempt['passed']}/{attempt['total']}"
     if attempt["status"] not in ("ok",):
         detail += f" ({attempt['status']})"
+    if reused:
+        detail += " · ya hecho"
     return f"  {mark}  {task.id + run_label:<24} {side.upper()}  {detail}"

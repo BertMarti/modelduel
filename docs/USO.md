@@ -14,7 +14,7 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
    - [Ollama (modelos en tu ordenador)](#ollama-modelos-en-tu-ordenador)
 5. [Crear tu propia tarea paso a paso](#crear-tu-propia-tarea-paso-a-paso)
 6. [Leer el informe](#leer-el-informe)
-7. [Opciones: `--runs`, `--timeout` y `--prices`](#opciones---runs---timeout-y---prices)
+7. [Opciones: `--runs`, `--timeout`, `--resume` y `--prices`](#opciones---runs---timeout---resume-y---prices)
 8. [Códigos de salida](#códigos-de-salida)
 9. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
 10. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
@@ -478,7 +478,7 @@ Un «error del proveedor» no detiene el duelo: se anota y se sigue con el resto
 
 ---
 
-## Opciones: `--runs`, `--timeout` y `--prices`
+## Opciones: `--runs`, `--timeout`, `--resume` y `--prices`
 
 Además de `--a`, `--b` y `--out` (obligatorias), la orden `run` acepta estas opciones:
 
@@ -486,6 +486,7 @@ Además de `--a`, `--b` y `--out` (obligatorias), la orden `run` acepta estas op
 |---|---|
 | `--runs N` | Ejecuciones por tarea (1 por defecto). |
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
+| `--resume` | Continúa el duelo de `--out` saltando los intentos ya terminados. |
 | `--retries N` | Reintentos ante HTTP 429/5xx y cortes de conexión (3 por defecto; `0` los desactiva). |
 | `--prices f.json` | Tabla de precios adicional. |
 | `--replays DIR` | Carpeta de respuestas grabadas para `replay`. |
@@ -503,6 +504,23 @@ Debe ser 1 o más; con `--runs 0` la orden termina con un error.
 ### `--timeout`
 
 Es el tiempo máximo, en segundos, que tienen **los tests** de una respuesta para ejecutarse (20 por defecto). Sirve para cortar bucles infinitos o soluciones muy lentas: al agotarse, el intento queda como «tiempo agotado». Admite decimales (`--timeout 2.5`) y debe ser mayor que 0. **No limita la espera al modelo:** eso lo controla la variable de entorno `MODELDUEL_HTTP_TIMEOUT` (180 s por defecto).
+
+### `--resume`
+
+Un duelo con APIs reales puede tardar y costar dinero, así que `results.json` se guarda **tras cada intento** (con un archivo temporal que después reemplaza al anterior, de modo que nunca queda a medias). Si el duelo se corta —Ctrl+C, un apagón, la red—, lo hecho sigue en `results.json` y en un `index.html` parcial que muestra «Duelo incompleto: X de Y intentos».
+
+Para continuar, repite **la misma orden** añadiendo `--resume`:
+
+```bash
+modelduel run mis-tareas --a gemini:<modelo> --b openai:<modelo> --runs 3 --out runs/duelo --resume
+```
+
+- Se saltan los intentos ya terminados (se ven como `==  ...  · ya hecho`) y solo se llama a los modelos por lo que falta.
+- Los intentos que acabaron en «error del proveedor» se **repiten**.
+- Si has cambiado los contendientes, la orden se detiene con un error: mezclar modelos distintos daría un marcador sin sentido. Usa otra carpeta `--out`.
+- Si has cambiado una tarea, el límite de tiempo o el número de ejecuciones, avisa y sigue: la tarea cambiada se repite entera, el resto se conserva.
+- Si no hay `results.json` previo, empieza de cero.
+- **Sin `--resume`**, modelduel se niega a sobrescribir un duelo incompleto (bórralo o cambia de `--out`); uno completo sí se rehace, como siempre.
 
 ### `--prices`
 
@@ -613,7 +631,7 @@ No: cada duelo enfrenta a dos. Para comparar más, haz varios duelos.
 No: solo funciones de Python comprobadas con pytest.
 
 **¿Dónde se guardan mis resultados?**
-En la carpeta que pases a `--out`: `results.json` (datos) e `index.html` (informe). Si repites el duelo en la misma carpeta, se sobrescriben; usa una carpeta distinta por duelo.
+En la carpeta que pases a `--out`: `results.json` (datos) e `index.html` (informe). Si repites un duelo completo en la misma carpeta, se sobrescriben; usa una carpeta distinta por duelo. Si se cortó a medias, continúalo con `--resume`.
 
 **¿Se envía mi código o mis tests a algún sitio?**
 Solo el **enunciado** (`task.md`, más las instrucciones de formato) se envía a la API del proveedor que elijas. Los tests no se envían a los modelos.

@@ -71,11 +71,14 @@ modelduel list-tasks examples/tasks
 | `--runs N` | Ejecuciones por tarea (1 por defecto). Una sola ejecución es una señal débil. |
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
 | `--retries N` | Reintentos ante HTTP 429/500/502/503/504 y cortes de conexión, con espera exponencial y respetando `Retry-After` (3 por defecto; `0` los desactiva). |
+| `--resume` | Continúa el duelo de `--out` saltando los intentos ya terminados (ver «Cortes y reanudación»). |
 | `--prices f.json` | Tabla de precios adicional (ver «Coste»). |
 | `--replays DIR` | Carpeta de respuestas grabadas para `replay` (por defecto, `replays/` junto a la carpeta de tareas). |
 | `--out DIR` | Carpeta donde se escriben `results.json` e `index.html`. Se comprueba antes de llamar a las APIs. |
 
 Códigos de salida: `0` duelo completado (aunque los modelos fallen tests), `1` no se pudieron escribir los resultados, `2` error de uso o de configuración (argumentos, tareas, proveedores, precios, `results.json`) y `130` interrumpido con Ctrl+C.
+
+**Cortes y reanudación.** `results.json` se reescribe de forma atómica (archivo temporal y reemplazo) tras cada intento, así que un corte —Ctrl+C, un apagón, una API caída— no pierde lo ya hecho, que además queda reflejado en un informe parcial marcado como «Duelo incompleto». Para continuar, repite la misma orden añadiendo `--resume`: se saltan los intentos terminados, se repiten los que acabaron en «error del proveedor» y se avisa si algo no coincide (tareas modificadas, otro límite de tiempo, otro número de ejecuciones). Si los contendientes son otros, la orden se detiene con un error. Sin `--resume`, modelduel se niega a sobrescribir un duelo incompleto.
 
 El informe `index.html` es un único archivo autocontenido: CSS en línea, gráficas SVG, sin JavaScript y con hoja de impresión clara.
 
@@ -172,6 +175,7 @@ src/modelduel/
 ├── extract.py          # extracción del bloque de código
 ├── runner.py           # prompt + ejecución de pytest en temporal con límite
 ├── duel.py             # orquestación del duelo
+├── resume.py           # reanudación de un duelo interrumpido
 ├── results.py          # results.json y resumen del marcador
 ├── pricing.py          # tarifas y fórmula de coste
 ├── providers/          # replay, gemini, openai_compat

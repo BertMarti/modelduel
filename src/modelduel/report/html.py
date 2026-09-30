@@ -390,6 +390,20 @@ def build_warning(runs: int) -> str:
     )
 
 
+def build_incomplete(results: dict) -> str:
+    """Aviso de un duelo cortado a medias (vacío si está completo)."""
+    if results.get("status") != "in_progress":
+        return ""
+    sides = list(results["contenders"])
+    expected = len(results["tasks"]) * int(results.get("runs", 1)) * len(sides)
+    done = sum(len(t["results"].get(side, [])) for t in results["tasks"] for side in sides)
+    return (
+        f"<strong>Duelo incompleto: {done} de {expected} intentos.</strong> "
+        "El marcador solo cuenta lo hecho hasta ahora. Continúa con <code>--resume</code> "
+        "y la misma configuración.<br><br>"
+    )
+
+
 def _verdict(summary: dict, runs: int = 1) -> str:
     a, b = summary["a"]["tests_passed"], summary["b"]["tests_passed"]
     summed = f" (suma de {runs} ejecuciones)" if runs > 1 else ""
@@ -446,7 +460,7 @@ def render_report(results: dict) -> str:
         score_total_b=summary["b"]["tests_total"],
         verdict=_verdict(summary, runs),
         metrics=build_metrics(summary, runs),
-        warning=build_warning(runs),
+        warning=build_incomplete(results) + build_warning(runs),
         chart=task_chart(results["tasks"]),
         table_caption=e(
             "Totales por tarea"
