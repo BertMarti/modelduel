@@ -1,5 +1,5 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por builder (v0.2.0 · #7)
+Última actualización: 2026-09-30 por qa (v0.2.0 · #8)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
@@ -7,6 +7,8 @@ v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** e
 - #5 guardado incremental y `--resume` (rama `agent/builder/5-guardado-incremental`, parte de la de #4): HECHO, en PR.
 - #6 liga de 2 a 6 contendientes (rama `agent/builder/6-liga`, parte de la de #5): HECHO, en PR.
 - #7 publicación en PyPI (rama `agent/builder/7-pypi`, parte de la de #6): HECHO, en PR. La publicación real la dispara Alberto tras registrar el «trusted publisher» (ver PR y `CONTRIBUTING.md`).
+
+- #8 revisión QA de v0.2.0 (rama `agent/qa/8-revision-v0.2`, parte de la de #7, PR #14): HECHA, en PR. Se fusiona después de #13.
 
 Base heredada de v0.1.0:
 - CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
@@ -68,14 +70,24 @@ Base heredada de v0.1.0:
 - 2026-09-30 (builder): #7 `pytest` NO pasa a ser dependencia obligatoria (se mantiene «solo biblioteca estándar»); se añade el extra opcional `modelduel[pytest]` para instalarlo de una vez. Los ejemplos se empaquetan con `force-include` en vez de moverlos a `src/`, para no duplicar ni cambiar rutas de docs, tests y CI.
 - 2026-09-30 (builder): #7 los enlaces del README son absolutos (`blob/main`) porque PyPI no resuelve rutas relativas; un test lo vigila. Ojo: apuntan a `main`, no a la etiqueta.
 - 2026-09-30 (builder): #7 `twine check` no se pudo ejecutar en local (Windows bloquea la DLL `nh3` por una directiva de control de aplicaciones); sí se construyeron sdist y wheel con `python -m build` y se instaló la wheel en un venv limpio (`modelduel demo` en verde). `twine check --strict` corre en el CI (job `package`) y en `release.yml`.
+- 2026-09-30 (qa): #8 `Retry-After` solo acepta segundos ASCII (dígitos, con decimales opcionales) o fecha HTTP; un número con cientos de dígitos o una fecha lejanísima cuenta como «espera excesiva» (se rinde sin esperar) en vez de «sin cabecera» (que reintentaba enseguida); negativo o ilegible = espera exponencial normal. El exponente de la espera se acota (`2**min(n, 62)`) para no desbordar con `--retries` enormes.
+- 2026-09-30 (qa): #8 `RetryPolicy.sleep` llama a `base._real_sleep`; `tests/conftest.py` lo sustituye por un error en todos los tests: ninguno puede esperar de verdad (hay que inyectar `sleep`).
+- 2026-09-30 (qa): #8 `load_results` rechaza un `schema` mayor que el conocido (error claro, exit 2) y `--resume` avisa si el duelo previo es de otra versión de modelduel (el prompt pudo cambiar). Un intento previo sin `status` se repite; un `results.json` manipulado que aun así rompe `plan_resume` da `ResumeError`, no una traza.
+- 2026-09-30 (qa): #8 los mensajes de error del proveedor se limpian de sustitutos UTF-16 sueltos al crear el intento (uno en el JSON de error del servidor rompía `save_results` con `UnicodeEncodeError`, que `on_update` no captura).
+- 2026-09-30 (qa): #8 en móvil (<= 720 px) cada fila de la comparativa de la liga pasa a nombre, valor y barra en filas (con 6 nombres largos la barra medía 0 px); `.table-wrap` es una región enfocable (`tabindex="0"`, `role="region"`, `aria-label`) con anillo de foco, para poder desplazar las tablas con el teclado.
+- 2026-09-30 (qa): #8 `release.yml` comprueba que el commit de la Release está en `main` (`merge-base --is-ancestor`) y no guarda credenciales de git en el checkout; los permisos ya eran mínimos (`contents: read`; `id-token: write` solo al publicar) y no hay tokens.
 
 ## Siguiente paso
-1. Alberto: fusionar los PR de v0.2.0 en orden (#4, #5, #6, #7) con «Create a merge commit».
+1. Alberto: fusionar los PR de v0.2.0 en orden (#10, #11, #12, #13 y por último el #14 de QA) con «Create a merge commit».
    - Para publicar en PyPI: registrar el *trusted publisher* (PyPI > Your projects > Publishing > "Add a new pending publisher": proyecto `modelduel`, propietario `BertMarti`, repositorio `modelduel`, workflow `release.yml`, environment `pypi`), crear el environment `pypi` en GitHub (Settings > Environments) y crear la Release `v0.2.0`.
 2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
 3. Tras fusionar y publicar: comprobar `pip install "modelduel[pytest]"` y `modelduel demo` desde un entorno limpio, y actualizar enlaces (README/web) con el badge de PyPI si se desea.
 
 ## Problemas conocidos
+- El veredicto del duelo de dos (`gana A por N`) cuenta tests superados, pero la clasificación de la consola y de la liga ordena primero por tareas resueltas: con pocas tareas pueden discrepar (decisión pendiente del lead: unificar criterio).
+- Sin `--resume`, un `results.json` ilegible o de un formato más nuevo se sobrescribe sin aviso (comportamiento de v0.1.0); solo se protege un duelo `in_progress` legible.
+- El sdist incluye `tests/`, pero esos tests necesitan `.github/` y `site/` (no van en el sdist), así que no se pueden ejecutar desde él.
+- Un Retry-After entre 30 y 120 s se respeta entero en cada reintento: con `--retries 3` un proveedor saturado puede costar hasta 6 min por intento.
 - El aislamiento es solo un directorio temporal + subproceso con límite + entorno sin secretos + muerte del árbol de procesos: el código del modelo puede leer y escribir en el resto del disco. Está advertido en README y web; lo ideal es usar un contenedor o VM.
 - Un proceso que se desligue a propósito del árbol (`setsid`/doble fork en POSIX, `CREATE_BREAKAWAY_FROM_JOB` si el Job lo permitiera) puede sobrevivir. En Windows hay una ventana de milisegundos entre crear pytest y meterlo en el Job Object (Popen no permite crear el proceso suspendido).
 - El disco que pueda llenar una solución que imprime sin parar está acotado solo por el límite de tiempo (va al temporal de la ejecución, que se borra).
@@ -91,3 +103,4 @@ Base heredada de v0.1.0:
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/5-guardado-incremental): #5 guardado incremental atómico de `results.json`, `--resume`, informe parcial al cortar con Ctrl+C y tests de corte y reanudación.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/6-liga): #6 liga de 2 a 6 contendientes con `--model`, clasificación e informe de liga (paleta AA ampliada), demo de tres en CI y web, tercer contendiente `replay:gamma`.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/7-pypi): #7 paquete listo para PyPI (v0.2.0, metadatos, ejemplos dentro de la wheel, `modelduel demo`), `release.yml` con Trusted Publishing, job `package` en el CI y guía de publicación.
+- 2026-09-30 qa · Claude Code Sonnet (agent/qa/8-revision-v0.2): #8 revisión de v0.2.0: Retry-After absurdo y desbordes, tests sin esperas reales, `--resume` ante formatos nuevos/dañados, sustitutos UTF-16 en errores, liga legible en móvil, tablas con teclado, contraste AA de toda la paleta, escapado con 2/3/6 y `release.yml` solo desde `main`. 222 → 258 tests.
