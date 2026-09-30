@@ -21,6 +21,8 @@ from tests.test_report import RESULTS, _attempt
         ((2, 8, 3.0, "USD"), (2, 8, 1.0, "USD"), ("b", "cost")),
         ((2, 8, None, None), (2, 8, 1.0, "USD"), (None, None)),  # sin coste comparable: empate
         ((2, 8, 1.0, "USD"), (2, 8, 1.0, "USD"), (None, None)),
+        ((2, 8, 0.1 + 0.2, "USD"), (2, 8, 0.3, "USD"), (None, None)),  # mismo coste mostrado
+        ((2, 8, 1.0, "USD"), (2, 8, 0.5, "EUR"), (None, None)),  # monedas distintas
     ],
 )
 def test_decide_coincide_con_la_clasificacion(a, b, expected):
@@ -85,3 +87,31 @@ def test_el_veredicto_indica_que_decide_por_coste():
 def test_el_veredicto_de_un_empate_dice_en_que_empatan():
     text = _verdict(render_report(_results(a=(4, 2), b=(4, 2))))
     assert text == "empate en tareas resueltas y tests (sin coste comparable)"
+
+
+def test_costes_que_se_muestran_iguales_empatan_en_clasificacion_y_veredicto():
+    summary = _summary(a=(2, 8, 0.1 + 0.2, "USD"), b=(2, 8, 0.3, "USD"))
+    assert 0.1 + 0.2 != 0.3
+    assert rank_sides(summary) == [(1, "a"), (1, "b")]
+    assert decide(summary) == (None, None)
+
+
+def test_el_empate_con_coste_comparable_menciona_la_suma_de_ejecuciones():
+    def tie(runs):
+        data = _results(a=(4, 2), b=(4, 2), runs=runs)
+        for task in data["tasks"]:
+            for side in "ab":
+                for attempt in task["results"][side]:
+                    attempt["cost"] = 0.25
+        data["contenders"]["a"]["price"] = data["contenders"]["b"]["price"] = {"currency": "EUR"}
+        return _verdict(render_report(data))
+
+    assert tie(1) == "empate en tareas resueltas, tests y coste"
+    assert tie(3) == "empate en tareas resueltas, tests y coste (suma de 3 ejecuciones)"
+
+
+def test_el_empate_sin_coste_comparable_menciona_la_suma_de_ejecuciones():
+    text = _verdict(render_report(_results(a=(4, 2), b=(4, 2), runs=2)))
+    assert text == (
+        "empate en tareas resueltas y tests (sin coste comparable) (suma de 2 ejecuciones)"
+    )
