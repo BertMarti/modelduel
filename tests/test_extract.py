@@ -55,3 +55,14 @@ def test_cuatro_comillas_permiten_triples_dentro():
 def test_find_code_blocks_devuelve_lenguajes():
     blocks = find_code_blocks("```python\na\n```\n```\nb\n```")
     assert blocks == [("python", "a"), ("", "b")]
+
+
+def test_bloque_sangrado_dentro_de_una_lista():
+    # Sin quitar la sangría común, el código daba «unexpected indent» al importarlo.
+    text = "1. Solución:\n   ```python\n   def f():\n       return 1\n   ```\n"
+    assert extract_code(text) == "def f():\n    return 1\n"
+
+
+def test_salta_bloques_python_vacios():
+    text = "```python\n\n```\n\n```python\nx = 1\n```"
+    assert extract_code(text) == "x = 1\n"

@@ -59,12 +59,17 @@ def save_results(results: dict, path: Path) -> None:
 
 def load_results(path: Path) -> dict:
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     except OSError as exc:
         raise ResultsError(f"No se pudo leer {path}: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise ResultsError(f"{path} no es JSON válido: {exc}") from exc
     if not isinstance(data, dict) or "tasks" not in data or "contenders" not in data:
         raise ResultsError(f"{path} no parece un results.json de modelduel.")
-    data["summary"] = summarize(data)
+    try:
+        data["summary"] = summarize(data)
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        raise ResultsError(
+            f"{path} no parece un results.json de modelduel ({type(exc).__name__}: {exc})."
+        ) from exc
     return data

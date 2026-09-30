@@ -32,7 +32,15 @@ class Task:
 
     @property
     def expected_tests(self) -> int:
-        return count_tests(self.test_path.read_text(encoding="utf-8"))
+        return count_tests(read_text(self.test_path))
+
+
+def read_text(path: Path) -> str:
+    """Lee UTF-8 aceptando el BOM que añaden algunos editores de Windows."""
+    try:
+        return path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise TaskError(f"{path} no está en UTF-8: {exc.reason}.") from exc
 
 
 def is_task_dir(path: Path) -> bool:
@@ -43,12 +51,20 @@ def load_task(path: Path) -> Task:
     path = Path(path)
     if not is_task_dir(path):
         raise TaskError(f"{path} no es una tarea: necesita {TASK_FILE} y {TEST_FILE}.")
-    statement = (path / TASK_FILE).read_text(encoding="utf-8").strip()
+    statement = read_text(path / TASK_FILE).strip()
+    test_path = path / TEST_FILE
+    try:
+        ast.parse(read_text(test_path))
+    except SyntaxError as exc:
+        # Mejor avisar ahora que atribuir el fallo a los modelos como «no se pudo importar».
+        raise TaskError(
+            f"{test_path} tiene un error de sintaxis en la línea {exc.lineno}: {exc.msg}."
+        ) from exc
     meta: dict = {}
     meta_path = path / META_FILE
     if meta_path.is_file():
         try:
-            meta = tomllib.loads(meta_path.read_text(encoding="utf-8"))
+            meta = tomllib.loads(read_text(meta_path))
         except tomllib.TOMLDecodeError as exc:
             raise TaskError(f"{meta_path} no es TOML válido: {exc}") from exc
     title = str(meta.get("title") or _title_from_statement(statement) or path.name)
@@ -70,6 +86,8 @@ def discover_tasks(path: Path) -> list[Task]:
         raise TaskError(f"No existe la ruta {path}.")
     if is_task_dir(path):
         return [load_task(path)]
+    if not path.is_dir():
+        raise TaskError(f"{path} no es una carpeta de tareas.")
     tasks = [load_task(child) for child in sorted(path.iterdir()) if is_task_dir(child)]
     if not tasks:
         raise TaskError(f"No hay tareas en {path}.")
@@ -91,17 +109,37 @@ def count_tests(source: str) -> int:
     except SyntaxError:
         return 0
 
+    # Constantes de módulo (``CASOS = [...]``) usadas en ``parametrize``.
+    constants: dict[str, int] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.List | ast.Tuple):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    constants[target.id] = len(node.value.elts)
+
+    def n_values(node: ast.expr | None) -> int | None:
+        if isinstance(node, ast.List | ast.Tuple):
+            return len(node.elts)
+        if isinstance(node, ast.Name):
+            return constants.get(node.id)
+        return None
+
     def weight(func: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
         total = 1
         for deco in func.decorator_list:
-            if (
+            if not (
                 isinstance(deco, ast.Call)
                 and isinstance(deco.func, ast.Attribute)
                 and deco.func.attr == "parametrize"
-                and len(deco.args) >= 2
-                and isinstance(deco.args[1], ast.List | ast.Tuple)
             ):
-                total *= max(len(deco.args[1].elts), 1)
+                continue
+            values = deco.args[1] if len(deco.args) >= 2 else None
+            for kw in deco.keywords:
+                if kw.arg == "argvalues":
+                    values = kw.value
+            n = n_values(values)
+            if n is not None:
+                total *= max(n, 1)
         return total
 
     count = 0

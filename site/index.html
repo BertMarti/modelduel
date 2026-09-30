@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>modelduel · dos modelos, una tarea, los mismos tests</title>
 <meta name="description" content="CLI que enfrenta a dos modelos de IA con la misma tarea de programación, ejecuta los tests y genera un informe HTML con aciertos, tiempo, tokens y coste.">
+<meta name="theme-color" content="#0f0f11">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_ES">
+<meta property="og:title" content="modelduel · dos modelos, una tarea, los mismos tests">
+<meta property="og:description" content="CLI que enfrenta a dos modelos de IA con la misma tarea de programación, ejecuta los tests y genera un informe HTML con aciertos, tiempo, tokens y coste.">
+<meta property="og:url" content="https://bertmarti.github.io/modelduel/">
+<link rel="canonical" href="https://bertmarti.github.io/modelduel/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230f0f11'/%3E%3Crect x='2' y='4' width='5' height='8' fill='%23b5e853'/%3E%3Crect x='9' y='4' width='5' height='8' fill='%23ff7eb6'/%3E%3C/svg%3E">
 <style>
 :root {
   --bg: #0f0f11; --panel: #151518; --text: #e8e8ea; --muted: #8d8d96; --line: #2a2a2f;
@@ -19,6 +27,8 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 var(
 a { color: inherit; text-decoration-color: var(--muted); text-underline-offset: 3px; }
 a:hover { text-decoration-color: currentColor; }
 a:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.skip { position: absolute; left: 16px; top: -48px; padding: 8px 12px; background: var(--text); color: var(--bg); font: 600 13px var(--mono); z-index: 1; }
+.skip:focus { top: 12px; }
 .a { color: var(--a); } .b { color: var(--b); } .muted { color: var(--muted); }
 nav { display: flex; justify-content: space-between; align-items: center; padding: 26px 0; border-bottom: 1px solid var(--line); font: 13px var(--mono); }
 nav .links { display: flex; gap: 22px; flex-wrap: wrap; }
@@ -28,7 +38,7 @@ nav .links a:hover { color: var(--text); }
 .hero { padding: 88px 0 64px; }
 .eyebrow { font: 12px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 h1 { font: 700 clamp(44px, 9vw, 96px)/.98 var(--mono); letter-spacing: -.05em; margin: 20px 0 26px; }
-h1 .vs { color: var(--muted); font-weight: 400; font-size: .42em; letter-spacing: 0; vertical-align: .45em; padding: 0 .2em; }
+h1 .vs { color: var(--muted); font-weight: 400; font-size: .42em; letter-spacing: 0; vertical-align: .45em; }
 .lede { font-size: 20px; max-width: 640px; margin: 0 0 34px; color: var(--text); }
 .lede em { font-style: normal; color: var(--muted); }
 .duel-bars { display: grid; gap: 10px; max-width: 520px; margin: 0 0 40px; }
@@ -56,7 +66,7 @@ p code, li code, td code { background: var(--panel); border: 1px solid var(--lin
 table { width: 100%; border-collapse: collapse; font-size: 15px; }
 th, td { text-align: left; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font: 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
-td:first-child { font-family: var(--mono); white-space: nowrap; }
+tbody th { font: 15px/1.6 var(--mono); letter-spacing: 0; text-transform: none; color: var(--text); white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
 .warning { border: 1px solid var(--line); border-left: 3px solid var(--b); background: var(--panel); padding: 22px 24px; }
 .warning h2 { color: var(--b); margin-bottom: 12px; }
@@ -74,12 +84,13 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
 @media print {
   :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; }
   html, body { background: #fff; color: #111; }
-  nav .links, .cta { display: none; }
+  nav .links, .cta, .skip { display: none; }
   .duel-bars svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
 </style>
 </head>
 <body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
 <div class="wrap">
 <nav aria-label="Principal">
   <span class="brand">modelduel</span>
@@ -94,7 +105,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
 
 <header class="hero">
   <div class="eyebrow">CLI · Python 3.12 · sin dependencias</div>
-  <h1><span class="a">modelo</span><span class="vs">vs</span><span class="b">modelo</span></h1>
+  <h1><span class="a">modelo</span> <span class="vs">vs</span> <span class="b">modelo</span></h1>
   <p class="lede">Dos modelos, una tarea, los mismos tests. <strong>modelduel</strong> pide el código a dos modelos de IA, ejecuta tus tests sobre cada respuesta y te da un informe con quién acierta, cuánto tarda y cuánto cuesta. <em>Tu propia comparativa, sin fiarte de rankings ajenos.</em></p>
   <div class="duel-bars" aria-hidden="true">
     <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="97" height="6" fill="#b5e853"/></svg><span class="a">31/32</span></div>
@@ -106,7 +117,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
   </div>
 </header>
 
-<main>
+<main id="contenido">
 <section aria-labelledby="que">
   <h2 id="que">Qué hace</h2>
   <div class="steps">
@@ -157,9 +168,9 @@ def test_basico():
   <table>
     <thead><tr><th scope="col">Especificación</th><th scope="col">Qué usa</th><th scope="col">Variables de entorno</th></tr></thead>
     <tbody>
-      <tr><td>replay:&lt;nombre&gt;</td><td>Respuestas grabadas en <code>examples/replays/&lt;nombre&gt;/&lt;tarea&gt;.md</code>. Sin red ni coste.</td><td>—</td></tr>
-      <tr><td>gemini:&lt;modelo&gt;</td><td>API REST <code>generateContent</code> de Google.</td><td><code>GEMINI_API_KEY</code></td></tr>
-      <tr><td>openai:&lt;modelo&gt;</td><td>Cualquier API compatible con Chat Completions: OpenAI, OpenRouter, Ollama…</td><td><code>OPENAI_API_KEY</code>, <code>OPENAI_BASE_URL</code></td></tr>
+      <tr><th scope="row">replay:&lt;nombre&gt;</th><td>Respuestas grabadas en <code>examples/replays/&lt;nombre&gt;/&lt;tarea&gt;.md</code>. Sin red ni coste.</td><td>—</td></tr>
+      <tr><th scope="row">gemini:&lt;modelo&gt;</th><td>API REST <code>generateContent</code> de Google.</td><td><code>GEMINI_API_KEY</code></td></tr>
+      <tr><th scope="row">openai:&lt;modelo&gt;</th><td>Cualquier API compatible con Chat Completions: OpenAI, OpenRouter, Ollama…</td><td><code>OPENAI_API_KEY</code>, <code>OPENAI_BASE_URL</code></td></tr>
     </tbody>
   </table>
   </div>

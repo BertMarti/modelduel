@@ -49,7 +49,7 @@ def load_prices(path: Path | None) -> dict[str, Price]:
     if path is None:
         return table
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     except OSError as exc:
         raise PricingError(f"No se pudo leer {path}: {exc}") from exc
     except json.JSONDecodeError as exc:

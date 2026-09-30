@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="modelduel $version">
 <title>$page_title</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230f0f11'/%3E%3Crect x='2' y='4' width='5' height='8' fill='%23b5e853'/%3E%3Crect x='9' y='4' width='5' height='8' fill='%23ff7eb6'/%3E%3C/svg%3E">
 <style>
 :root {
   --bg: #0f0f11;
@@ -31,6 +32,7 @@ a:hover { text-decoration-color: currentColor; }
 .b { color: var(--b); }
 .muted { color: var(--muted); }
 .mono { font-family: var(--mono); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .eyebrow {
   font: 12px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase;
   color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px;
@@ -39,7 +41,7 @@ h1 {
   font: 700 clamp(34px, 6.4vw, 68px)/1.02 var(--mono); letter-spacing: -.035em;
   margin: 22px 0 14px; overflow-wrap: anywhere;
 }
-h1 .vs { color: var(--muted); font-weight: 400; font-size: .5em; letter-spacing: 0; padding: 0 .25em; vertical-align: .35em; }
+h1 .vs { color: var(--muted); font-weight: 400; font-size: .5em; letter-spacing: 0; vertical-align: .35em; }
 h2 {
   font: 600 13px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase;
   color: var(--muted); margin: 64px 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
@@ -70,7 +72,7 @@ h2 {
 }
 .metric .val { font: 500 20px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
 .metric .val.b-side { text-align: right; }
-.metric .val.lose { opacity: .55; }
+.metric .val.lose .num { opacity: .8; }
 .metric .val .mark { font-size: 9px; vertical-align: 5px; margin: 0 8px; }
 .metric .val .sub { display: block; font: 12px/1.4 var(--mono); color: var(--muted); margin-top: 4px; }
 .metric .mid { text-align: center; }
@@ -110,10 +112,10 @@ caption { text-align: left; color: var(--muted); font-size: 13px; padding-bottom
 th, td { padding: 11px 9px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
 th { font: 11px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
 thead tr:first-child th { border-bottom: 0; padding-bottom: 2px; }
-thead tr:first-child th:first-child, tbody td:first-child { text-align: left; white-space: normal; padding-left: 0; min-width: 170px; }
+thead tr:first-child th:first-child, tbody th:first-child { text-align: left; white-space: normal; padding-left: 0; min-width: 170px; }
 thead tr + tr th { padding-top: 0; }
-td.task { font-family: var(--mono); }
-td.task span { display: block; font-size: 12px; color: var(--muted); font-family: var(--sans); }
+th.task { font: 14px/1.4 var(--mono); letter-spacing: 0; text-transform: none; color: var(--text); }
+th.task span { display: block; font-size: 12px; color: var(--muted); font-family: var(--sans); }
 td.mono { font-family: var(--mono); }
 .status { font: 11px var(--mono); color: var(--muted); display: block; }
 
@@ -170,6 +172,9 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--line);
   details > summary::before { content: ""; width: 0; }
   details::details-content { content-visibility: visible; display: block; }
   .bar-line svg, .metric svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .table-wrap { overflow: visible; }
+  table { font-size: 11px; }
+  th, td { white-space: normal; padding: 6px 4px; }
   section, .metric, details { break-inside: avoid; }
   a { text-decoration: none; }
 }
@@ -179,7 +184,7 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--line);
 <div class="wrap">
 <header>
   <div class="eyebrow"><span>modelduel</span><span>Informe de duelo</span><span>$date_human</span><span>v$version</span></div>
-  <h1><span class="a">$label_a</span><span class="vs">vs</span><span class="b">$label_b</span></h1>
+  <h1><span class="a">$label_a</span> <span class="vs">vs</span> <span class="b">$label_b</span></h1>
   <p class="lede">$lede</p>
 </header>
 
@@ -187,12 +192,12 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--line);
 <section class="board" aria-label="Marcador">
   <div class="left">
     <div class="side-name"><b class="a">A</b>$spec_a</div>
-    <div class="big a">$score_a<small>/$score_total</small></div>
+    <div class="big a">$score_a<small>/$score_total_a</small></div>
   </div>
   <div class="colon" aria-hidden="true">:</div>
   <div class="right">
     <div class="side-name"><b class="b">B</b>$spec_b</div>
-    <div class="big b">$score_b<small>/$score_total</small></div>
+    <div class="big b">$score_b<small>/$score_total_b</small></div>
   </div>
   <p class="verdict">tests superados · $verdict</p>
 </section>
@@ -202,7 +207,7 @@ $metrics
 </section>
 
 <aside class="warn" role="note">
-  <strong>Una sola ejecución es una señal débil.</strong> $warning
+  $warning
 </aside>
 
 <h2>Tests superados por tarea</h2>

@@ -40,17 +40,34 @@ class OpenAIProvider:
         return parse_openai_response(data, latency)
 
 
-def parse_openai_response(data: dict, latency: float) -> Response:
+def parse_openai_response(data: object, latency: float) -> Response:
+    if not isinstance(data, dict):
+        raise ProviderError("La API devolvió una respuesta con un formato inesperado.")
     choices = data.get("choices") or []
     if not choices:
         error = data.get("error")
-        detail = error.get("message") if isinstance(error, dict) else "sin opciones"
+        if isinstance(error, dict):
+            detail = error.get("message") or "sin opciones"
+        else:
+            detail = error if isinstance(error, str) and error.strip() else "sin opciones"
         raise ProviderError(f"La API no devolvió respuesta ({detail}).")
-    message = choices[0].get("message") or {}
+    choice = choices[0]
+    if not isinstance(choice, dict):
+        raise ProviderError("La API devolvió una opción con un formato inesperado.")
+    message = choice.get("message")
+    message = message if isinstance(message, dict) else {}
     content = message.get("content") or ""
     if isinstance(content, list):  # algunos servidores devuelven partes
-        content = "".join(p.get("text", "") for p in content if isinstance(p, dict))
-    usage = data.get("usage") or {}
+        content = "".join(str(p.get("text") or "") for p in content if isinstance(p, dict))
+    if not isinstance(content, str):
+        content = ""
+    if not content.strip():
+        if message.get("refusal"):
+            raise ProviderError(f"El modelo rechazó la petición: {message['refusal']}")
+        reason = choice.get("finish_reason") or "sin texto"
+        raise ProviderError(f"La API no devolvió texto (finish_reason: {reason}).")
+    usage = data.get("usage")
+    usage = usage if isinstance(usage, dict) else {}
     return Response(
         text=content,
         input_tokens=as_int(usage.get("prompt_tokens")),

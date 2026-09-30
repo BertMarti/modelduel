@@ -32,14 +32,30 @@ class GeminiProvider:
         return parse_gemini_response(data, latency)
 
 
-def parse_gemini_response(data: dict, latency: float) -> Response:
+def parse_gemini_response(data: object, latency: float) -> Response:
+    if not isinstance(data, dict):
+        raise ProviderError("Gemini devolvió una respuesta con un formato inesperado.")
     candidates = data.get("candidates") or []
     if not candidates:
-        reason = (data.get("promptFeedback") or {}).get("blockReason", "sin candidatos")
-        raise ProviderError(f"Gemini no devolvió respuesta ({reason}).")
-    parts = (candidates[0].get("content") or {}).get("parts") or []
-    text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-    usage = data.get("usageMetadata") or {}
+        feedback = data.get("promptFeedback")
+        reason = feedback.get("blockReason") if isinstance(feedback, dict) else None
+        raise ProviderError(f"Gemini no devolvió respuesta ({reason or 'sin candidatos'}).")
+    first = candidates[0]
+    if not isinstance(first, dict):
+        raise ProviderError("Gemini devolvió un candidato con un formato inesperado.")
+    content = first.get("content")
+    parts = content.get("parts") if isinstance(content, dict) else None
+    text = "".join(
+        str(p.get("text") or "")
+        for p in parts or []
+        if isinstance(p, dict) and not p.get("thought")
+    )
+    if not text.strip():
+        # SAFETY, RECITATION, MAX_TOKENS (todo el presupuesto en razonamiento)...
+        reason = first.get("finishReason") or "sin texto"
+        raise ProviderError(f"Gemini no devolvió texto (finishReason: {reason}).")
+    usage = data.get("usageMetadata")
+    usage = usage if isinstance(usage, dict) else {}
     output = as_int(usage.get("candidatesTokenCount"))
     thoughts = as_int(usage.get("thoughtsTokenCount")) or 0
     return Response(

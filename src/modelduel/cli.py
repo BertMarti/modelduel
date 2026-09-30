@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import math
+import re
 import sys
 from pathlib import Path
 
@@ -16,16 +18,77 @@ from modelduel.results import ResultsError, load_results, save_results
 from modelduel.runner import DEFAULT_TIMEOUT, RunnerError, ensure_pytest_available
 from modelduel.tasks import TaskError, discover_tasks, is_task_dir
 
+# Códigos de salida: 0 duelo completado (aunque los modelos fallen tests), 1 no se pudieron
+# escribir los resultados, 2 error de uso o de configuración, 130 interrumpido con Ctrl+C.
+EXIT_OK = 0
+EXIT_ERROR = 1
 EXIT_USAGE = 2
+EXIT_INTERRUPTED = 130
+
+
+class OutputError(Exception):
+    """No se pudo escribir en la carpeta de salida."""
+
+
+# argparse no trae traducciones: se traducen sus mensajes de error más habituales.
+_ARGPARSE_ES = [
+    (r"the following arguments are required: (.+)", r"faltan argumentos obligatorios: \1"),
+    (
+        r"argument orden: invalid choice: (.+?) \(choose from (.+)\)",
+        r"orden no válida: \1 (elige entre \2)",
+    ),
+    (
+        r"argument (.+?): invalid choice: (.+?) \(choose from (.+)\)",
+        r"argumento \1: valor no válido: \2 (elige entre \3)",
+    ),
+    (r"argument (.+?): invalid \w+ value: (.+)", r"argumento \1: valor no válido: \2"),
+    (r"argument (.+?): expected one argument", r"argumento \1: necesita un valor"),
+    (r"unrecognized arguments: (.+)", r"argumentos no reconocidos: \1"),
+    (r"ambiguous option: (.+?) could match (.+)", r"opción ambigua: \1 puede ser \2"),
+]
+
+
+def translate_argparse(message: str) -> str:
+    for pattern, replacement in _ARGPARSE_ES:
+        translated, n = re.subn(f"^{pattern}$", replacement, message)
+        if n:
+            return translated
+    return message
+
+
+class _SpanishHelpFormatter(argparse.HelpFormatter):
+    def add_usage(self, usage, actions, groups, prefix=None):
+        super().add_usage(usage, actions, groups, prefix="uso: " if prefix is None else prefix)
+
+
+class SpanishArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser con ayuda y errores en español y código de salida ``EXIT_USAGE``."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        kwargs["add_help"] = False
+        kwargs.setdefault("formatter_class", _SpanishHelpFormatter)
+        super().__init__(*args, **kwargs)
+        self._positionals.title = "argumentos posicionales"
+        self._optionals.title = "opciones"
+        self.add_argument("-h", "--help", action="help", help="muestra esta ayuda y sale")
+
+    def error(self, message: str):  # type: ignore[override]
+        self.print_usage(sys.stderr)
+        self.exit(EXIT_USAGE, f"{self.prog}: error: {translate_argparse(message)}\n")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = SpanishArgumentParser(
         prog="modelduel",
         description="Dos modelos, una tarea, los mismos tests.",
         epilog="Aviso: el código generado por los modelos se ejecuta en tu máquina.",
     )
-    parser.add_argument("--version", action="version", version=f"modelduel {__version__}")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"modelduel {__version__}",
+        help="muestra la versión y sale",
+    )
     sub = parser.add_subparsers(dest="command", required=True, metavar="orden")
 
     run = sub.add_parser("run", help="enfrenta a dos modelos y genera el informe")
@@ -69,16 +132,19 @@ def main(argv: list[str] | None = None) -> int:
     except (TaskError, ProviderError, PricingError, ResultsError, RunnerError) as exc:
         print(f"modelduel: error: {exc}", file=sys.stderr)
         return EXIT_USAGE
+    except OutputError as exc:
+        print(f"modelduel: error: {exc}", file=sys.stderr)
+        return EXIT_ERROR
     except KeyboardInterrupt:
         print("\nmodelduel: interrumpido.", file=sys.stderr)
-        return 130
+        return EXIT_INTERRUPTED
 
 
 def cmd_run(args: argparse.Namespace) -> int:
     if args.runs < 1:
         raise TaskError("--runs debe ser 1 o más.")
-    if args.timeout <= 0:
-        raise TaskError("--timeout debe ser mayor que 0.")
+    if not math.isfinite(args.timeout) or args.timeout <= 0:
+        raise TaskError("--timeout debe ser un número de segundos mayor que 0.")
     tasks = discover_tasks(args.tasks)
     prices = load_prices(args.prices)
     # examples/tasks[/<tarea>] -> examples/replays
@@ -90,6 +156,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     ]
     providers = {"a": get_provider(args.a, replay_dirs), "b": get_provider(args.b, replay_dirs)}
     ensure_pytest_available()
+    # Antes de gastar llamadas a las APIs: la carpeta de salida tiene que poder crearse.
+    _prepare_out(args.out)
 
     print(
         f"modelduel {__version__} · {plural(len(tasks), 'tarea', 'tareas')} · "
@@ -107,8 +175,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         timeout=args.timeout,
         progress=lambda line: print(line, flush=True),
     )
-    save_results(results, args.out / "results.json")
-    html_path = write_report(results, args.out)
+    html_path = _write_outputs(results, args.out, with_json=True)
     print()
     print(scoreboard(results))
     print()
@@ -119,9 +186,31 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_report(args: argparse.Namespace) -> int:
     results = load_results(args.results)
-    html_path = write_report(results, args.out)
+    _prepare_out(args.out)
+    try:
+        html_path = _write_outputs(results, args.out, with_json=False)
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        raise ResultsError(
+            f"{args.results} no parece un results.json de modelduel ({type(exc).__name__}: {exc})."
+        ) from exc
     print(f"Informe regenerado: {html_path}")
     return 0
+
+
+def _prepare_out(out: Path) -> None:
+    try:
+        out.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise OutputError(f"no se pudo escribir en {out}: {exc.strerror or exc}.") from exc
+
+
+def _write_outputs(results: dict, out: Path, with_json: bool) -> Path:
+    try:
+        if with_json:
+            save_results(results, out / "results.json")
+        return write_report(results, out)
+    except OSError as exc:
+        raise OutputError(f"no se pudo escribir en {out}: {exc.strerror or exc}.") from exc
 
 
 def cmd_list_tasks(args: argparse.Namespace) -> int:

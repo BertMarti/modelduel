@@ -39,6 +39,7 @@ def fmt_int(value: int | None) -> str:
 def fmt_seconds(value: float | None) -> str:
     if value is None:
         return "sin datos"
+    value = round(value, 1)  # sin esto, 119,97 s salía como «1 min 60,0 s»
     if value >= 60:
         minutes, seconds = divmod(value, 60)
         return f"{int(minutes)} min {seconds:04.1f} s".replace(".", ",")
@@ -70,7 +71,7 @@ def fmt_date(iso: str) -> str:
     try:
         dt = datetime.fromisoformat(iso)
     except (TypeError, ValueError):
-        return e(iso)
+        return str(iso)  # texto plano: lo escapa quien lo inserta
     return f"{dt.day} {MONTHS[dt.month - 1]} {dt.year} · {dt:%H:%M} UTC"
 
 
@@ -92,6 +93,7 @@ def svg_versus_bar(value_a: float | None, value_b: float | None, label: str) -> 
     len_b = (half - gap) * b / top
     return (
         f'<svg viewBox="0 0 400 6" preserveAspectRatio="none" role="img" aria-label="{e(label)}">'
+        f"<title>{e(label)}</title>"
         f'<rect class="track" x="0" y="2.5" width="400" height="1" fill="#2a2a2f"/>'
         f'<rect class="fill-a" x="{half - gap - len_a:.2f}" y="0" width="{len_a:.2f}" height="6"/>'
         f'<rect class="fill-b" x="{half + gap:.2f}" y="0" width="{len_b:.2f}" height="6"/>'
@@ -104,6 +106,7 @@ def svg_ratio_bar(ratio: float, side: str, label: str) -> str:
     width = max(0.0, min(ratio, 1.0)) * 100
     return (
         f'<svg viewBox="0 0 100 6" preserveAspectRatio="none" role="img" aria-label="{e(label)}">'
+        f"<title>{e(label)}</title>"
         '<rect class="track" x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/>'
         f'<rect class="fill-{side}" x="0" y="0" width="{width:.2f}" height="6"/>'
         "</svg>"
@@ -162,11 +165,14 @@ def metric_row(
         mark = ""
         if winner == side:
             classes.append("win")
-            mark = '<span class="mark" title="mejor">●</span>'
+            mark = (
+                '<span class="mark" aria-hidden="true">●</span><span class="sr-only">(mejor)</span>'
+            )
         elif winner is not None:
             classes.append("lose")
         sub = f'<span class="sub">{e(subs[idx])}</span>' if subs[idx] else ""
-        value = f"{mark}{e(shown[idx])}" if side == "b" else f"{e(shown[idx])}{mark}"
+        num = f'<span class="num">{e(shown[idx])}</span>'
+        value = f"{mark}{num}" if side == "b" else f"{num}{mark}"
         cells.append(f'<div class="{" ".join(classes)}">{value}{sub}</div>')
     hint_html = f'<div class="hint">{e(hint)}</div>' if hint else ""
     bar = svg_versus_bar(raw[0], raw[1], f"{label}: A {shown[0]}, B {shown[1]}")
@@ -177,8 +183,9 @@ def metric_row(
     )
 
 
-def build_metrics(summary: dict) -> str:
+def build_metrics(summary: dict, runs: int = 1) -> str:
     sa, sb = summary["a"], summary["b"]
+    summed = f"suma de {runs} ejecuciones" if runs > 1 else ""
     rows = [
         metric_row(
             "Tareas resueltas",
@@ -196,6 +203,7 @@ def build_metrics(summary: dict) -> str:
                 f"{sb['tests_passed']}/{sb['tests_total']}",
             ),
             (sa["tests_passed"], sb["tests_passed"]),
+            hint=summed,
         ),
         metric_row(
             "Tiempo del modelo",
@@ -206,7 +214,7 @@ def build_metrics(summary: dict) -> str:
                 f"tests: {fmt_seconds(sa['test_time_s'])}",
                 f"tests: {fmt_seconds(sb['test_time_s'])}",
             ),
-            hint="menos es mejor",
+            hint="menos es mejor" + (f" · {summed}" if summed else ""),
         ),
         metric_row(
             "Tokens",
@@ -220,6 +228,19 @@ def build_metrics(summary: dict) -> str:
             hint="menos es mejor",
         ),
     ]
+    if runs > 1:
+        rows.insert(
+            1,
+            metric_row(
+                "Intentos resueltos",
+                (
+                    f"{sa['attempts_solved']}/{sa['attempts_total']}",
+                    f"{sb['attempts_solved']}/{sb['attempts_total']}",
+                ),
+                (sa["attempts_solved"], sb["attempts_solved"]),
+                hint="ejecuciones con todos los tests en verde",
+            ),
+        )
     same_currency = sa["currency"] == sb["currency"]
     cost_hint = "menos es mejor"
     if sa["fictitious_price"] or sb["fictitious_price"]:
@@ -280,7 +301,7 @@ def build_table_rows(results: dict) -> str:
     for task in results["tasks"]:
         t = {side: _side_task_totals(task["results"][side], currencies[side]) for side in SIDES}
         diff = f"<span>{e(task.get('difficulty'))}</span>" if task.get("difficulty") else ""
-        cells = [f'<td class="task">{e(task["title"])}{diff}</td>']
+        cells = [f'<th scope="row" class="task">{e(task["title"])}{diff}</th>']
         for side in SIDES:
             status = (
                 f'<span class="status">{e(t[side]["status"])}</span>' if t[side]["status"] else ""
@@ -329,13 +350,13 @@ def build_details(results: dict) -> str:
 def _attempt_html(attempt: dict, runs: int) -> str:
     head = []
     if runs > 1:
-        head.append(f"<strong>Ejecución {attempt.get('run', '?')}</strong>")
-    head.append(f"{attempt['passed']}/{attempt['total']} tests")
+        head.append(f"<strong>Ejecución {e(attempt.get('run', '?'))}</strong>")
+    head.append(f"{e(attempt['passed'])}/{e(attempt['total'])} tests")
     if attempt["status"] == "ok":
         failing = attempt["failed"] + attempt["errors"]
         head.append("resuelta" if attempt["solved"] else plural(failing, "falla", "fallan"))
     else:
-        head.append(STATUS_LABELS.get(attempt["status"], attempt["status"]))
+        head.append(e(STATUS_LABELS.get(attempt["status"], attempt["status"])))
     if attempt.get("latency_s") is not None:
         head.append(fmt_seconds(attempt["latency_s"]))
     parts = [f'<div class="attempt"><div class="attempt-head">{" · ".join(head)}</div>']
@@ -357,22 +378,25 @@ def _attempt_html(attempt: dict, runs: int) -> str:
 def build_warning(runs: int) -> str:
     if runs <= 1:
         return (
+            "<strong>Una sola ejecución es una señal débil.</strong> "
             "Los modelos no son deterministas: la misma pregunta puede dar otra respuesta mañana. "
             "Repite el duelo con <code>--runs N</code> y con tareas de tu propio trabajo antes de "
             "sacar conclusiones."
         )
     return (
+        "<strong>Pocas ejecuciones siguen siendo una señal débil.</strong> "
         f"Aquí hay {runs} ejecuciones por tarea, mejor que una, pero sigue siendo una muestra "
         "pequeña. Usa tareas de tu propio trabajo y mira el código, no solo el marcador."
     )
 
 
-def _verdict(summary: dict) -> str:
+def _verdict(summary: dict, runs: int = 1) -> str:
     a, b = summary["a"]["tests_passed"], summary["b"]["tests_passed"]
+    summed = f" (suma de {runs} ejecuciones)" if runs > 1 else ""
     if a == b:
-        return "empate"
+        return "empate" + summed
     side = "a" if a > b else "b"
-    return f'gana <strong class="{side}">{side.upper()}</strong> por {abs(a - b)}'
+    return f'gana <strong class="{side}">{side.upper()}</strong> por {abs(a - b)}{summed}'
 
 
 def _short_label(spec: str) -> str:
@@ -399,7 +423,6 @@ def render_report(results: dict) -> str:
         if fictitious
         else "Coste = entrada/1e6 × tarifa + salida/1e6 × tarifa · «sin datos» si no hay precio."
     )
-    total_expected = summary["a"]["tests_total"] or summary["b"]["tests_total"]
     template = Template(
         resources.files("modelduel.report").joinpath("template.html").read_text("utf-8")
     )
@@ -419,9 +442,10 @@ def render_report(results: dict) -> str:
         ),
         score_a=summary["a"]["tests_passed"],
         score_b=summary["b"]["tests_passed"],
-        score_total=total_expected,
-        verdict=_verdict(summary),
-        metrics=build_metrics(summary),
+        score_total_a=summary["a"]["tests_total"],
+        score_total_b=summary["b"]["tests_total"],
+        verdict=_verdict(summary, runs),
+        metrics=build_metrics(summary, runs),
         warning=build_warning(runs),
         chart=task_chart(results["tasks"]),
         table_caption=e(

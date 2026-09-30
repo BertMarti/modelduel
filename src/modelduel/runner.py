@@ -1,15 +1,20 @@
 """Construye el prompt y ejecuta los tests de una tarea sobre el código de un modelo.
 
 El código generado se ejecuta SIEMPRE en un directorio temporal, en un subproceso con límite
-de tiempo y sin las variables de entorno que parecen secretos.
+de tiempo y sin las variables de entorno que parecen secretos. Al terminar (o al agotar el
+tiempo) se mata el árbol de procesos completo: un *Job Object* en Windows y un grupo de procesos
+en POSIX. La salida va a un archivo y solo se leen su principio y su final, así que una solución
+que imprime sin parar no puede agotar la memoria.
 """
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -22,6 +27,8 @@ from modelduel.tasks import TEST_FILE, Task
 
 DEFAULT_TIMEOUT = 20.0
 MAX_OUTPUT_CHARS = 12_000
+# Bytes que se leen como máximo del archivo de salida (mitad del principio, mitad del final).
+MAX_READ_BYTES = 256 * 1024
 
 PROMPT_INSTRUCTIONS = """\
 ---
@@ -99,16 +106,21 @@ def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) ->
             message="La respuesta no contiene ningún bloque de código.",
         )
 
-    with tempfile.TemporaryDirectory(prefix="modelduel-", ignore_cleanup_errors=True) as tmp:
-        workdir = Path(tmp)
-        (workdir / "solution.py").write_text(code, encoding="utf-8")
+    root = Path(tempfile.mkdtemp(prefix="modelduel-"))
+    try:
+        workdir = root / "work"
+        tmpdir = root / "tmp"
+        workdir.mkdir()
+        tmpdir.mkdir()
+        (workdir / "solution.py").write_text(code, encoding="utf-8", errors="replace")
         shutil.copyfile(task.test_path, workdir / TEST_FILE)
         conftest = task.path / "conftest.py"
         if conftest.is_file():
             shutil.copyfile(conftest, workdir / "conftest.py")
         # Un pytest.ini vacío aísla la ejecución de cualquier configuración del usuario.
         (workdir / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
-        junit = workdir / "junit.xml"
+        junit = root / "junit.xml"
+        output_path = root / "output.log"
         cmd = [
             sys.executable,
             "-m",
@@ -120,41 +132,41 @@ def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) ->
             f"--junitxml={junit}",
             TEST_FILE,
         ]
-        start = time.perf_counter()
-        try:
-            proc = subprocess.run(
-                cmd,
-                cwd=workdir,
-                env=safe_env(),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-                stdin=subprocess.DEVNULL,
-            )
-        except subprocess.TimeoutExpired as exc:
-            output = _decode(exc.stdout) + _decode(exc.stderr)
-            return TestRun(
-                status="timeout",
-                total=expected,
-                duration_s=round(time.perf_counter() - start, 3),
-                output=_truncate(output),
-                message=f"Los tests superaron el límite de {timeout:g} s y se interrumpieron.",
-            )
-        duration = round(time.perf_counter() - start, 3)
-        output = _truncate(_clean_output(proc.stdout + proc.stderr, workdir))
+        env = safe_env()
+        # Los temporales de la solución y de pytest se quedan dentro de la ejecución y se borran.
+        for name in ("TMP", "TEMP", "TMPDIR"):
+            env[name] = str(tmpdir)
+        returncode, duration = _execute(cmd, workdir, env, output_path, timeout)
+        output = _truncate(_clean_output(_read_capped(output_path), root))
         counts = parse_junit(junit) if junit.is_file() else None
+    finally:
+        _remove_tree(root)
 
+    if returncode is None:
+        return TestRun(
+            status="timeout",
+            total=expected,
+            duration_s=duration,
+            output=output,
+            message=f"Los tests superaron el límite de {timeout:g} s y se interrumpieron.",
+        )
+    if returncode == 5 and (counts is None or counts["total"] == 0):
+        return TestRun(
+            status="error",
+            total=expected,
+            duration_s=duration,
+            output=output,
+            message="pytest no encontró ningún test en la tarea: revisa su test_task.py.",
+        )
     if counts is None:
         return TestRun(
             status="error",
             total=expected,
             duration_s=duration,
             output=output,
-            message=f"pytest terminó con código {proc.returncode} sin generar resultados.",
+            message=f"pytest terminó con código {returncode} sin generar resultados.",
         )
-    if counts["collection_error"] or (proc.returncode in (2, 3, 4) and counts["total"] == 0):
+    if counts["collection_error"] or (returncode in (2, 3, 4) and counts["total"] == 0):
         return TestRun(
             status="import_error",
             total=expected,
@@ -206,22 +218,155 @@ def parse_junit(path: Path) -> dict | None:
     return counts
 
 
-def _decode(data: bytes | str | None) -> str:
-    if data is None:
+# ---------------------------------------------------------------- subproceso
+
+
+def _execute(
+    cmd: list[str], workdir: Path, env: dict[str, str], output_path: Path, timeout: float
+) -> tuple[int | None, float]:
+    """Ejecuta ``cmd`` y devuelve ``(código de salida, duración)``; ``None`` si agota el tiempo.
+
+    stdout y stderr van juntos a ``output_path``: un archivo no obliga a esperar a que los
+    procesos nietos suelten una tubería. Al volver no queda vivo ningún proceso del árbol
+    (salvo los que se desliguen a propósito de él; ver «Problemas conocidos» en MEMORY.md).
+    """
+    extra: dict = {}
+    if os.name != "nt":
+        extra["start_new_session"] = True  # grupo de procesos propio para matarlo entero
+    start = time.perf_counter()
+    with open(output_path, "wb") as out:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=workdir,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=out,
+            stderr=subprocess.STDOUT,
+            **extra,
+        )
+        tree = _ProcessTree(proc)
+        try:
+            returncode: int | None = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            returncode = None
+        finally:
+            # También tras un final normal: la solución puede haber dejado hijos en marcha.
+            tree.kill()
+            proc.wait()
+    return returncode, round(time.perf_counter() - start, 3)
+
+
+class _ProcessTree:
+    """Mata un proceso y todos sus descendientes solo con la biblioteca estándar."""
+
+    def __init__(self, proc: subprocess.Popen) -> None:
+        self.proc = proc
+        self.job = _win_job_for(proc) if os.name == "nt" else None
+
+    def kill(self) -> None:
+        if os.name != "nt":
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(self.proc.pid, signal.SIGKILL)
+            return
+        if self.job is not None:  # pragma: no cover - solo Windows
+            _win_terminate_job(self.job)
+            self.job = None
+        elif self.proc.poll() is None:  # pragma: no cover - solo Windows sin Job Object
+            # taskkill recorre el árbol mientras el proceso padre siga vivo.
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(self.proc.pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+
+
+def _kernel32():  # pragma: no cover - solo Windows
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateJobObjectW.argtypes = (wintypes.LPVOID, wintypes.LPCWSTR)
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+    kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+    kernel32.TerminateJobObject.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    kernel32.TerminateJobObject.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    return kernel32
+
+
+def _win_job_for(proc: subprocess.Popen) -> int | None:  # pragma: no cover - solo Windows
+    """Mete ``proc`` en un Job Object nuevo (sus hijos entran solos). ``None`` si no se puede."""
+    try:
+        kernel32 = _kernel32()
+        job = kernel32.CreateJobObjectW(None, None)
+        if not job:
+            return None
+        if not kernel32.AssignProcessToJobObject(job, int(proc._handle)):  # type: ignore[attr-defined]
+            kernel32.CloseHandle(job)
+            return None
+        return job
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
+def _win_terminate_job(job: int) -> None:  # pragma: no cover - solo Windows
+    kernel32 = _kernel32()
+    kernel32.TerminateJobObject(job, 1)
+    kernel32.CloseHandle(job)
+
+
+def _remove_tree(path: Path) -> None:
+    """Borra el temporal; en Windows reintenta porque un proceso recién muerto tarda en soltarlo."""
+    for _ in range(10):
+        shutil.rmtree(path, ignore_errors=True)
+        if not path.exists():
+            return
+        time.sleep(0.2)
+
+
+# ---------------------------------------------------------------- salida
+
+
+def _read_capped(path: Path, limit: int = MAX_READ_BYTES) -> str:
+    """Lee como mucho ``limit`` bytes del archivo: su principio y su final."""
+    try:
+        size = path.stat().st_size
+        with open(path, "rb") as fh:
+            if size <= limit:
+                return fh.read().decode("utf-8", errors="replace")
+            half = limit // 2
+            head = fh.read(half)
+            fh.seek(size - half)
+            tail = fh.read(half)
+    except OSError:
         return ""
-    if isinstance(data, bytes):
-        return data.decode("utf-8", errors="replace")
-    return data
+    return (
+        head.decode("utf-8", errors="replace")
+        + f"\n… [salida recortada: {size - 2 * half} bytes omitidos] …\n"
+        + tail.decode("utf-8", errors="replace")
+    )
 
 
-def _clean_output(output: str, workdir: Path) -> str:
-    """Quita la ruta del directorio temporal para que el informe no muestre rutas locales."""
-    for variant in {str(workdir), str(workdir.resolve()), workdir.as_posix()}:
+def _clean_output(output: str, root: Path) -> str:
+    """Normaliza los finales de línea y quita la ruta del temporal para no mostrar rutas locales."""
+    output = output.replace("\r\n", "\n").replace("\r", "\n")
+    variants: set[str] = set()
+    for base in (root / "work", root):
+        for form in (base, base.resolve()):
+            variants |= {str(form), form.as_posix()}
+    # Primero las más largas, para que ``<root>/work`` no quede como ``<tmp>/work``.
+    for variant in sorted(variants, key=len, reverse=True):
         output = output.replace(variant, "<tmp>")
     return re.sub(r"\n{3,}", "\n\n", output).strip()
 
 
 def _truncate(text: str, limit: int = MAX_OUTPUT_CHARS) -> str:
+    """Conserva el principio y el final: pytest imprime el resumen al final."""
     if len(text) <= limit:
         return text
-    return text[:limit] + f"\n… [salida recortada: {len(text) - limit} caracteres más]"
+    half = limit // 2
+    omitted = len(text) - 2 * half
+    return f"{text[:half]}\n… [salida recortada: {omitted} caracteres omitidos] …\n{text[-half:]}"
