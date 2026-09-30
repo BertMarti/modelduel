@@ -70,6 +70,7 @@ modelduel list-tasks examples/tasks
 | `--a`, `--b` | Contendientes en formato `proveedor:modelo`. |
 | `--runs N` | Ejecuciones por tarea (1 por defecto). Una sola ejecución es una señal débil. |
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
+| `--retries N` | Reintentos ante HTTP 429/500/502/503/504 y cortes de conexión, con espera exponencial y respetando `Retry-After` (3 por defecto; `0` los desactiva). |
 | `--prices f.json` | Tabla de precios adicional (ver «Coste»). |
 | `--replays DIR` | Carpeta de respuestas grabadas para `replay` (por defecto, `replays/` junto a la carpeta de tareas). |
 | `--out DIR` | Carpeta donde se escriben `results.json` e `index.html`. Se comprueba antes de llamar a las APIs. |
