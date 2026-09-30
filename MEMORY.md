@@ -1,10 +1,10 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por builder (v0.2.0 · #4)
+Última actualización: 2026-09-30 por builder (v0.2.0 · #5)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
 - #4 reintentos ante 429/5xx (rama `agent/builder/4-reintentos`): HECHO, en PR.
-- #5 guardado incremental y `--resume`: pendiente.
+- #5 guardado incremental y `--resume` (rama `agent/builder/5-guardado-incremental`, parte de la de #4): HECHO, en PR.
 - #6 liga de 2 a 6 contendientes: pendiente.
 - #7 publicación en PyPI: pendiente.
 
@@ -12,6 +12,8 @@ Base heredada de v0.1.0:
 - CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
 - Proveedores `replay`, `gemini` (REST `generateContent`) y `openai` (Chat Completions compatible: OpenAI, OpenRouter, Ollama). Errores de red, HTTP y respuestas vacías o raras se convierten en `ProviderError` con mensaje en español.
 - Reintentos (#4): `post_json` reintenta HTTP 429/500/502/503/504 y cortes de conexión (`--retries N`, 3 por defecto, `0` los desactiva) con espera exponencial (1 s × 2^n, tope 30 s) y jitter (50-100 %), respetando `Retry-After` (segundos o fecha; si pide más de 120 s no se espera). Cada reintento se avisa en consola (`~~  openai:modelo: reintento 1/3 en 1.2 s: HTTP 429 ...`).
+- Guardado incremental (#5): `run_duel` llama a `on_update` tras cada intento y la CLI reescribe `results.json` de forma atómica (`.tmp` + `os.replace`, con reintentos por si Windows lo tiene abierto). `results.json` lleva `status` (`in_progress`/`complete`), `updated_at` y una huella (`fingerprint`) por tarea. Ctrl+C escribe además un informe parcial con el aviso «Duelo incompleto».
+- `--resume` (`src/modelduel/resume.py`): reutiliza los intentos terminados de tareas sin cambios y repite los `provider_error`; contendientes distintos = error (exit 2); tarea cambiada, otro `--timeout` u otro `--runs` = aviso. Sin `--resume` no se sobrescribe un duelo incompleto (sí uno completo o ilegible, como en v0.1.0).
 - Runner: extrae el bloque de código, ejecuta pytest en un directorio temporal con límite de tiempo y lee el XML JUnit. Mata el árbol de procesos al terminar, acota la salida y distingue `ok`, `no_code`, `import_error`, `timeout`, `error` y `provider_error`.
 - Costes con tabla ampliable (`--prices`); solo hay precios ficticios integrados para `replay:alfa` y `replay:beta`.
 - Informe HTML «duelo editorial oscuro» (`string.Template`, CSS en línea, SVG con `<title>` y `aria-label`, sin JavaScript, hoja de impresión). Con `--runs` > 1 muestra «Intentos resueltos» y «suma de N ejecuciones».
@@ -51,11 +53,14 @@ Base heredada de v0.1.0:
 - 2026-09-30 (builder): #4 no reintenta los tiempos de espera agotados (`MODELDUEL_HTTP_TIMEOUT`, 180 s por defecto: reintentar triplicaría la espera) ni los servidores apagados (`ConnectionRefusedError`, p. ej. Ollama sin arrancar) ni errores DNS; sí los cortes de una conexión ya abierta (`ConnectionError`, `RemoteDisconnected`, `IncompleteRead`). La latencia registrada es la del intento bueno, sin las esperas.
 - 2026-09-30 (builder): `RetryPolicy` (en `providers/base.py`) lleva `sleep` y `rng` inyectables: los tests de reintentos no esperan y el jitter es determinista.
 - 2026-09-30 (lead/builder): flujo de v0.2.0 por issues, ramas `agent/<rol>/<n>-<slug>`, PRs siempre contra `main` con `Closes #n`, y Alberto fusiona (ver `AGENTS.md`). Los PR encadenados deben fusionarse con «Create a merge commit» (no squash) y en orden.
+- 2026-09-30 (builder): #5 `--resume` NO mezcla contendientes distintos (error) pero sí tolera cambios de timeout/runs/tareas con aviso; los `provider_error` se repiten porque el motivo de reanudar suele ser precisamente un fallo del proveedor. El coste de los intentos reutilizados se recalcula con la tabla de precios actual.
+- 2026-09-30 (builder): #5 `tasks_solved` exige tantos intentos como `runs` para contar una tarea como resuelta: en un `results.json` parcial no cuenta como resuelta una tarea con ejecuciones sin hacer.
+- 2026-09-30 (builder): #5 si falla el guardado intermedio (disco lleno) el duelo continúa con un único aviso; el guardado final sí es un error (exit 1).
 
 ## Siguiente paso
 1. Alberto: fusionar los PR de v0.2.0 en orden (#4, #5, #6, #7) con «Create a merge commit».
 2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
-3. builder: continuar con #5 (guardado incremental y `--resume`).
+3. builder: continuar con #6 (liga de 2 a 6 contendientes).
 
 ## Problemas conocidos
 - El aislamiento es solo un directorio temporal + subproceso con límite + entorno sin secretos + muerte del árbol de procesos: el código del modelo puede leer y escribir en el resto del disco. Está advertido en README y web; lo ideal es usar un contenedor o VM.
@@ -70,3 +75,4 @@ Base heredada de v0.1.0:
 - 2026-09-30 qa (agent/qa): revisión QA en PR #2: runner (árbol de procesos, salida acotada, UTF-8/CRLF, tareas sin tests), tareas (BOM, tests rotos, parametrize), proveedores (errores de red/HTTP, respuestas vacías), duelo resiliente, informe (escapado, `--runs`, accesibilidad AA, impresión), CLI en español con códigos coherentes, web (meta, favicon, accesibilidad) y cobertura en CI. 68 → 132 tests.
 - 2026-09-30 docs · Claude Code Sonnet (agent/docs): `docs/USO.md` (guía completa en español, comprobada contra el código y ejecutando la demo y un ejemplo de tarea nuevo con respuestas grabadas), `CONTRIBUTING.md`, enlaces desde README y web, y fila docs de `AGENTS.md` actualizada.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/4-reintentos): #4 reintentos con espera exponencial y jitter ante 429/5xx y cortes de conexión, `--retries`, avisos en consola, tests sin red ni esperas; AGENTS.md con el flujo por issues de v0.2.0.
+- 2026-09-30 builder · Claude Code Sonnet (agent/builder/5-guardado-incremental): #5 guardado incremental atómico de `results.json`, `--resume`, informe parcial al cortar con Ctrl+C y tests de corte y reanudación.

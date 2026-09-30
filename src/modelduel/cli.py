@@ -15,7 +15,8 @@ from modelduel.providers import ProviderError, get_provider
 from modelduel.providers.base import DEFAULT_RETRIES
 from modelduel.report import write_report
 from modelduel.report.html import fmt_cost, fmt_int, fmt_seconds, plural
-from modelduel.results import ResultsError, load_results, save_results
+from modelduel.results import ResultsError, load_results, save_results, summarize
+from modelduel.resume import ResumeError, plan_resume
 from modelduel.runner import DEFAULT_TIMEOUT, RunnerError, ensure_pytest_available
 from modelduel.tasks import TaskError, discover_tasks, is_task_dir
 
@@ -111,6 +112,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help=f"reintentos ante HTTP 429/5xx y cortes de conexión ({DEFAULT_RETRIES})",
     )
+    run.add_argument(
+        "--resume",
+        action="store_true",
+        help="continúa el duelo de --out saltando los intentos ya terminados",
+    )
     run.add_argument("--prices", type=Path, metavar="F.json", help="tabla de precios adicional")
     run.add_argument(
         "--replays", type=Path, metavar="DIR", help="carpeta de respuestas grabadas para replay"
@@ -137,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "report":
             return cmd_report(args)
         return cmd_list_tasks(args)
-    except (TaskError, ProviderError, PricingError, ResultsError, RunnerError) as exc:
+    except (TaskError, ProviderError, PricingError, ResultsError, RunnerError, ResumeError) as exc:
         print(f"modelduel: error: {exc}", file=sys.stderr)
         return EXIT_USAGE
     except OutputError as exc:
@@ -175,30 +181,109 @@ def cmd_run(args: argparse.Namespace) -> int:
     ensure_pytest_available()
     # Antes de gastar llamadas a las APIs: la carpeta de salida tiene que poder crearse.
     _prepare_out(args.out)
+    results_path = args.out / "results.json"
+    previous = _load_previous(results_path, args.resume)
+    reuse: dict = {}
+    warnings: list[str] = []
+    if previous is not None:
+        specs = {side: provider.spec for side, provider in providers.items()}
+        reuse, warnings = plan_resume(previous, tasks, specs, args.runs, args.timeout)
 
     print(
         f"modelduel {__version__} · {plural(len(tasks), 'tarea', 'tareas')} · "
         f"{plural(args.runs, 'ejecución', 'ejecuciones')} por tarea"
     )
-    print(f"  A  {providers['a'].spec}")
-    print(f"  B  {providers['b'].spec}")
+    for side, provider in providers.items():
+        print(f"  {side.upper()}  {provider.spec}")
     print("  Aviso: el código de los modelos se ejecuta en esta máquina (temporal + límite).")
+    if args.resume:
+        total = len(tasks) * args.runs * len(providers)
+        if previous is None:
+            print(f"  Reanudar: no hay {results_path}; se empieza de cero.")
+        else:
+            print(
+                f"  Reanudando: {plural(len(reuse), 'intento', 'intentos')} ya hecho"
+                f"{'' if len(reuse) == 1 else 's'} de {total}; "
+                f"quedan {total - len(reuse)}."
+            )
+        for warning in warnings:
+            print(f"  Aviso: {warning}")
     print()
-    results = run_duel(
-        tasks,
-        providers,
-        prices,
-        runs=args.runs,
-        timeout=args.timeout,
-        progress=lambda line: print(line, flush=True),
-    )
+
+    latest: dict = {}
+    save_failed = False
+
+    def on_update(current: dict) -> None:
+        """Guarda ``results.json`` tras cada intento sin tumbar el duelo si falla el disco."""
+        nonlocal save_failed
+        latest["results"] = current
+        try:
+            save_results(current, results_path)
+        except OSError as exc:
+            if not save_failed:
+                save_failed = True
+                print(f"  Aviso: no se pudo guardar {results_path}: {exc.strerror or exc}.")
+
+    try:
+        results = run_duel(
+            tasks,
+            providers,
+            prices,
+            runs=args.runs,
+            timeout=args.timeout,
+            progress=lambda line: print(line, flush=True),
+            on_update=on_update,
+            reuse=reuse,
+            created_at=(previous or {}).get("created_at"),
+        )
+    except KeyboardInterrupt:
+        return _interrupted(latest.get("results"), args.out)
     html_path = _write_outputs(results, args.out, with_json=True)
     print()
     print(scoreboard(results))
     print()
-    print(f"  Resultados  {args.out / 'results.json'}")
+    print(f"  Resultados  {results_path}")
     print(f"  Informe     {html_path}")
     return 0
+
+
+def _load_previous(results_path: Path, resume: bool) -> dict | None:
+    """``results.json`` previo de la carpeta de salida (o ``None``).
+
+    Sin ``--resume`` solo importa para no machacar por descuido un duelo a medias, que puede
+    haber costado dinero.
+    """
+    if not results_path.is_file():
+        return None
+    if resume:
+        return load_results(results_path)
+    try:
+        previous = load_results(results_path)
+    except ResultsError:
+        return None
+    if previous.get("status") == "in_progress":
+        raise ResumeError(
+            f"{results_path} es un duelo incompleto. Continúalo con --resume o bórralo, "
+            "o elige otra carpeta --out."
+        )
+    return None
+
+
+def _interrupted(results: dict | None, out: Path) -> int:
+    """Ctrl+C: lo hecho ya está en ``results.json``; se deja también el informe parcial."""
+    print("\nmodelduel: interrumpido.", file=sys.stderr)
+    if results is not None:
+        try:
+            results["summary"] = summarize(results)
+            write_report(results, out)
+        except (OSError, KeyError, TypeError, ValueError, AttributeError):
+            pass
+        print(
+            f"Lo hecho hasta ahora está en {out / 'results.json'}. "
+            "Continúa con la misma orden añadiendo --resume.",
+            file=sys.stderr,
+        )
+    return EXIT_INTERRUPTED
 
 
 def cmd_report(args: argparse.Namespace) -> int:
