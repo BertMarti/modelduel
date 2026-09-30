@@ -4,22 +4,42 @@ from __future__ import annotations
 
 import os
 import urllib.parse
+from collections.abc import Callable
 
-from modelduel.providers.base import ProviderError, Response, as_int, post_json, require_env
+from modelduel.providers.base import (
+    DEFAULT_RETRIES,
+    ProviderError,
+    Response,
+    RetryPolicy,
+    as_int,
+    post_json,
+    require_env,
+)
 
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 
 class GeminiProvider:
-    def __init__(self, model: str) -> None:
+    def __init__(
+        self,
+        model: str,
+        retries: int = DEFAULT_RETRIES,
+        on_retry: Callable[[str], None] | None = None,
+    ) -> None:
         if not model:
             raise ProviderError("gemini necesita un modelo: gemini:<modelo>.")
         self.model = model
+        self._on_retry = on_retry
+        self.retry = RetryPolicy(retries=retries, notify=self._notify)
         self.spec = f"gemini:{model}"
         self.base_url = os.environ.get("GEMINI_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
         self.api_key = require_env(
             "GEMINI_API_KEY", "Crea una clave en Google AI Studio y expórtala en tu terminal."
         )
+
+    def _notify(self, message: str) -> None:
+        if self._on_retry:
+            self._on_retry(f"{self.spec}: {message}")
 
     def complete(self, prompt: str, *, task_id: str | None = None) -> Response:
         model = urllib.parse.quote(self.model, safe="-._")
@@ -27,7 +47,11 @@ class GeminiProvider:
         payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
         # La clave va en una cabecera, no en la URL, para que no aparezca en errores ni logs.
         data, latency = post_json(
-            url, payload, {"x-goog-api-key": self.api_key}, secrets=(self.api_key,)
+            url,
+            payload,
+            {"x-goog-api-key": self.api_key},
+            secrets=(self.api_key,),
+            retry=self.retry,
         )
         return parse_gemini_response(data, latency)
 

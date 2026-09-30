@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
-from modelduel.providers.base import Provider, ProviderError, Response
+from modelduel.providers.base import DEFAULT_RETRIES, Provider, ProviderError, Response
 from modelduel.providers.gemini import GeminiProvider
 from modelduel.providers.openai_compat import OpenAIProvider
 from modelduel.providers.replay import ReplayProvider
@@ -25,10 +26,15 @@ def parse_spec(spec: str) -> tuple[str, str]:
     return kind, model
 
 
-def get_provider(spec: str, replay_dirs: list[Path] | None = None) -> Provider:
+def get_provider(
+    spec: str,
+    replay_dirs: list[Path] | None = None,
+    retries: int = DEFAULT_RETRIES,
+    on_retry: Callable[[str], None] | None = None,
+) -> Provider:
     kind, model = parse_spec(spec)
     if kind == "replay":
         return ReplayProvider(model, replay_dirs)
     if kind == "gemini":
-        return GeminiProvider(model)
-    return OpenAIProvider(model)
+        return GeminiProvider(model, retries, on_retry)
+    return OpenAIProvider(model, retries, on_retry)

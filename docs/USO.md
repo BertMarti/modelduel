@@ -486,6 +486,7 @@ Además de `--a`, `--b` y `--out` (obligatorias), la orden `run` acepta estas op
 |---|---|
 | `--runs N` | Ejecuciones por tarea (1 por defecto). |
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
+| `--retries N` | Reintentos ante HTTP 429/5xx y cortes de conexión (3 por defecto; `0` los desactiva). |
 | `--prices f.json` | Tabla de precios adicional. |
 | `--replays DIR` | Carpeta de respuestas grabadas para `replay`. |
 
@@ -598,7 +599,7 @@ El código del modelo tiene un error de sintaxis o no define la función con el 
 Es un problema de tu tarea, no del modelo: `test_task.py` no contiene funciones que empiecen por `test`. Compruébalo con `modelduel list-tasks`, que muestra el número de tests de cada tarea.
 
 **Errores HTTP 429 («límite de peticiones o cuota agotada»).**
-El proveedor te está limitando: has superado el número de peticiones por minuto o se ha agotado tu cuota o saldo. Espera un poco y repite, revisa tu plan, o usa un modelo distinto. modelduel **no reintenta** de momento: ese intento queda como «error del proveedor» y el duelo sigue, así que un 429 en mitad de una serie larga deja huecos. Repite el duelo cuando puedas.
+El proveedor te está limitando: has superado el número de peticiones por minuto o se ha agotado tu cuota o saldo. Espera un poco y repite, revisa tu plan, o usa un modelo distinto. modelduel **reintenta solo** los 429, 500, 502, 503 y 504 y los cortes de conexión (hasta 3 veces, con `--retries N`; `0` lo desactiva): espera 1, 2, 4… segundos con algo de azar, respeta la cabecera `Retry-After` y avisa en consola de cada reintento. Si tras los reintentos sigue fallando, o si el servidor pide esperar más de 2 minutos, ese intento queda como «error del proveedor» y el duelo sigue. Los tiempos de espera agotados (`MODELDUEL_HTTP_TIMEOUT`) no se reintentan.
 
 **Otros errores HTTP.** El mensaje incluye una pista: 400 (revisa el nombre del modelo), 401 y 403 (revisa la clave y los permisos), 404 (¿existe el modelo y es correcta `OPENAI_BASE_URL`?), y los 5xx son errores del servidor del proveedor.
 

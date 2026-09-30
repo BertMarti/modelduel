@@ -7,18 +7,33 @@ from __future__ import annotations
 
 import os
 import urllib.parse
+from collections.abc import Callable
 
-from modelduel.providers.base import ProviderError, Response, as_int, post_json
+from modelduel.providers.base import (
+    DEFAULT_RETRIES,
+    ProviderError,
+    Response,
+    RetryPolicy,
+    as_int,
+    post_json,
+)
 
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 
 
 class OpenAIProvider:
-    def __init__(self, model: str) -> None:
+    def __init__(
+        self,
+        model: str,
+        retries: int = DEFAULT_RETRIES,
+        on_retry: Callable[[str], None] | None = None,
+    ) -> None:
         if not model:
             raise ProviderError("openai necesita un modelo: openai:<modelo>.")
         self.model = model
+        self._on_retry = on_retry
+        self.retry = RetryPolicy(retries=retries, notify=self._notify)
         self.spec = f"openai:{model}"
         self.base_url = (os.environ.get("OPENAI_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
         self.api_key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -29,13 +44,21 @@ class OpenAIProvider:
                 f"(necesaria para {self.base_url}; los servidores locales como Ollama no la piden)."
             )
 
+    def _notify(self, message: str) -> None:
+        if self._on_retry:
+            self._on_retry(f"{self.spec}: {message}")
+
     def complete(self, prompt: str, *, task_id: str | None = None) -> Response:
         headers = {}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {"model": self.model, "messages": [{"role": "user", "content": prompt}]}
         data, latency = post_json(
-            f"{self.base_url}/chat/completions", payload, headers, secrets=(self.api_key,)
+            f"{self.base_url}/chat/completions",
+            payload,
+            headers,
+            secrets=(self.api_key,),
+            retry=self.retry,
         )
         return parse_openai_response(data, latency)
 

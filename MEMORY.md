@@ -1,17 +1,24 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por docs
+Última actualización: 2026-09-30 por builder (v0.2.0 · #4)
 
 ## Estado actual
-MVP completo en la rama `agent/builder` (PR #1 a `main`, sin fusionar) y revisión QA en `agent/qa` (PR #2 a `agent/builder`, se fusiona después de #1):
+v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
+- #4 reintentos ante 429/5xx (rama `agent/builder/4-reintentos`): HECHO, en PR.
+- #5 guardado incremental y `--resume`: pendiente.
+- #6 liga de 2 a 6 contendientes: pendiente.
+- #7 publicación en PyPI: pendiente.
+
+Base heredada de v0.1.0:
 - CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
 - Proveedores `replay`, `gemini` (REST `generateContent`) y `openai` (Chat Completions compatible: OpenAI, OpenRouter, Ollama). Errores de red, HTTP y respuestas vacías o raras se convierten en `ProviderError` con mensaje en español.
+- Reintentos (#4): `post_json` reintenta HTTP 429/500/502/503/504 y cortes de conexión (`--retries N`, 3 por defecto, `0` los desactiva) con espera exponencial (1 s × 2^n, tope 30 s) y jitter (50-100 %), respetando `Retry-After` (segundos o fecha; si pide más de 120 s no se espera). Cada reintento se avisa en consola (`~~  openai:modelo: reintento 1/3 en 1.2 s: HTTP 429 ...`).
 - Runner: extrae el bloque de código, ejecuta pytest en un directorio temporal con límite de tiempo y lee el XML JUnit. Mata el árbol de procesos al terminar, acota la salida y distingue `ok`, `no_code`, `import_error`, `timeout`, `error` y `provider_error`.
 - Costes con tabla ampliable (`--prices`); solo hay precios ficticios integrados para `replay:alfa` y `replay:beta`.
 - Informe HTML «duelo editorial oscuro» (`string.Template`, CSS en línea, SVG con `<title>` y `aria-label`, sin JavaScript, hoja de impresión). Con `--runs` > 1 muestra «Intentos resueltos» y «suma de N ejecuciones».
-- Tres tareas originales (`slugify`, `merge_intervals`, `parse_duration`) y respuestas grabadas de `alfa` (falla 1 caso límite de `parse_duration`) y `beta` (falla 2 tests de `slugify`).
-- Web estática en `site/index.html` con metadatos Open Graph y favicon en línea; la demo `site/demo/` se genera en el CI (está en `.gitignore`).
-- 132 tests pytest sin red (cobertura ~94 %); CI en Ubuntu y Windows con `pytest --cov` (mínimo 90 %); despliegue a Pages en `deploy.yml`.
-- Documentación en `agent/docs` (PR a `agent/qa`, se fusiona después de #1 y #2): `docs/USO.md` (guía de uso en español, con un ejemplo de tarea nuevo, `es_palindromo`, probado con respuestas grabadas), `CONTRIBUTING.md` y enlaces a ambos desde el README y `site/index.html` (apuntan a `blob/main`, así que funcionan cuando se fusione en `main`).
+- Tres tareas originales (`slugify`, `merge_intervals`, `parse_duration`) y respuestas grabadas de `alfa` y `beta`.
+- Web estática en `site/index.html`; la demo `site/demo/` se genera en el CI (está en `.gitignore`).
+- Tests pytest sin red (cobertura > 90 % exigida en el CI Ubuntu y Windows); despliegue a Pages en `deploy.yml`.
+- Documentación: `docs/USO.md`, `CONTRIBUTING.md`.
 
 ## Decisiones (por qué)
 - 2026-09-29: Proveedor `replay` con respuestas grabadas para que la demo y los tests funcionen sin claves ni coste.
@@ -41,18 +48,20 @@ MVP completo en la rama `agent/builder` (PR #1 a `main`, sin fusionar) y revisi�
 - 2026-09-30 (docs): la documentación la escribe Claude Code (subagente, Sonnet) en `agent/docs`, no OpenCode, porque el sistema de permisos no permite lanzar OpenCode en modo autónomo. `AGENTS.md` lo refleja; OpenCode volverá a ser el agente docs cuando se permita su ejecución autónoma.
 - 2026-09-30 (docs): los enlaces de la web a `docs/USO.md` y `CONTRIBUTING.md` apuntan a `github.com/BertMarti/modelduel/blob/main/...` (el test de la web solo admite enlaces a ese repositorio); no funcionarán hasta que la rama se fusione en `main`.
 
+- 2026-09-30 (builder): #4 no reintenta los tiempos de espera agotados (`MODELDUEL_HTTP_TIMEOUT`, 180 s por defecto: reintentar triplicaría la espera) ni los servidores apagados (`ConnectionRefusedError`, p. ej. Ollama sin arrancar) ni errores DNS; sí los cortes de una conexión ya abierta (`ConnectionError`, `RemoteDisconnected`, `IncompleteRead`). La latencia registrada es la del intento bueno, sin las esperas.
+- 2026-09-30 (builder): `RetryPolicy` (en `providers/base.py`) lleva `sleep` y `rng` inyectables: los tests de reintentos no esperan y el jitter es determinista.
+- 2026-09-30 (lead/builder): flujo de v0.2.0 por issues, ramas `agent/<rol>/<n>-<slug>`, PRs siempre contra `main` con `Closes #n`, y Alberto fusiona (ver `AGENTS.md`). Los PR encadenados deben fusionarse con «Create a merge commit» (no squash) y en orden.
+
 ## Siguiente paso
-1. lead: fusionar #1 en `main` y después #2 (cambiar su base a `main` si GitHub no lo hace solo al borrar `agent/builder`); comprobar que Pages publica la web y `demo/`.
-2. lead: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
-3. lead: fusionar el PR de `agent/docs` después de #1 y #2 y comprobar que los enlaces «Guía de uso» y «Contribuir» de la web abren los archivos en GitHub.
-4. Opcional: reintentos con espera para HTTP 429/5xx y guardado incremental de `results.json` durante el duelo.
+1. Alberto: fusionar los PR de v0.2.0 en orden (#4, #5, #6, #7) con «Create a merge commit».
+2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
+3. builder: continuar con #5 (guardado incremental y `--resume`).
 
 ## Problemas conocidos
 - El aislamiento es solo un directorio temporal + subproceso con límite + entorno sin secretos + muerte del árbol de procesos: el código del modelo puede leer y escribir en el resto del disco. Está advertido en README y web; lo ideal es usar un contenedor o VM.
 - Un proceso que se desligue a propósito del árbol (`setsid`/doble fork en POSIX, `CREATE_BREAKAWAY_FROM_JOB` si el Job lo permitiera) puede sobrevivir. En Windows hay una ventana de milisegundos entre crear pytest y meterlo en el Job Object (Popen no permite crear el proceso suspendido).
 - El disco que pueda llenar una solución que imprime sin parar está acotado solo por el límite de tiempo (va al temporal de la ejecución, que se borra).
 - `<details>` cerrados no se despliegan al imprimir en navegadores sin `::details-content` (p. ej. Firefox antiguo); sin JavaScript no hay alternativa fiable.
-- Sin reintentos ante HTTP 429/5xx: el intento queda como «error del proveedor».
 - Los proveedores `gemini` y `openai` solo se prueban con respuestas simuladas (sin red); no se han probado contra las APIs reales.
 
 ## Registro de sesiones
@@ -60,3 +69,4 @@ MVP completo en la rama `agent/builder` (PR #1 a `main`, sin fusionar) y revisi�
 - 2026-09-29 builder (agent/builder): MVP completo (CLI, proveedores, runner, costes, informe, tareas, web, tests, CI y Pages) y PR a main.
 - 2026-09-30 qa (agent/qa): revisión QA en PR #2: runner (árbol de procesos, salida acotada, UTF-8/CRLF, tareas sin tests), tareas (BOM, tests rotos, parametrize), proveedores (errores de red/HTTP, respuestas vacías), duelo resiliente, informe (escapado, `--runs`, accesibilidad AA, impresión), CLI en español con códigos coherentes, web (meta, favicon, accesibilidad) y cobertura en CI. 68 → 132 tests.
 - 2026-09-30 docs · Claude Code Sonnet (agent/docs): `docs/USO.md` (guía completa en español, comprobada contra el código y ejecutando la demo y un ejemplo de tarea nuevo con respuestas grabadas), `CONTRIBUTING.md`, enlaces desde README y web, y fila docs de `AGENTS.md` actualizada.
+- 2026-09-30 builder · Claude Code Sonnet (agent/builder/4-reintentos): #4 reintentos con espera exponencial y jitter ante 429/5xx y cortes de conexión, `--retries`, avisos en consola, tests sin red ni esperas; AGENTS.md con el flujo por issues de v0.2.0.

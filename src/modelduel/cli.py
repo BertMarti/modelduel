@@ -12,6 +12,7 @@ from modelduel import __version__
 from modelduel.duel import run_duel
 from modelduel.pricing import PricingError, load_prices
 from modelduel.providers import ProviderError, get_provider
+from modelduel.providers.base import DEFAULT_RETRIES
 from modelduel.report import write_report
 from modelduel.report.html import fmt_cost, fmt_int, fmt_seconds, plural
 from modelduel.results import ResultsError, load_results, save_results
@@ -103,6 +104,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="S",
         help=f"límite en segundos para los tests de cada respuesta ({DEFAULT_TIMEOUT:g})",
     )
+    run.add_argument(
+        "--retries",
+        type=int,
+        default=DEFAULT_RETRIES,
+        metavar="N",
+        help=f"reintentos ante HTTP 429/5xx y cortes de conexión ({DEFAULT_RETRIES})",
+    )
     run.add_argument("--prices", type=Path, metavar="F.json", help="tabla de precios adicional")
     run.add_argument(
         "--replays", type=Path, metavar="DIR", help="carpeta de respuestas grabadas para replay"
@@ -145,6 +153,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         raise TaskError("--runs debe ser 1 o más.")
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         raise TaskError("--timeout debe ser un número de segundos mayor que 0.")
+    if args.retries < 0:
+        raise TaskError("--retries debe ser 0 o más.")
     tasks = discover_tasks(args.tasks)
     prices = load_prices(args.prices)
     # examples/tasks[/<tarea>] -> examples/replays
@@ -154,7 +164,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         for d in (args.replays, tasks_root.parent / "replays", Path("examples/replays"))
         if d is not None
     ]
-    providers = {"a": get_provider(args.a, replay_dirs), "b": get_provider(args.b, replay_dirs)}
+
+    def on_retry(message: str) -> None:
+        print(f"  ~~  {message}", flush=True)
+
+    providers = {
+        side: get_provider(spec, replay_dirs, retries=args.retries, on_retry=on_retry)
+        for side, spec in (("a", args.a), ("b", args.b))
+    }
     ensure_pytest_available()
     # Antes de gastar llamadas a las APIs: la carpeta de salida tiene que poder crearse.
     _prepare_out(args.out)

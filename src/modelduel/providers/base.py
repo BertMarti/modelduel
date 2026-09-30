@@ -6,13 +6,19 @@ import http.client
 import json
 import math
 import os
+import random
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Protocol
 
 DEFAULT_HTTP_TIMEOUT = 180.0
+DEFAULT_RETRIES = 3
+RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 USER_AGENT = "modelduel (+https://github.com/BertMarti/modelduel)"
 
 
@@ -26,6 +32,40 @@ class Response:
     input_tokens: int | None
     output_tokens: int | None
     latency_s: float
+
+
+@dataclass
+class RetryPolicy:
+    """Reintentos con espera exponencial y jitter ante errores pasajeros.
+
+    ``sleep`` y ``rng`` son inyectables para que los tests sean deterministas y no esperen.
+    """
+
+    retries: int = DEFAULT_RETRIES
+    base_delay: float = 1.0
+    max_delay: float = 30.0
+    max_retry_after: float = 120.0  # si el servidor pide esperar más, no se espera: se rinde
+    notify: Callable[[str], None] | None = None
+    sleep: Callable[[float], None] = field(default=time.sleep, repr=False)
+    rng: Callable[[], float] = field(default=random.random, repr=False)
+
+    def delay(self, attempt: int, retry_after: float | None) -> float:
+        """Espera antes del reintento número ``attempt + 1`` (``attempt`` empieza en 0).
+
+        Sin ``Retry-After``: ``base × 2^attempt`` acotado por ``max_delay`` y con jitter entre el
+        50 % y el 100 %. Con ``Retry-After`` se espera como mínimo eso.
+        """
+        exponential = min(self.max_delay, self.base_delay * 2**attempt)
+        jittered = exponential * (0.5 + 0.5 * self.rng())
+        return max(jittered, retry_after) if retry_after is not None else jittered
+
+
+class TransientError(ProviderError):
+    """Error pasajero (429, 5xx, corte de conexión): merece la pena reintentar."""
+
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class Provider(Protocol):
@@ -69,13 +109,63 @@ _HTTP_HINTS = {
 
 
 def post_json(
-    url: str, payload: dict, headers: dict[str, str], secrets: tuple[str, ...] = ()
+    url: str,
+    payload: dict,
+    headers: dict[str, str],
+    secrets: tuple[str, ...] = (),
+    retry: RetryPolicy | None = None,
 ) -> tuple[dict, float]:
     """POST JSON y devuelve ``(respuesta, latencia_s)``. Nunca incluye secretos en los errores.
 
     Cualquier fallo de red o de protocolo se convierte en ``ProviderError`` para que el duelo
-    lo registre como «error del proveedor» y siga con el resto de intentos.
+    lo registre como «error del proveedor» y siga con el resto de intentos. Con ``retry`` se
+    reintentan los errores pasajeros (HTTP 429/500/502/503/504 y cortes de conexión).
     """
+    retry = retry or RetryPolicy(retries=0)
+    attempt = 0
+    while True:
+        try:
+            return _post_once(url, payload, headers, secrets)
+        except TransientError as exc:
+            if attempt >= retry.retries:
+                suffix = f" (tras {plural_retries(attempt)})" if attempt else ""
+                raise ProviderError(f"{exc}{suffix}") from None
+            if exc.retry_after is not None and exc.retry_after > retry.max_retry_after:
+                raise ProviderError(
+                    f"{exc} (el servidor pide esperar {exc.retry_after:g} s: no se reintenta)"
+                ) from None
+            wait = retry.delay(attempt, exc.retry_after)
+            attempt += 1
+            if retry.notify:
+                retry.notify(f"reintento {attempt}/{retry.retries} en {wait:.1f} s: {exc}")
+            retry.sleep(wait)
+
+
+def plural_retries(n: int) -> str:
+    return "1 reintento" if n == 1 else f"{n} reintentos"
+
+
+def parse_retry_after(value: str | None) -> float | None:
+    """``Retry-After`` en segundos o como fecha HTTP; ``None`` si falta o no se entiende."""
+    if not value:
+        return None
+    value = value.strip()
+    try:
+        seconds = float(value)
+    except ValueError:
+        try:
+            when = parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        seconds = (when - datetime.now(UTC)).total_seconds()
+    return max(0.0, seconds) if math.isfinite(seconds) else None
+
+
+def _post_once(
+    url: str, payload: dict, headers: dict[str, str], secrets: tuple[str, ...]
+) -> tuple[dict, float]:
     timeout = http_timeout()
     body = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
@@ -92,24 +182,39 @@ def post_json(
         detail = error_detail(exc)
         hint = _HTTP_HINTS.get(exc.code) or ("error del servidor" if exc.code >= 500 else "")
         hint = f" ({hint})" if hint else ""
-        raise ProviderError(redact(f"HTTP {exc.code} en {url}{hint}: {detail}", secrets)) from None
+        message = redact(f"HTTP {exc.code} en {url}{hint}: {detail}", secrets)
+        if exc.code in RETRY_STATUS:
+            retry_after = parse_retry_after(exc.headers.get("Retry-After") if exc.headers else None)
+            raise TransientError(message, retry_after) from None
+        raise ProviderError(message) from None
     except urllib.error.URLError as exc:
         if isinstance(exc.reason, TimeoutError):
             raise ProviderError(f"La petición a {url} superó {timeout:g} s.") from None
-        raise ProviderError(
-            redact(f"No se pudo conectar con {url}: {exc.reason}", secrets)
-        ) from None
+        message = redact(f"No se pudo conectar con {url}: {exc.reason}", secrets)
+        if _is_connection_cut(exc.reason):
+            raise TransientError(message) from None
+        raise ProviderError(message) from None
     except TimeoutError:
         raise ProviderError(f"La petición a {url} superó {timeout:g} s.") from None
     except (OSError, http.client.HTTPException) as exc:
         # p. ej. RemoteDisconnected, ConnectionResetError o IncompleteRead al leer la respuesta.
         name = type(exc).__name__
-        raise ProviderError(redact(f"Se cortó la conexión con {url} ({name}).", secrets)) from None
+        message = redact(f"Se cortó la conexión con {url} ({name}).", secrets)
+        if _is_connection_cut(exc):
+            raise TransientError(message) from None
+        raise ProviderError(message) from None
     latency = time.perf_counter() - start
     try:
         return json.loads(raw.decode("utf-8")), latency
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ProviderError(f"Respuesta no JSON de {url}: {exc}") from None
+
+
+def _is_connection_cut(reason: object) -> bool:
+    """Corte de una conexión ya abierta (reintentable); un servidor apagado no lo es."""
+    if isinstance(reason, ConnectionRefusedError):
+        return False
+    return isinstance(reason, ConnectionError | http.client.HTTPException)
 
 
 def error_detail(exc: urllib.error.HTTPError, limit: int = 300) -> str:
