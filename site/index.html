@@ -54,6 +54,8 @@ section { padding: 56px 0; border-top: 1px solid var(--line); }
 h2 { font: 600 13px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 22px; }
 h3 { font: 600 17px/1.4 var(--mono); margin: 0 0 8px; }
 p { margin: 0 0 16px; }
+ul { margin: 0 0 16px; padding-left: 1.2em; }
+li { margin-bottom: 6px; }
 pre { margin: 0 0 20px; padding: 16px 18px; background: var(--panel); border: 1px solid var(--line); font: 13.5px/1.6 var(--mono); overflow-x: auto; }
 code { font-family: var(--mono); font-size: .9em; }
 p code, li code, td code { background: var(--panel); border: 1px solid var(--line); padding: 1px 5px; }
@@ -96,6 +98,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
   <span class="brand">modelduel</span>
   <span class="links">
     <a href="#instalar">Instalar</a>
+    <a href="#novedades">Novedades</a>
     <a href="#tareas">Tareas</a>
     <a href="#proveedores">Proveedores</a>
     <a href="demo/">Demo</a>
@@ -132,19 +135,33 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
 <section aria-labelledby="instalar">
   <h2 id="instalar">Instalación y uso</h2>
   <p>Necesitas Python 3.12 o superior. modelduel no tiene dependencias; pytest hace falta para ejecutar los tests de las tareas.</p>
-  <pre><code>pip install git+https://github.com/BertMarti/modelduel pytest
+  <pre><code>pip install "modelduel[pytest]"    # o: pip install modelduel pytest
 
-# Demo sin claves, con respuestas grabadas: una liga de tres contendientes
-git clone https://github.com/BertMarti/modelduel
-cd modelduel
-modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out runs/demo
+# Demo sin claves ni coste: una liga de tres contendientes con respuestas grabadas
+modelduel demo
+modelduel demo --copy MIS-EJEMPLOS  # copia las tareas de ejemplo como plantilla
 
 # Dos modelos reales (o repite --model para una liga de 2 a 6)
-modelduel run examples/tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo
+modelduel run MIS-EJEMPLOS/tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo
+
+# Continuar un duelo cortado
+modelduel run MIS-EJEMPLOS/tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo --resume
 
 # Otras órdenes
-modelduel list-tasks examples/tasks
+modelduel list-tasks MIS-EJEMPLOS/tasks
 modelduel report runs/duelo/results.json --out runs/duelo</code></pre>
+  <p>El paquete se publica en PyPI al crearse la <em>release</em> <code>v0.2.0</code>; hasta entonces, instálalo con <code>pip install git+https://github.com/BertMarti/modelduel pytest</code>.</p>
+</section>
+
+<section aria-labelledby="novedades">
+  <h2 id="novedades">Novedades de v0.2.0</h2>
+  <ul>
+    <li><strong>Liga de 2 a 6 contendientes</strong> con <code>--model</code> repetible: clasificación, matriz por tarea y seis colores con contraste AA, siempre con su letra.</li>
+    <li><strong>Reintentos</strong> ante HTTP 429/5xx y cortes de conexión, con espera exponencial (<code>--retries</code>).</li>
+    <li><strong>Guardado incremental y <code>--resume</code></strong>: un corte no pierde lo ya hecho.</li>
+    <li><strong>PyPI y <code>modelduel demo</code></strong>: pruébalo sin claves ni coste.</li>
+  </ul>
+  <p>Todos los cambios, en el <a href="https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md">registro de cambios</a>; el uso paso a paso, en la <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">guía de uso</a>.</p>
 </section>
 
 <section aria-labelledby="tareas">
@@ -196,12 +213,22 @@ def test_basico():
   <h2 id="aviso">Una sola ejecución es una señal débil</h2>
   <p>Los modelos no son deterministas. Repite el duelo con <code>--runs N</code>, usa tareas de tu propio trabajo y lee el código, no solo el marcador.</p>
 </section>
+
+<section aria-labelledby="hecho">
+  <h2 id="hecho">Cómo se ha hecho</h2>
+  <p>Lo ha desarrollado un equipo de agentes de IA (Claude Code), cada uno en su rama y con pull requests. <strong>Alberto Martínez</strong> supervisa y fusiona todo.</p>
+  <ul>
+    <li><strong>v0.1.0:</strong> lead, builder y qa con Claude Opus; docs con Claude Sonnet.</li>
+    <li><strong>v0.2.0:</strong> todo con Claude Sonnet, guiado por issues del hito.</li>
+    <li><strong>OpenCode</strong> estaba previsto para la documentación, pero no pudo ejecutarse en modo autónomo.</li>
+  </ul>
+</section>
 </main>
 
 <footer>
   <span>modelduel · licencia MIT</span>
   <span>Construido por un equipo de agentes de IA (Claude Code) supervisado por Alberto Martínez</span>
-  <span><a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">Guía de uso</a> · <a href="https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md">Contribuir</a> · <a href="https://github.com/BertMarti/modelduel">github.com/BertMarti/modelduel</a></span>
+  <span><a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">Guía de uso</a> · <a href="https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md">Cambios</a> · <a href="https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md">Contribuir</a> · <a href="https://github.com/BertMarti/modelduel">github.com/BertMarti/modelduel</a></span>
 </footer>
 </div>
 </body>

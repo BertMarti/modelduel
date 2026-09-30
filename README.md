@@ -8,7 +8,7 @@
 
 **Web:** <https://bertmarti.github.io/modelduel/> · **Informe de demostración:** <https://bertmarti.github.io/modelduel/demo/>
 
-**Documentación:** [Guía de uso](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md) (instalación, duelos reales, crear tus tareas, leer el informe) · [Cómo contribuir](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md)
+**Documentación:** [Guía de uso](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md) (instalación, duelos reales, crear tus tareas, liga, reintentos, reanudación y leer el informe) · [Registro de cambios](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md) · [Cómo contribuir](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md)
 
 ```text
   #   Contendiente     Tareas   Tests   Tiempo   Tokens (ent/sal)        Coste
@@ -26,6 +26,15 @@
 
 Los rankings de modelos miden tareas que no son las tuyas. La forma honesta de elegir es hacer tu propia comparativa: el mismo enunciado, los mismos tests y los números a la vista. modelduel convierte ese ejercicio en una orden.
 
+## Novedades de v0.2.0
+
+- **Liga de 2 a 6 contendientes** con `--model` repetible: clasificación, comparativa, matriz por tarea y paleta de seis colores con contraste AA (siempre con su letra `A`-`F`).
+- **Reintentos** ante HTTP 429/5xx y cortes de conexión, con espera exponencial y `Retry-After` (`--retries`).
+- **Guardado incremental y `--resume`**: un corte no pierde lo ya hecho y el duelo se continúa con la misma orden.
+- **Publicación en PyPI** (`pip install modelduel`) y **`modelduel demo`**: prueba sin claves ni coste y `demo --copy` para empezar desde una plantilla.
+
+Detalle en el [registro de cambios](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md).
+
 ## Instalación
 
 Necesitas Python 3.12 o superior. modelduel solo usa la biblioteca estándar; pytest hace falta para ejecutar los tests de las tareas.
@@ -35,7 +44,10 @@ pip install "modelduel[pytest]"     # o: pip install modelduel pytest
 modelduel demo                       # prueba sin claves ni coste, con los ejemplos incluidos
 ```
 
-`modelduel demo` enfrenta a tres modelos ficticios (respuestas grabadas) y escribe el informe en `modelduel-demo/`; `modelduel demo --copy MIS-EJEMPLOS` copia las tareas y respuestas de ejemplo para que las uses como plantilla. Desde el repositorio también puedes instalar la última versión con `pip install git+https://github.com/BertMarti/modelduel pytest`.
+> [!NOTE]
+> El paquete se publica en PyPI al crearse la *release* `v0.2.0`. Hasta entonces, instálalo desde GitHub: `pip install git+https://github.com/BertMarti/modelduel pytest`.
+
+`modelduel demo` enfrenta a tres modelos ficticios (respuestas grabadas) y escribe el informe en `modelduel-demo/`; `modelduel demo --copy MIS-EJEMPLOS` copia las tareas y respuestas de ejemplo para que las uses como plantilla.
 
 Para desarrollar:
 
@@ -168,13 +180,16 @@ Se busca primero por `proveedor:modelo` y después solo por `modelo`. Si un mode
 ## Más documentación
 
 - [`docs/USO.md`](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md): guía para personas usuarias, paso a paso y con solución de problemas.
-- [`CONTRIBUTING.md`](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md): entorno, comandos, ramas, commits y cómo añadir un proveedor o una tarea de ejemplo.
+- [`CHANGELOG.md`](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md): qué trae cada versión.
+- [`CONTRIBUTING.md`](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md): entorno, comandos, ramas, commits, cómo añadir un proveedor, una tarea o un color a la liga, y cómo publicar una versión.
+
+Limitación conocida: el veredicto del duelo de dos («gana A por N») cuenta tests superados, mientras que la clasificación ordena primero por tareas resueltas, así que pueden discrepar con pocas tareas ([#15](https://github.com/BertMarti/modelduel/issues/15), previsto para v0.3.0).
 
 ## Estructura
 
 ```text
 src/modelduel/
-├── cli.py              # run, report, list-tasks
+├── cli.py              # run, report, list-tasks, demo
 ├── tasks.py            # carga de tareas y recuento de tests
 ├── extract.py          # extracción del bloque de código
 ├── runner.py           # prompt + ejecución de pytest en temporal con límite
@@ -184,10 +199,11 @@ src/modelduel/
 ├── results.py          # results.json y resumen del marcador
 ├── pricing.py          # tarifas y fórmula de coste
 ├── providers/          # replay, gemini, openai_compat
-└── report/             # informe HTML (string.Template + SVG)
+└── report/             # informe HTML: duelo de dos y liga de 3 a 6 (string.Template + SVG)
 docs/USO.md             # guía de uso para personas usuarias
+CHANGELOG.md            # registro de cambios (Keep a Changelog)
 examples/tasks/         # tareas originales de ejemplo
-examples/replays/       # respuestas grabadas de alfa y beta
+examples/replays/       # respuestas grabadas de alfa, beta y gamma
 site/                   # web del proyecto (la demo se genera en el CI)
 tests/                  # pytest, sin llamadas de red
 ```
@@ -200,7 +216,11 @@ tests/                  # pytest, sin llamadas de red
 
 ## Cómo se ha construido
 
-Este proyecto lo ha desarrollado un **equipo de agentes de IA** —Claude Code: lead y builder (Opus), qa (Opus) y docs (Sonnet); OpenCode estaba previsto para la documentación pero no pudo ejecutarse en modo autónomo— trabajando cada uno en su rama y con pull requests, **supervisado por Alberto Martínez**. Las decisiones y el estado del proyecto están en [`MEMORY.md`](https://github.com/BertMarti/modelduel/blob/main/MEMORY.md) y las reglas del equipo en [`AGENTS.md`](https://github.com/BertMarti/modelduel/blob/main/AGENTS.md).
+Este proyecto lo ha desarrollado un **equipo de agentes de IA** (Claude Code), cada uno en su rama y con pull requests, **supervisado por Alberto Martínez**, que revisa y fusiona todo:
+
+- **v0.1.0:** lead, builder y qa con Claude Opus; la documentación (docs), con Claude Sonnet.
+- **v0.2.0:** todo con Claude Sonnet, guiado por issues del hito y un pull request por issue.
+- **OpenCode** estaba previsto para la documentación, pero no pudo ejecutarse en modo autónomo, así que la escribe Claude Code. Las decisiones y el estado del proyecto están en [`MEMORY.md`](https://github.com/BertMarti/modelduel/blob/main/MEMORY.md) y las reglas del equipo en [`AGENTS.md`](https://github.com/BertMarti/modelduel/blob/main/AGENTS.md).
 
 ## Licencia
 
