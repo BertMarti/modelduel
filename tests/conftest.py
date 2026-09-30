@@ -51,3 +51,14 @@ def test_negativos():
 def test_cero():
     assert add(0, 0) == 0
 """
+
+
+@pytest.fixture(autouse=True)
+def _sin_esperas_reales_en_reintentos(monkeypatch):
+    """Ningún test debe esperar de verdad entre reintentos: hay que inyectar ``sleep``."""
+    from modelduel.providers import base
+
+    def boom(seconds: float) -> None:
+        raise AssertionError(f"un test intentó esperar {seconds} s de verdad en un reintento")
+
+    monkeypatch.setattr(base, "_real_sleep", boom)
