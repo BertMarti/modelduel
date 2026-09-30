@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # para comprobar que la etiqueta sale de main
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -28,6 +31,15 @@ jobs:
 
       - name: Instalar las herramientas de empaquetado
         run: python -m pip install --upgrade pip build twine
+
+      - name: Comprobar que la etiqueta sale de main
+        shell: bash
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "El commit de la Release no está en main: no se publica." >&2
+            exit 1
+          fi
 
       - name: Comprobar que la etiqueta coincide con la versión
         shell: bash
