@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import math
 import re
+import shutil
 import sys
 from pathlib import Path
 
 from modelduel import __version__
+from modelduel.demo import DEMO_MODELS, examples_dir
 from modelduel.duel import run_duel
 from modelduel.pricing import PricingError, load_prices
 from modelduel.providers import ProviderError, get_provider
@@ -141,6 +143,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--out", type=Path, required=True, metavar="DIR", help="carpeta de salida")
 
+    demo = sub.add_parser(
+        "demo",
+        help="prueba modelduel sin claves, con los ejemplos incluidos y tres modelos ficticios",
+    )
+    demo.add_argument(
+        "--out",
+        type=Path,
+        default=Path("modelduel-demo"),
+        metavar="DIR",
+        help="carpeta de salida (modelduel-demo)",
+    )
+    demo.add_argument(
+        "--copy",
+        type=Path,
+        metavar="DIR",
+        help="en vez de ejecutar el duelo, copia las tareas y respuestas de ejemplo a DIR",
+    )
+
     report = sub.add_parser("report", help="regenera el informe HTML desde results.json")
     report.add_argument("results", type=Path, help="ruta a results.json")
     report.add_argument("--out", type=Path, required=True, metavar="DIR", help="carpeta de salida")
@@ -158,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "run":
             return cmd_run(args)
+        if args.command == "demo":
+            return cmd_demo(args)
         if args.command == "report":
             return cmd_report(args)
         return cmd_list_tasks(args)
@@ -330,6 +352,46 @@ def _interrupted(results: dict | None, out: Path) -> int:
             file=sys.stderr,
         )
     return EXIT_INTERRUPTED
+
+
+def cmd_demo(args: argparse.Namespace) -> int:
+    """``modelduel demo``: liga de tres contendientes ficticios sobre los ejemplos incluidos."""
+    examples = examples_dir()
+    if args.copy:
+        target = args.copy
+        if target.exists() and any(target.iterdir()):
+            raise TaskError(f"{target} ya existe y no está vacía: elige otra carpeta.")
+        try:
+            shutil.copytree(
+                examples, target, dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__")
+            )
+        except OSError as exc:
+            raise OutputError(f"no se pudo copiar a {target}: {exc.strerror or exc}.") from exc
+        print(f"Ejemplos copiados en {target}:")
+        print(f"  tareas     {target / 'tasks'}")
+        print(f"  respuestas {target / 'replays'}")
+        print("Pruébalos con:")
+        print(f"  modelduel run {target / 'tasks'} --model replay:alfa --model replay:beta")
+        return 0
+    run_args = argparse.Namespace(
+        tasks=examples / "tasks",
+        a=None,
+        b=None,
+        model=list(DEMO_MODELS),
+        runs=1,
+        timeout=DEFAULT_TIMEOUT,
+        retries=0,
+        resume=False,
+        prices=None,
+        replays=examples / "replays",
+        out=args.out,
+    )
+    code = cmd_run(run_args)
+    if code == 0:
+        print()
+        print("  Son respuestas grabadas y precios ficticios. Para un duelo real, mira la guía:")
+        print("  https://github.com/BertMarti/modelduel/blob/main/docs/USO.md")
+    return code
 
 
 def cmd_report(args: argparse.Namespace) -> int:

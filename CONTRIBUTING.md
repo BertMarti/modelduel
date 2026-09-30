@@ -75,3 +75,13 @@ Una tarea es una carpeta en `examples/tasks/<id>/` con `task.md`, `test_task.py`
 2. Graba una respuesta por contendiente en `examples/replays/alfa/<id>.md` y `examples/replays/beta/<id>.md` (con el front-matter de tokens y latencia). Son ficticias y se escriben a mano.
 3. Actualiza lo que dependa del conjunto de tareas: `tests/test_tasks.py` (orden esperado) y `tests/test_cli.py` (resultados de la demo), además de las cifras del README y de la web (`site/index.html`) si cambian los marcadores.
 4. Comprueba `modelduel list-tasks examples/tasks`, ejecuta la demo y revisa el informe.
+
+## Publicar una versión en PyPI (mantenedor)
+
+La publicación es automática y **no usa tokens**: `release.yml` usa *Trusted Publishing* (OIDC) de PyPI.
+
+1. Sube la versión en `src/modelduel/__init__.py` (única fuente: `pyproject.toml` la lee de ahí), actualiza `MEMORY.md` y fusiona el PR en `main`.
+2. Crea una *Release* en GitHub con una etiqueta `vX.Y.Z` igual a la versión (por ejemplo, `v0.2.0`).
+3. El workflow construye el sdist y la wheel, comprueba que la etiqueta coincide con la versión, ejecuta `twine check`, prueba la wheel en un entorno limpio y, si todo va bien, publica en PyPI a través del *environment* `pypi`.
+
+Para comprobar el paquete en local sin publicar: `pip install build twine`, `python -m build` y `twine check dist/*`.

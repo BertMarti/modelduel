@@ -74,25 +74,33 @@ pip install -e . pytest
 modelduel --version
 ```
 
-Si todo va bien, `modelduel --version` escribe `modelduel 0.1.0` (o la versión actual).
+Si todo va bien, `modelduel --version` escribe `modelduel 0.2.0` (o la versión actual).
 
 **Cada vez que abras una terminal nueva** tienes que volver a activar el entorno (`.venv\Scripts\Activate.ps1` en Windows, `source .venv/bin/activate` en Linux y macOS) o no encontrará la orden `modelduel`.
 
 ### Instalarlo sin clonar el proyecto
 
-También puedes instalarlo directamente desde GitHub:
+Desde la versión 0.2.0 se publica en PyPI:
 
 ```bash
-pip install git+https://github.com/BertMarti/modelduel pytest
+pip install "modelduel[pytest]"
 ```
 
-Así tendrás la orden `modelduel`, pero no las tareas y respuestas de ejemplo (`examples/`), que solo están en el repositorio clonado. Para la demo de la sección siguiente necesitas clonarlo.
+(`[pytest]` instala también pytest, que hace falta para ejecutar los tests de las tareas; equivale a `pip install modelduel pytest`.) Así tienes la orden `modelduel` **con los ejemplos incluidos**:
+
+```bash
+modelduel demo                        # liga de tres modelos ficticios, informe en modelduel-demo/
+modelduel demo --out otra-carpeta     # elegir la carpeta de salida
+modelduel demo --copy MIS-EJEMPLOS    # copiar tareas y respuestas de ejemplo para usarlas de plantilla
+```
+
+También puedes instalar la última versión, aún sin publicar, desde GitHub: `pip install git+https://github.com/BertMarti/modelduel pytest`.
 
 ---
 
 ## Tu primer duelo con la demo
 
-La demo no necesita claves ni cuesta nada: usa respuestas **grabadas y ficticias** de tres «modelos» llamados `alfa`, `beta` y `gamma` (proveedor `replay`): es una liga de tres contendientes. Desde la carpeta `modelduel` con el entorno activado:
+La demo no necesita claves ni cuesta nada: usa respuestas **grabadas y ficticias** de tres «modelos» llamados `alfa`, `beta` y `gamma` (proveedor `replay`): es una liga de tres contendientes. Desde la carpeta `modelduel` con el entorno activado (si lo instalaste desde PyPI, basta `modelduel demo`, que hace lo mismo con los ejemplos incluidos):
 
 ```bash
 modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out runs/demo
@@ -101,7 +109,7 @@ modelduel run examples/tasks --model replay:alfa --model replay:beta --model rep
 (En Windows, la misma orden; las barras de las rutas también funcionan.) Verás algo así:
 
 ```text
-modelduel 0.1.0 · 3 tareas · 1 ejecución por tarea
+modelduel 0.2.0 · 3 tareas · 1 ejecución por tarea
   A  replay:alfa
   B  replay:beta
   C  replay:gamma

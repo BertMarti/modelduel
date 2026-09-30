@@ -1,0 +1,80 @@
+name: Release
+
+# Publica en PyPI al crear una Release en GitHub, con Trusted Publishing (OIDC):
+# no hay tokens ni contraseñas en el repositorio. Los pasos de registro en PyPI están en
+# CONTRIBUTING.md y en la descripción del PR que añadió este workflow.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Construir y comprobar el paquete
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar las herramientas de empaquetado
+        run: python -m pip install --upgrade pip build twine
+
+      - name: Comprobar que la etiqueta coincide con la versión
+        shell: bash
+        run: |
+          version=$(python -c "import re, pathlib; print(re.search(r'__version__ = \"([^\"]+)\"', pathlib.Path('src/modelduel/__init__.py').read_text()).group(1))")
+          echo "Versión del paquete: $version · etiqueta: $GITHUB_REF_NAME"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "La etiqueta ($GITHUB_REF_NAME) debe ser v$version" >&2
+            exit 1
+          fi
+
+      - name: Construir sdist y wheel
+        run: python -m build
+
+      - name: Comprobar los metadatos
+        run: twine check --strict dist/*
+
+      - name: Probar la wheel en un entorno limpio
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/smoke"
+          "$RUNNER_TEMP/smoke/bin/pip" install "$(ls dist/*.whl)[pytest]"
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/smoke/bin/modelduel" --version
+          "$RUNNER_TEMP/smoke/bin/modelduel" demo --out "$RUNNER_TEMP/smoke-out"
+          test -s "$RUNNER_TEMP/smoke-out/index.html"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publicar en PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/modelduel/
+    permissions:
+      id-token: write # imprescindible para Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publicar en PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

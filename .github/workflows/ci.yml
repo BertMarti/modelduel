@@ -61,3 +61,31 @@ jobs:
           grep -q "Informe de liga" site/demo/index.html
           grep -q "Clasificación" site/demo/index.html
           if grep -qi "<script" site/demo/index.html; then echo "El informe no debe tener JavaScript"; exit 1; fi
+
+  package:
+    name: Paquete (sdist, wheel y metadatos)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar las herramientas de empaquetado
+        run: python -m pip install --upgrade pip build twine
+
+      - name: Construir sdist y wheel
+        run: python -m build
+
+      - name: Comprobar los metadatos
+        run: twine check --strict dist/*
+
+      - name: Probar la wheel en un entorno limpio
+        run: |
+          python -m venv "$RUNNER_TEMP/smoke"
+          "$RUNNER_TEMP/smoke/bin/pip" install "$(ls dist/*.whl)[pytest]"
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/smoke/bin/modelduel" --version
+          "$RUNNER_TEMP/smoke/bin/modelduel" demo --out "$RUNNER_TEMP/smoke-out"
+          test -s "$RUNNER_TEMP/smoke-out/index.html"
