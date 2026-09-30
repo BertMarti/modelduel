@@ -16,7 +16,7 @@
 <style>
 :root {
   --bg: #0f0f11; --panel: #151518; --text: #e8e8ea; --muted: #8d8d96; --line: #2a2a2f;
-  --a: #b5e853; --b: #ff7eb6;
+  --a: #b5e853; --b: #ff7eb6; --c: #4fd1e5;
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -29,7 +29,7 @@ a:hover { text-decoration-color: currentColor; }
 a:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .skip { position: absolute; left: 16px; top: -48px; padding: 8px 12px; background: var(--text); color: var(--bg); font: 600 13px var(--mono); z-index: 1; }
 .skip:focus { top: 12px; }
-.a { color: var(--a); } .b { color: var(--b); } .muted { color: var(--muted); }
+.a { color: var(--a); } .b { color: var(--b); } .c { color: var(--c); } .muted { color: var(--muted); }
 nav { display: flex; justify-content: space-between; align-items: center; padding: 26px 0; border-bottom: 1px solid var(--line); font: 13px var(--mono); }
 nav .links { display: flex; gap: 22px; flex-wrap: wrap; }
 nav .links a { text-decoration: none; color: var(--muted); }
@@ -107,10 +107,11 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
 <header class="hero">
   <div class="eyebrow">CLI · Python 3.12 · sin dependencias</div>
   <h1><span class="a">modelo</span> <span class="vs">vs</span> <span class="b">modelo</span></h1>
-  <p class="lede">Dos modelos, una tarea, los mismos tests. <strong>modelduel</strong> pide el código a dos modelos de IA, ejecuta tus tests sobre cada respuesta y te da un informe con quién acierta, cuánto tarda y cuánto cuesta. <em>Tu propia comparativa, sin fiarte de rankings ajenos.</em></p>
+  <p class="lede">Dos modelos, una tarea, los mismos tests. <strong>modelduel</strong> pide el código a dos modelos de IA (o a una liga de hasta seis), ejecuta tus tests sobre cada respuesta y te da un informe con quién acierta, cuánto tarda y cuánto cuesta. <em>Tu propia comparativa, sin fiarte de rankings ajenos.</em></p>
   <div class="duel-bars" aria-hidden="true">
     <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="97" height="6" fill="#b5e853"/></svg><span class="a">31/32</span></div>
     <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="94" height="6" fill="#ff7eb6"/></svg><span class="b">30/32</span></div>
+    <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="94" height="6" fill="#4fd1e5"/></svg><span class="c">30/32</span></div>
   </div>
   <div class="cta">
     <a class="btn primary" href="demo/">Ver el informe de demostración</a>
@@ -122,7 +123,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
 <section aria-labelledby="que">
   <h2 id="que">Qué hace</h2>
   <div class="steps">
-    <div><h3>Pregunta</h3><p>Envía el mismo enunciado a los dos modelos y les pide un único bloque de código Python.</p></div>
+    <div><h3>Pregunta</h3><p>Envía el mismo enunciado a cada modelo y les pide un único bloque de código Python.</p></div>
     <div><h3>Ejecuta</h3><p>Guarda cada respuesta como <code>solution.py</code> en un directorio temporal y pasa los tests de la tarea con pytest y un límite de tiempo.</p></div>
     <div><h3>Compara</h3><p>Genera <code>results.json</code> y un informe HTML con marcador, tiempos, tokens, coste estimado y el código de cada modelo.</p></div>
   </div>
@@ -133,12 +134,12 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
   <p>Necesitas Python 3.12 o superior. modelduel no tiene dependencias; pytest hace falta para ejecutar los tests de las tareas.</p>
   <pre><code>pip install git+https://github.com/BertMarti/modelduel pytest
 
-# Demo sin claves, con respuestas grabadas
+# Demo sin claves, con respuestas grabadas: una liga de tres contendientes
 git clone https://github.com/BertMarti/modelduel
 cd modelduel
-modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo
+modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out runs/demo
 
-# Dos modelos reales
+# Dos modelos reales (o repite --model para una liga de 2 a 6)
 modelduel run examples/tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo
 
 # Otras órdenes

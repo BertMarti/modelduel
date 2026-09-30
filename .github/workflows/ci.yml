@@ -43,8 +43,14 @@ jobs:
       - name: Tests
         run: pytest --cov --cov-report=term
 
-      - name: Demo con respuestas grabadas
-        run: modelduel run examples/tasks --a replay:alfa --b replay:beta --out site/demo
+      - name: Demo con respuestas grabadas (liga de tres)
+        run: modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo
+
+      - name: Duelo de dos con --a y --b (compatibilidad con v0.1.0)
+        shell: bash
+        run: |
+          modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/duelo-dos
+          grep -q "Informe de duelo" runs/duelo-dos/index.html
 
       - name: Comprobar el informe
         shell: bash
@@ -52,4 +58,6 @@ jobs:
           test -s site/demo/index.html
           test -s site/demo/results.json
           grep -q "Una sola ejecución es una señal débil" site/demo/index.html
+          grep -q "Informe de liga" site/demo/index.html
+          grep -q "Clasificación" site/demo/index.html
           if grep -qi "<script" site/demo/index.html; then echo "El informe no debe tener JavaScript"; exit 1; fi

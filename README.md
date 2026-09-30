@@ -1,6 +1,6 @@
 # modelduel
 
-**Dos modelos, una tarea, los mismos tests.** `modelduel` enfrenta a dos modelos de IA con un problema de programación, ejecuta tus tests sobre el código de cada uno y te da un informe con quién acierta, cuánto tarda y cuánto cuesta.
+**Dos modelos, una tarea, los mismos tests.** `modelduel` enfrenta a dos modelos de IA (o a una liga de hasta seis) con un problema de programación, ejecuta tus tests sobre el código de cada uno y te da un informe con quién acierta, cuánto tarda y cuánto cuesta.
 
 [![CI](https://github.com/BertMarti/modelduel/actions/workflows/ci.yml/badge.svg)](https://github.com/BertMarti/modelduel/actions/workflows/ci.yml)
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-b5e853.svg)](LICENSE)
@@ -11,13 +11,11 @@
 **Documentación:** [Guía de uso](docs/USO.md) (instalación, duelos reales, crear tus tareas, leer el informe) · [Cómo contribuir](CONTRIBUTING.md)
 
 ```text
-                          A replay:alfa   B replay:beta
-  -----------------------------------------------------
-  Tests superados                 31/32           30/32
-  Tareas resueltas                  2/3             2/3
-  Tiempo del modelo              10,1 s          28,1 s
-  Tokens entrada/salida       1.401/703     1.373/2.132
-  Coste estimado             0,0017 USD      0,0248 USD
+  #   Contendiente     Tareas   Tests   Tiempo   Tokens (ent/sal)        Coste
+  ----------------------------------------------------------------------------
+  1   A replay:alfa       2/3   31/32   10,1 s          1.401/703   0,0017 USD
+  2   C replay:gamma      2/3   30/32    3,7 s          1.314/426   0,0003 USD
+  3   B replay:beta       2/3   30/32   28,1 s        1.373/2.132   0,0248 USD
   (precios ficticios de demostración)
 ```
 
@@ -50,8 +48,8 @@ ruff check . && ruff format --check . && pytest --cov
 ## Uso rápido
 
 ```bash
-# Demo sin claves ni coste, con respuestas grabadas
-modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo
+# Demo sin claves ni coste, con respuestas grabadas: una liga de tres contendientes
+modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out runs/demo
 
 # Dos modelos reales, tres ejecuciones por tarea
 export GEMINI_API_KEY=...        # PowerShell: $env:GEMINI_API_KEY = "..."
@@ -67,7 +65,8 @@ modelduel list-tasks examples/tasks
 
 | Opción | Qué hace |
 |---|---|
-| `--a`, `--b` | Contendientes en formato `proveedor:modelo`. |
+| `--a`, `--b` | Contendientes A y B en formato `proveedor:modelo` (un duelo de dos, como en v0.1.0). |
+| `--model`, `-m` | Contendiente `proveedor:modelo`; repítelo para una **liga de 2 a 6** (se pueden mezclar con `--a`/`--b`: van primero A y B, después cada `--model`). Los nombres repetidos se rechazan; para repetir un modelo usa `--runs`. |
 | `--runs N` | Ejecuciones por tarea (1 por defecto). Una sola ejecución es una señal débil. |
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
 | `--retries N` | Reintentos ante HTTP 429/500/502/503/504 y cortes de conexión, con espera exponencial y respetando `Retry-After` (3 por defecto; `0` los desactiva). |
@@ -77,6 +76,8 @@ modelduel list-tasks examples/tasks
 | `--out DIR` | Carpeta donde se escriben `results.json` e `index.html`. Se comprueba antes de llamar a las APIs. |
 
 Códigos de salida: `0` duelo completado (aunque los modelos fallen tests), `1` no se pudieron escribir los resultados, `2` error de uso o de configuración (argumentos, tareas, proveedores, precios, `results.json`) y `130` interrumpido con Ctrl+C.
+
+**Liga.** Con tres o más contendientes el informe cambia de forma: una **clasificación** (tareas resueltas, luego tests superados y luego coste, menos es mejor; los empates comparten posición), una comparativa con una barra fina por contendiente y una **matriz por tarea**. Cada contendiente tiene una letra (`A` a `F`) y un color con contraste AA sobre el fondo oscuro (lima, rosa, cian, ámbar, violeta y coral), pero la letra siempre acompaña al color. Con dos contendientes sigue el informe enfrentado de siempre. El coste solo desempata si todos tienen precio y en la misma moneda.
 
 **Cortes y reanudación.** `results.json` se reescribe de forma atómica (archivo temporal y reemplazo) tras cada intento, así que un corte —Ctrl+C, un apagón, una API caída— no pierde lo ya hecho, que además queda reflejado en un informe parcial marcado como «Duelo incompleto». Para continuar, repite la misma orden añadiendo `--resume`: se saltan los intentos terminados, se repiten los que acabaron en «error del proveedor» y se avisa si algo no coincide (tareas modificadas, otro límite de tiempo, otro número de ejecuciones). Si los contendientes son otros, la orden se detiene con un error. Sin `--resume`, modelduel se niega a sobrescribir un duelo incompleto.
 

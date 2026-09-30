@@ -40,7 +40,7 @@ def test_run_de_extremo_a_extremo_con_replay(examples_dir, tmp_path, capsys):
     assert "<script" not in html.lower()
 
     printed = capsys.readouterr().out
-    assert "Tests superados" in printed
+    assert "Contendiente" in printed and "Tests" in printed
     assert "precios ficticios" in printed
 
 
@@ -114,7 +114,7 @@ def _usage_error(argv, capsys) -> str:
 def test_errores_de_argumentos_en_espanol(capsys):
     err = _usage_error(["run"], capsys)
     assert err.startswith("uso: modelduel run")
-    assert "faltan argumentos obligatorios: tasks, --a, --b, --out" in err
+    assert "faltan argumentos obligatorios: tasks, --out" in err
     err = _usage_error(["run", "t", "--a", "x", "--b", "y", "--out", "o", "--runs", "dos"], capsys)
     assert "argumento --runs: valor no válido: 'dos'" in err
     err = _usage_error(["duelo"], capsys)

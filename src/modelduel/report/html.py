@@ -5,11 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from html import escape
 from importlib import resources
-from pathlib import Path
 from string import Template
 
 from modelduel import __version__
-from modelduel.results import SIDES, summarize
+from modelduel.results import sides_of
 
 STATUS_LABELS = {
     "ok": "tests ejecutados",
@@ -19,6 +18,9 @@ STATUS_LABELS = {
     "error": "error al ejecutar",
     "provider_error": "error del proveedor",
 }
+
+# Duelo de dos: A a la izquierda, B a la derecha. Con más contendientes se usa la liga.
+VERSUS = ("a", "b")
 
 MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
@@ -118,7 +120,7 @@ def task_chart(tasks: list[dict]) -> str:
     rows = []
     for task in tasks:
         lines = []
-        for side in SIDES:
+        for side in VERSUS:
             attempts = task["results"].get(side, [])
             passed = sum(a["passed"] for a in attempts)
             total = sum(a["total"] for a in attempts)
@@ -158,7 +160,7 @@ def metric_row(
 ) -> str:
     winner = _winner(raw[0], raw[1], lower_is_better)
     cells = []
-    for idx, side in enumerate(SIDES):
+    for idx, side in enumerate(VERSUS):
         classes = ["val", side]
         if side == "b":
             classes.append("b-side")
@@ -296,19 +298,19 @@ def build_table_rows(results: dict) -> str:
     rows = []
     currencies = {
         side: ((results["contenders"].get(side) or {}).get("price") or {}).get("currency")
-        for side in SIDES
+        for side in VERSUS
     }
     for task in results["tasks"]:
-        t = {side: _side_task_totals(task["results"][side], currencies[side]) for side in SIDES}
+        t = {side: _side_task_totals(task["results"][side], currencies[side]) for side in VERSUS}
         diff = f"<span>{e(task.get('difficulty'))}</span>" if task.get("difficulty") else ""
         cells = [f'<th scope="row" class="task">{e(task["title"])}{diff}</th>']
-        for side in SIDES:
+        for side in VERSUS:
             status = (
                 f'<span class="status">{e(t[side]["status"])}</span>' if t[side]["status"] else ""
             )
             cells.append(f'<td class="mono {side}">{e(t[side]["tests"])}{status}</td>')
         for key in ("time", "tokens", "cost"):
-            for side in SIDES:
+            for side in VERSUS:
                 cells.append(f"<td>{e(t[side][key])}</td>")
         rows.append("    <tr>" + "".join(cells) + "</tr>")
     return "\n".join(rows)
@@ -316,16 +318,18 @@ def build_table_rows(results: dict) -> str:
 
 def build_details(results: dict) -> str:
     runs = results.get("runs", 1)
+    sides = sides_of(results)
+    duo_class = "duo" if len(sides) <= 2 else "duo league"
     blocks = []
     for task in results["tasks"]:
         summary_bits = []
-        for side in SIDES:
+        for side in sides:
             attempts = task["results"][side]
             passed = sum(a["passed"] for a in attempts)
             total = sum(a["total"] for a in attempts)
             summary_bits.append(f'<span class="{side}">{side.upper()} {passed}/{total}</span>')
         columns = []
-        for side in SIDES:
+        for side in sides:
             spec = results["contenders"][side]["spec"]
             attempts_html = [_attempt_html(attempt, runs) for attempt in task["results"][side]]
             columns.append(
@@ -341,7 +345,7 @@ def build_details(results: dict) -> str:
             + "</summary>"
             '<div class="detail-body">'
             f'<div class="statement">{e(task.get("statement", ""))}</div>'
-            f'<div class="duo">{"".join(columns)}</div>'
+            f'<div class="{duo_class}">{"".join(columns)}</div>'
             "</div></details>"
         )
     return "\n".join(blocks)
@@ -394,7 +398,7 @@ def build_incomplete(results: dict) -> str:
     """Aviso de un duelo cortado a medias (vacío si está completo)."""
     if results.get("status") != "in_progress":
         return ""
-    sides = list(results["contenders"])
+    sides = sides_of(results)
     expected = len(results["tasks"]) * int(results.get("runs", 1)) * len(sides)
     done = sum(len(t["results"].get(side, [])) for t in results["tasks"] for side in sides)
     return (
@@ -421,15 +425,15 @@ def _short_label(spec: str) -> str:
 # ---------------------------------------------------------------- API
 
 
-def render_report(results: dict) -> str:
-    summary = results.get("summary") or summarize(results)
+def render_versus(results: dict, summary: dict) -> str:
+    """Informe de un duelo de dos: A a la izquierda y B a la derecha."""
     spec_a = results["contenders"]["a"]["spec"]
     spec_b = results["contenders"]["b"]["spec"]
     runs = int(results.get("runs", 1))
     n_tasks = len(results["tasks"])
     fictitious = [
         side
-        for side in SIDES
+        for side in VERSUS
         if ((results["contenders"][side] or {}).get("price") or {}).get("fictitious")
     ]
     price_note = (
@@ -441,6 +445,7 @@ def render_report(results: dict) -> str:
         resources.files("modelduel.report").joinpath("template.html").read_text("utf-8")
     )
     return template.substitute(
+        css=resources.files("modelduel.report").joinpath("style.css").read_text("utf-8"),
         version=e(results.get("version", __version__)),
         page_title=e(f"{_short_label(spec_a)} vs {_short_label(spec_b)} · modelduel"),
         date_human=e(fmt_date(results.get("created_at", ""))),
@@ -471,11 +476,3 @@ def render_report(results: dict) -> str:
         details=build_details(results),
         price_note=e(price_note),
     )
-
-
-def write_report(results: dict, out_dir: Path) -> Path:
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / "index.html"
-    path.write_text(render_report(results), encoding="utf-8")
-    return path

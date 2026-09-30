@@ -369,7 +369,7 @@ def test_cli_resume_con_otros_contendientes_falla_con_mensaje(cli_args, cut, cap
     assert main(args) == 130
     capsys.readouterr()
     swapped = [*args]
-    swapped[swapped.index("replay:beta")] = "replay:alfa"
+    swapped[swapped.index("replay:beta")] = "replay:gamma"
     assert main([*swapped, "--resume"]) == 2
     assert "no coinciden" in capsys.readouterr().err
     assert json.loads((out / "results.json").read_text(encoding="utf-8"))["status"] == "in_progress"

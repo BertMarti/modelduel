@@ -40,6 +40,7 @@ BUILTIN_PRICES: dict[str, Price] = {
     # Precios FICTICIOS: solo sirven para que la demo con respuestas grabadas muestre costes.
     "replay:alfa": Price(input=0.40, output=1.60, currency="USD", fictitious=True),
     "replay:beta": Price(input=2.50, output=10.00, currency="USD", fictitious=True),
+    "replay:gamma": Price(input=0.10, output=0.40, currency="USD", fictitious=True),
 }
 
 
