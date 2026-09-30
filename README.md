@@ -8,6 +8,8 @@
 
 **Web:** <https://bertmarti.github.io/modelduel/> · **Informe de demostración:** <https://bertmarti.github.io/modelduel/demo/>
 
+**Documentación:** [Guía de uso](docs/USO.md) (instalación, duelos reales, crear tus tareas, leer el informe) · [Cómo contribuir](CONTRIBUTING.md)
+
 ```text
                           A replay:alfa   B replay:beta
   -----------------------------------------------------
@@ -155,6 +157,11 @@ Las tarifas son por **millón de tokens**. Como los precios reales cambian a men
 
 Se busca primero por `proveedor:modelo` y después solo por `modelo`. Si un modelo no tiene precio, o el proveedor no devuelve tokens, el coste es **«sin datos»**: nunca se inventa. Los precios integrados de `replay:alfa` y `replay:beta` son **ficticios** y el informe lo indica.
 
+## Más documentación
+
+- [`docs/USO.md`](docs/USO.md): guía para personas usuarias, paso a paso y con solución de problemas.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): entorno, comandos, ramas, commits y cómo añadir un proveedor o una tarea de ejemplo.
+
 ## Estructura
 
 ```text
@@ -168,6 +175,7 @@ src/modelduel/
 ├── pricing.py          # tarifas y fórmula de coste
 ├── providers/          # replay, gemini, openai_compat
 └── report/             # informe HTML (string.Template + SVG)
+docs/USO.md             # guía de uso para personas usuarias
 examples/tasks/         # tareas originales de ejemplo
 examples/replays/       # respuestas grabadas de alfa y beta
 site/                   # web del proyecto (la demo se genera en el CI)
@@ -182,7 +190,7 @@ tests/                  # pytest, sin llamadas de red
 
 ## Cómo se ha construido
 
-Este proyecto lo ha desarrollado un **equipo de agentes de IA** —Claude Code (lead, builder y qa) y OpenCode (documentación)— trabajando cada uno en su rama y con pull requests, **supervisado por Alberto Martínez**. Las decisiones y el estado del proyecto están en [`MEMORY.md`](MEMORY.md) y las reglas del equipo en [`AGENTS.md`](AGENTS.md).
+Este proyecto lo ha desarrollado un **equipo de agentes de IA** —Claude Code: lead y builder (Opus), qa (Opus) y docs (Sonnet); OpenCode estaba previsto para la documentación pero no pudo ejecutarse en modo autónomo— trabajando cada uno en su rama y con pull requests, **supervisado por Alberto Martínez**. Las decisiones y el estado del proyecto están en [`MEMORY.md`](MEMORY.md) y las reglas del equipo en [`AGENTS.md`](AGENTS.md).
 
 ## Licencia
 

@@ -5,7 +5,7 @@
 - [ ] CI en verde
 
 ## Agente y rama
-Agente: <!-- builder / qa / opencode-docs / lead -->
+Agente: <!-- builder / qa / docs / lead -->
 
 ## Checklist
 - [ ] MEMORY.md actualizado
