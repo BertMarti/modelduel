@@ -1,5 +1,5 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por builder (v0.3.0 · #15)
+Última actualización: 2026-09-30 por builder (v0.3.0 · #15 y #17)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
@@ -12,13 +12,13 @@ v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** e
 - #9 documentación de v0.2.0 (rama `agent/docs/9-documentacion-v0.2`, parte de la de #8, PR #16): HECHA, en PR. Se fusiona después de #14. Trae `CHANGELOG.md` (v0.1.0 y v0.2.0, Keep a Changelog), `docs/USO.md` al día (PyPI, `demo`, `--retries`, `--resume`, liga, límites), README, web, `CONTRIBUTING.md` (publicar una versión y añadir un color a la paleta) y este archivo.
 - Hito **v0.3.0** (un PR por issue contra `main`, encadenados como antes):
   - #15 veredicto unificado con la clasificación (rama `agent/builder/15-veredicto-unificado`): HECHO, en PR.
-  - #17 formato es-ES en el aviso de reintento: pendiente (rama parte de la de #15).
+  - #17 formato es-ES en el aviso de reintento (rama `agent/builder/17-aviso-reintento-es`, parte de la de #15): HECHO, en PR.
   - #18 y #19 bloqueadas hasta que Alberto publique el paquete en PyPI.
 
 Base heredada de v0.1.0:
 - CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
 - Proveedores `replay`, `gemini` (REST `generateContent`) y `openai` (Chat Completions compatible: OpenAI, OpenRouter, Ollama). Errores de red, HTTP y respuestas vacías o raras se convierten en `ProviderError` con mensaje en español.
-- Reintentos (#4): `post_json` reintenta HTTP 429/500/502/503/504 y cortes de conexión (`--retries N`, 3 por defecto, `0` los desactiva) con espera exponencial (1 s × 2^n, tope 30 s) y jitter (50-100 %), respetando `Retry-After` (segundos o fecha; si pide más de 120 s no se espera). Cada reintento se avisa en consola (`~~  openai:modelo: reintento 1/3 en 1.2 s: HTTP 429 ...`).
+- Reintentos (#4): `post_json` reintenta HTTP 429/500/502/503/504 y cortes de conexión (`--retries N`, 3 por defecto, `0` los desactiva) con espera exponencial (1 s × 2^n, tope 30 s) y jitter (50-100 %), respetando `Retry-After` (segundos o fecha; si pide más de 120 s no se espera). Cada reintento se avisa en consola (`~~  openai:modelo: reintento 1/3 en 1,2 s: HTTP 429 ...`).
 - Guardado incremental (#5): `run_duel` llama a `on_update` tras cada intento y la CLI reescribe `results.json` de forma atómica (`.tmp` + `os.replace`, con reintentos por si Windows lo tiene abierto). `results.json` lleva `status` (`in_progress`/`complete`), `updated_at` y una huella (`fingerprint`) por tarea. Ctrl+C escribe además un informe parcial con el aviso «Duelo incompleto».
 - `--resume` (`src/modelduel/resume.py`): reutiliza los intentos terminados de tareas sin cambios y repite los `provider_error`; contendientes distintos = error (exit 2); tarea cambiada, otro `--timeout` u otro `--runs` = aviso. Sin `--resume` no se sobrescribe un duelo incompleto (sí uno completo o ilegible, como en v0.1.0).
 - Liga (#6): `--model/-m SPEC` repetible (2 a 6 en total, contando `--a`/`--b`, que van primero); cada contendiente recibe una letra `a`-`f` (`results.ALL_SIDES`) y `results.json` sigue con la misma estructura (`contenders`/`results` por letra), así que los de v0.1.0 se leen igual. `rank_sides` clasifica por tareas resueltas, tests y coste (el coste solo si todos tienen precio en la misma moneda); los empates comparten posición. Nombres repetidos = error.
@@ -93,6 +93,7 @@ Base heredada de v0.1.0:
 3. Tras fusionar y publicar: quitar de README, `docs/USO.md` y la web el aviso «se publica al crear la release», comprobar `pip install "modelduel[pytest]"` y `modelduel demo` desde un entorno limpio, y actualizar enlaces (README/web) con el badge de PyPI si se desea.
 
 - 2026-09-30 (builder): #15 `results.rank_sides` y el veredicto comparten una única clave de ordenación (`_rank_key`: tareas resueltas, tests, coste); `decide(summary)` devuelve `(ganador, criterio)` mirando en qué posición de la clave difieren los dos primeros, y `costs_comparable` decide si el coste cuenta. El informe (`_verdict`) dice el criterio: «gana A por tareas resueltas (2 frente a 1)», «por tests superados (…, con las mismas tareas resueltas)», «por coste (…)» o «empate en tareas resueltas, tests y coste» (sin coste comparable: «empate en tareas resueltas y tests (sin coste comparable)»). Bajo los números grandes del marcador hay una etiqueta «tests superados» para que no se confundan con el criterio decisivo (una tarea resuelta pesa más que los tests sueltos).
+- 2026-09-30 (builder): #17 el aviso de reintento usa `report.html.fmt_seconds` (el mismo que la CLI y el informe): `1,2 s`, y `1 min 15,0 s` a partir de 60 s. `providers/base.py` importa ahora de `report.html` (no hay ciclo: el informe no importa proveedores). El mensaje «el servidor pide esperar N s» sigue con `:g` (es un error, no el aviso).
 - 2026-09-30 (builder): `graphify-out/` (grafo local) está en `.gitignore`.
 
 ## Problemas conocidos
@@ -117,3 +118,4 @@ Base heredada de v0.1.0:
 - 2026-09-30 qa · Claude Code Sonnet (agent/qa/8-revision-v0.2): #8 revisión de v0.2.0: Retry-After absurdo y desbordes, tests sin esperas reales, `--resume` ante formatos nuevos/dañados, sustitutos UTF-16 en errores, liga legible en móvil, tablas con teclado, contraste AA de toda la paleta, escapado con 2/3/6 y `release.yml` solo desde `main`. 222 → 258 tests.
 - 2026-09-30 docs · Claude Code Sonnet (agent/docs/9-documentacion-v0.2): #9 `CHANGELOG.md` (v0.1.0 y v0.2.0), guía de uso con PyPI, `demo`, `--retries`, `--resume` (avisos y errores comprobados ejecutando la herramienta con `replay`), liga y límites conocidos, README, web, `CONTRIBUTING.md` (publicar una versión, añadir un color a la paleta) y `MEMORY.md`.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/15-veredicto-unificado): #15 veredicto del duelo de dos con la misma ordenación que la clasificación y texto que indica el criterio decisivo; tests con los casos que antes discrepaban; CHANGELOG, USO y README al día.
+- 2026-09-30 builder · Claude Code Sonnet (agent/builder/17-aviso-reintento-es): #17 aviso de reintento en formato es-ES con el formateador común; test del mensaje.

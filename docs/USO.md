@@ -579,7 +579,7 @@ Las APIs reales fallan a veces por motivos pasajeros. Con `--retries N` (3 por d
 La espera crece como 1, 2, 4… segundos (tope de 30 s) con algo de azar para que varios clientes no coincidan. Si el servidor manda la cabecera `Retry-After`, se respeta, salvo que pida esperar **más de 2 minutos**: entonces modelduel se rinde sin esperar. Cada reintento se avisa en consola:
 
 ```text
-  ~~  openai:mi-modelo: reintento 1/3 en 1.2 s: HTTP 429 ...
+  ~~  openai:mi-modelo: reintento 1/3 en 1,2 s: HTTP 429 ...
 ```
 
 **No** se reintenta lo que no suele arreglarse esperando: los errores de tu configuración (400, 401, 403, 404…), los **tiempos de espera agotados** (`MODELDUEL_HTTP_TIMEOUT`: reintentar triplicaría la espera), un **servidor apagado** (por ejemplo, Ollama sin arrancar) ni los errores de resolución de nombres (DNS). Si tras los reintentos la llamada sigue fallando, ese intento queda como «error del proveedor» y el duelo sigue con el resto; `--resume` puede repetirlo después. El tiempo del modelo que se anota es el del intento bueno, sin las esperas.

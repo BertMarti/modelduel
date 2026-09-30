@@ -98,10 +98,17 @@ def test_espera_exponencial_y_se_rinde_tras_los_reintentos(monkeypatch):
     assert sleeps == [1.0, 2.0, 4.0]
     assert "HTTP 503" in str(info.value) and "tras 3 reintentos" in str(info.value)
     assert [n.split(":")[0] for n in notes] == [
-        "reintento 1/3 en 1.0 s",
-        "reintento 2/3 en 2.0 s",
-        "reintento 3/3 en 4.0 s",
+        "reintento 1/3 en 1,0 s",
+        "reintento 2/3 en 2,0 s",
+        "reintento 3/3 en 4,0 s",
     ]
+
+
+def test_el_aviso_usa_el_formato_es_es_con_decimales(monkeypatch):
+    _script(monkeypatch, [_http_error(429, "1.5"), _Ok()])
+    policy, _sleeps, notes = _policy(retries=1)
+    post_json("https://x.test", {}, {}, retry=policy)
+    assert notes[0].startswith("reintento 1/1 en 1,5 s: ")
 
 
 def test_un_solo_reintento_en_singular(monkeypatch):

@@ -17,6 +17,8 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Protocol
 
+from modelduel.report.html import fmt_seconds
+
 DEFAULT_HTTP_TIMEOUT = 180.0
 DEFAULT_RETRIES = 3
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
@@ -148,7 +150,7 @@ def post_json(
             wait = retry.delay(attempt, exc.retry_after)
             attempt += 1
             if retry.notify:
-                retry.notify(f"reintento {attempt}/{retry.retries} en {wait:.1f} s: {exc}")
+                retry.notify(f"reintento {attempt}/{retry.retries} en {fmt_seconds(wait)}: {exc}")
             retry.sleep(wait)
 
 
