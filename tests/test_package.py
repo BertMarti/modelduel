@@ -149,3 +149,21 @@ def test_demo_avisa_si_no_se_puede_copiar(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("modelduel.cli.shutil.copytree", boom)
     assert main(["demo", "--copy", str(tmp_path / "x")]) == 1
     assert "no se pudo copiar" in capsys.readouterr().err
+
+
+def test_release_solo_publica_commits_de_main_y_no_guarda_credenciales():
+    build = RELEASE.split("  publish:")[0]
+    assert "merge-base --is-ancestor HEAD origin/main" in build
+    assert "persist-credentials: false" in build and "fetch-depth: 0" in build
+
+
+def test_la_wheel_incluye_todo_lo_que_necesita_modelduel_demo():
+    """Lo que ``modelduel demo`` lee tiene que viajar en la wheel (``force-include``)."""
+    folder = examples_dir()
+    wheel = PYPROJECT["tool"]["hatch"]["build"]["targets"]["wheel"]
+    assert wheel["force-include"]["examples"] == "modelduel/examples"
+    assert folder.name == "examples" and folder == (ROOT / "examples")
+    package = ROOT / "src" / "modelduel" / "report"
+    for name in ("template.html", "league.html", "style.css"):
+        assert (package / name).is_file()  # hatch incluye todo lo que hay bajo src/modelduel
+    assert wheel["packages"] == ["src/modelduel"]

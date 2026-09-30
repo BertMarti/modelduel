@@ -351,3 +351,61 @@ def test_los_resultados_de_v010_siguen_renderizando_como_duelo():
 
     html = render_report(copy.deepcopy(RESULTS))
     assert "Informe de duelo" in html and 'class="board"' in html
+
+
+# ---------------------------------------------------------------- QA: paleta, móvil y teclado
+
+
+def _css_block(html: str, start: str) -> str:
+    """Contenido entre llaves del primer bloque que empieza por ``start``."""
+    return html.split(start)[1].split("}")[0]
+
+
+def test_contraste_aa_de_toda_la_paleta_sobre_todos_fondos(make_task):
+    """Cada color de texto (no solo los acentos) sobre cada fondo, en pantalla e impresión."""
+    from tests.test_report import _blend
+
+    html = _html(make_task, 6)
+    screen = _css_vars(_css_block(html, ":root {"))
+    printed = {**screen, **_css_vars(html.split("@media print")[1].split("}")[0])}
+    colors = set(ALL_SIDES) | {"text", "muted"}
+    assert set(screen) == colors | {"bg", "panel", "line"}  # nada sin revisar
+    for theme, bgs in ((screen, ("bg", "panel")), (printed, ("bg", "panel"))):
+        for name in colors:
+            for bg in bgs:
+                assert _contrast(theme[name], theme[bg]) >= 4.5, (name, bg)
+    # El valor «perdedor» atenuado (.8) de cualquier contendiente sigue en AA.
+    for side in ALL_SIDES:
+        assert _contrast(_blend(screen[side], screen["bg"], 0.8), screen["bg"]) >= 4.5, side
+    # Colores literales de texto en el CSS: todos cumplen AA sobre su fondo.
+    for literal in re.findall(r"(?<![-\w])color:\s*(#[0-9a-fA-F]{6})\b", html):
+        assert _contrast(literal, "#ffffff") >= 4.5 or _contrast(literal, screen["bg"]) >= 4.5
+
+
+def test_en_movil_las_barras_de_la_liga_no_se_quedan_en_cero(make_task):
+    """Con 6 nombres largos la columna de la barra medía 0 px a 375 px."""
+    html = _html(make_task, 6)
+    mobile = html.split("@media (max-width: 720px)")[1].split("@media print")[0]
+    assert re.search(r"\.lg-row\s*\{[^}]*grid-template-columns:\s*34px minmax\(0, 1fr\)", mobile)
+    assert re.search(r"\.lg-row svg\s*\{[^}]*grid-column:\s*1 / -1", mobile)
+
+
+@pytest.mark.parametrize("n", [2, 3, 6])
+def test_las_tablas_con_desplazamiento_se_alcanzan_con_el_teclado(make_task, n):
+    html = _html(make_task, n)
+    wraps = re.findall(r'<div class="table-wrap"([^>]*)>', html)
+    assert wraps
+    for attrs in wraps:
+        assert 'tabindex="0"' in attrs and 'role="region"' in attrs and "aria-label=" in attrs
+    assert ".table-wrap:focus-visible" in html
+
+
+@pytest.mark.parametrize("n", [2, 3, 6])
+def test_los_nombres_de_modelo_hostiles_se_escapan_en_todo_el_informe(make_task, n):
+    hostile = "<img src=x onerror=alert(1)>&\"'"
+    results = _league(make_task, n)
+    for side in ALL_SIDES[:n]:
+        results["contenders"][side]["spec"] = f"fake:{hostile}{side}"
+    html = render_report(results)
+    assert "<img" not in html and "onerror=alert(1)>" not in html
+    assert "&lt;img src=x onerror=alert(1)&gt;" in html

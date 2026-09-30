@@ -255,7 +255,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     warnings: list[str] = []
     if previous is not None:
         specs = {side: provider.spec for side, provider in providers.items()}
-        reuse, warnings = plan_resume(previous, tasks, specs, args.runs, args.timeout)
+        try:
+            reuse, warnings = plan_resume(previous, tasks, specs, args.runs, args.timeout)
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise ResumeError(
+                f"{results_path} está dañado o incompleto ({type(exc).__name__}: {exc}). "
+                "Bórralo o elige otra carpeta --out."
+            ) from exc
 
     print(
         f"modelduel {__version__} · {plural(len(tasks), 'tarea', 'tareas')} · "

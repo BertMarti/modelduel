@@ -110,6 +110,7 @@ h2 {
 
 /* Tabla */
 .table-wrap { overflow-x: auto; }
+.table-wrap:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
 caption { text-align: left; color: var(--muted); font-size: 13px; padding-bottom: 10px; caption-side: bottom; padding-top: 10px; }
 th, td { padding: 11px 9px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
@@ -193,6 +194,10 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--line);
   .metric .mid { grid-column: 1 / -1; order: -1; }
   .duo { grid-template-columns: 1fr; }
   .detail-body { padding-left: 0; }
+  /* Con 6 nombres largos la barra se quedaba en 0 px: nombre, valor y barra van en filas. */
+  .lg-row { grid-template-columns: 34px minmax(0, 1fr); }
+  .lg-val { grid-column: 2; text-align: left; order: 2; }
+  .lg-row svg { grid-column: 1 / -1; order: 3; }
 }
 
 @media print {

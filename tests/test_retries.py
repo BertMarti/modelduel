@@ -263,3 +263,59 @@ def test_cli_retries_por_defecto_y_validacion(monkeypatch, capsys, examples_dir,
     assert seen["replay:alfa"] == 3
     assert main([*base_args, "--retries", "-1"]) == 2
     assert "--retries" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------- QA: casos límite
+
+
+def test_retry_after_enorme_o_absurdo_se_rinde_sin_esperar(monkeypatch):
+    for value in ("9" * 400, "99999999999", "Fri, 31 Dec 9999 23:59:59 GMT"):
+        calls = _script(monkeypatch, [_http_error(429, value), _Ok()])
+        policy, sleeps, _notes = _policy()
+        with pytest.raises(ProviderError, match="no se reintenta"):
+            post_json("https://x.test", {}, {}, retry=policy)
+        assert len(calls) == 1 and sleeps == [], value
+
+
+def test_retry_after_enorme_no_imprime_inf(monkeypatch):
+    _script(monkeypatch, [_http_error(503, "9" * 400)])
+    policy, _sleeps, _notes = _policy()
+    with pytest.raises(ProviderError) as info:
+        post_json("https://x.test", {}, {}, retry=policy)
+    assert "inf" not in str(info.value) and "un tiempo excesivo" in str(info.value)
+
+
+@pytest.mark.parametrize("value", ["-5", "-1e9", "0", "", "nan", "inf", "1e999", "1_0", "٣"])
+def test_retry_after_negativo_o_raro_nunca_da_una_espera_negativa(monkeypatch, value):
+    parsed = parse_retry_after(value)
+    assert parsed is None or parsed >= 0
+    _script(monkeypatch, [_http_error(429, value), _Ok()])
+    policy, sleeps, _notes = _policy()
+    post_json("https://x.test", {}, {}, retry=policy)
+    assert sleeps == [1.0]  # solo la espera exponencial normal
+
+
+def test_retry_after_fecha_http_absurda_no_revienta():
+    assert parse_retry_after("Sun, 06 Nov 99999 08:49:37 GMT") is None
+    assert parse_retry_after("Wed, 21 Oct 2099 25:99:99 GMT") is None
+
+
+def test_retry_after_dentro_del_tope_se_espera_y_en_fecha_tambien(monkeypatch):
+    future = format_datetime(datetime.now(UTC) + timedelta(seconds=60), usegmt=True)
+    _script(monkeypatch, [_http_error(429, future), _http_error(429, "119"), _Ok()])
+    policy, sleeps, _notes = _policy()
+    post_json("https://x.test", {}, {}, retry=policy)
+    assert 50 < sleeps[0] <= 60 and sleeps[1] == 119.0
+
+
+def test_la_espera_no_se_desborda_con_muchos_reintentos():
+    policy = RetryPolicy(rng=lambda: 1.0)
+    assert policy.delay(5000, None) == policy.max_delay
+    assert policy.delay(1024, None) == policy.max_delay
+
+
+def test_ningun_test_espera_de_verdad_entre_reintentos(monkeypatch):
+    """La política por defecto usa la espera real; el guardián de conftest la prohíbe."""
+    _script(monkeypatch, [_http_error(503), _Ok()])
+    with pytest.raises(AssertionError, match="esperar"):
+        post_json("https://x.test", {}, {}, retry=RetryPolicy(retries=1))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
+from modelduel import __version__
 from modelduel.tasks import Task, read_text
 
 Key = tuple[str, str, int]  # (id de la tarea, contendiente, número de ejecución)
@@ -44,8 +45,14 @@ def plan_resume(
             "Usa la misma configuración o elige otra carpeta --out."
         )
     warnings: list[str] = []
+    old_version = previous.get("version")
+    if old_version is not None and old_version != __version__:
+        warnings.append(
+            f"el duelo anterior se hizo con modelduel {old_version} y ahora es {__version__}: "
+            "si cambió lo que se envía a los modelos, los resultados pueden no ser comparables."
+        )
     old_timeout = previous.get("timeout_s")
-    if old_timeout is not None and old_timeout != timeout:
+    if isinstance(old_timeout, int | float) and old_timeout != timeout:
         warnings.append(
             f"el límite de los tests era {old_timeout:g} s y ahora es {timeout:g} s: "
             "se conservan los intentos ya hechos."
@@ -74,7 +81,7 @@ def plan_resume(
                 if (
                     isinstance(run, int)
                     and 1 <= run <= runs
-                    and attempt["status"] != "provider_error"
+                    and attempt.get("status") not in (None, "provider_error")
                 ):
                     reusable[(task.id, side, run)] = attempt
     for task_id in sorted(set(by_id) - {t.id for t in tasks}):

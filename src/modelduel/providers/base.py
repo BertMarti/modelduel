@@ -7,6 +7,7 @@ import json
 import math
 import os
 import random
+import re
 import time
 import urllib.error
 import urllib.request
@@ -20,6 +21,11 @@ DEFAULT_HTTP_TIMEOUT = 180.0
 DEFAULT_RETRIES = 3
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 USER_AGENT = "modelduel (+https://github.com/BertMarti/modelduel)"
+
+
+def _real_sleep(seconds: float) -> None:
+    """Espera de verdad; los tests la sustituyen para no esperar nunca."""
+    time.sleep(seconds)
 
 
 class ProviderError(Exception):
@@ -46,7 +52,7 @@ class RetryPolicy:
     max_delay: float = 30.0
     max_retry_after: float = 120.0  # si el servidor pide esperar más, no se espera: se rinde
     notify: Callable[[str], None] | None = None
-    sleep: Callable[[float], None] = field(default=time.sleep, repr=False)
+    sleep: Callable[[float], None] = field(default=lambda s: _real_sleep(s), repr=False)
     rng: Callable[[], float] = field(default=random.random, repr=False)
 
     def delay(self, attempt: int, retry_after: float | None) -> float:
@@ -55,7 +61,7 @@ class RetryPolicy:
         Sin ``Retry-After``: ``base × 2^attempt`` acotado por ``max_delay`` y con jitter entre el
         50 % y el 100 %. Con ``Retry-After`` se espera como mínimo eso.
         """
-        exponential = min(self.max_delay, self.base_delay * 2**attempt)
+        exponential = min(self.max_delay, self.base_delay * 2 ** min(attempt, 62))  # sin desbordar
         jittered = exponential * (0.5 + 0.5 * self.rng())
         return max(jittered, retry_after) if retry_after is not None else jittered
 
@@ -131,8 +137,13 @@ def post_json(
                 suffix = f" (tras {plural_retries(attempt)})" if attempt else ""
                 raise ProviderError(f"{exc}{suffix}") from None
             if exc.retry_after is not None and exc.retry_after > retry.max_retry_after:
+                asked = (
+                    "un tiempo excesivo"
+                    if math.isinf(exc.retry_after)
+                    else f"{exc.retry_after:g} s"
+                )
                 raise ProviderError(
-                    f"{exc} (el servidor pide esperar {exc.retry_after:g} s: no se reintenta)"
+                    f"{exc} (el servidor pide esperar {asked}: no se reintenta)"
                 ) from None
             wait = retry.delay(attempt, exc.retry_after)
             attempt += 1
@@ -145,22 +156,32 @@ def plural_retries(n: int) -> str:
     return "1 reintento" if n == 1 else f"{n} reintentos"
 
 
+_SECONDS = re.compile(r"\+?\d+(?:\.\d+)?", re.ASCII)
+
+
 def parse_retry_after(value: str | None) -> float | None:
-    """``Retry-After`` en segundos o como fecha HTTP; ``None`` si falta o no se entiende."""
+    """``Retry-After`` en segundos o como fecha HTTP; ``None`` si falta o no se entiende.
+
+    Un valor absurdo (cientos de dígitos) devuelve ``inf``: «espera una eternidad» no
+    es lo mismo que «no he dicho nada», y quien llama se rinde en vez de reintentar ya.
+    """
     if not value:
         return None
     value = value.strip()
+    if _SECONDS.fullmatch(value):
+        return float(value)  # un literal enorme da inf
+    if re.fullmatch(r"-\d+(?:\.\d+)?", value, re.ASCII):
+        return 0.0  # negativo: no hay que esperar más de lo habitual
     try:
-        seconds = float(value)
-    except ValueError:
-        try:
-            when = parsedate_to_datetime(value)
-        except (TypeError, ValueError):
-            return None
-        if when.tzinfo is None:
-            when = when.replace(tzinfo=UTC)
-        seconds = (when - datetime.now(UTC)).total_seconds()
-    return max(0.0, seconds) if math.isfinite(seconds) else None
+        when = parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    try:
+        return max(0.0, (when - datetime.now(UTC)).total_seconds())
+    except OverflowError:
+        return math.inf
 
 
 def _post_once(
