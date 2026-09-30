@@ -13,20 +13,22 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
    - [OpenRouter](#openrouter)
    - [Ollama (modelos en tu ordenador)](#ollama-modelos-en-tu-ordenador)
 5. [Crear tu propia tarea paso a paso](#crear-tu-propia-tarea-paso-a-paso)
-6. [Leer el informe](#leer-el-informe)
-7. [Opciones: `--runs`, `--timeout`, `--resume` y `--prices`](#opciones---runs---timeout---resume-y---prices)
-8. [Códigos de salida](#códigos-de-salida)
-9. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
-10. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
+6. [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos)
+7. [Leer el informe](#leer-el-informe)
+8. [Opciones: `--runs`, `--timeout`, `--retries`, `--resume` y `--prices`](#opciones---runs---timeout---retries---resume-y---prices)
+9. [Códigos de salida](#códigos-de-salida)
+10. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
+11. [Límites conocidos](#límites-conocidos)
+12. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
 
 ---
 
 ## Qué es y cuándo usarlo
 
-modelduel es una herramienta de terminal que **enfrenta a dos modelos de inteligencia artificial con el mismo problema de programación**:
+modelduel es una herramienta de terminal que **enfrenta a dos modelos de inteligencia artificial (o a una liga de hasta seis) con el mismo problema de programación**:
 
-1. Envía el mismo enunciado a los dos modelos y les pide una función en Python.
-2. Guarda la respuesta de cada uno y le pasa **tus tests** (los mismos para los dos).
+1. Envía el mismo enunciado a cada modelo y les pide una función en Python.
+2. Guarda la respuesta de cada uno y le pasa **tus tests** (los mismos para todos).
 3. Te da un informe con quién acierta más, cuánto tarda, cuántos tokens gasta y cuánto cuesta.
 
 Úsalo cuando tengas que **elegir un modelo para tu trabajo** y no te fíes de los rankings generales, porque miden tareas que no son las tuyas. También sirve para comprobar si un modelo barato o pequeño (por ejemplo, uno que corre en tu ordenador con Ollama) te basta para lo que haces.
@@ -42,15 +44,28 @@ Ten en cuenta dos límites:
 
 ## Instalación
 
-Necesitas:
+Necesitas **Python 3.12 o superior** y **pytest** en el mismo entorno (modelduel lo usa para ejecutar los tests de las tareas; no es una dependencia del programa y por eso se instala aparte, o con el extra `[pytest]`). modelduel no necesita ninguna otra biblioteca.
 
-- **Python 3.12 o superior.**
-- **Git**, para descargar el proyecto.
-- **pytest** en el mismo entorno de Python (modelduel lo usa para ejecutar los tests de las tareas; no es una dependencia del programa y por eso se instala aparte).
+### Desde PyPI (recomendado)
 
-modelduel no necesita ninguna otra biblioteca.
+```bash
+pip install "modelduel[pytest]"
+modelduel --version
+```
 
-### Windows (PowerShell)
+`[pytest]` instala también pytest; es lo mismo que `pip install modelduel pytest`. Escribe `modelduel 0.2.0` (o la versión actual) si todo va bien. Así tienes la orden `modelduel` **con las tareas y respuestas de ejemplo incluidas** (ver `modelduel demo` en la sección siguiente).
+
+> **Ojo:** el paquete se publica en PyPI cuando se crea la *release* `v0.2.0` del repositorio. Hasta entonces `pip install modelduel` no lo encontrará y tienes que instalarlo desde GitHub (siguiente apartado).
+
+### Desde GitHub (la última versión, publicada o no)
+
+```bash
+pip install git+https://github.com/BertMarti/modelduel pytest
+```
+
+### Desde el código fuente (para tener `examples/` a mano)
+
+Necesitas además **Git**. Windows (PowerShell):
 
 ```powershell
 git clone https://github.com/BertMarti/modelduel
@@ -63,7 +78,7 @@ modelduel --version
 
 Si PowerShell se queja de que la ejecución de scripts está deshabilitada al activar el entorno, no hace falta activarlo: usa `.venv\Scripts\python.exe -m modelduel` donde esta guía dice `modelduel`.
 
-### Linux y macOS
+Linux y macOS:
 
 ```bash
 git clone https://github.com/BertMarti/modelduel
@@ -74,33 +89,29 @@ pip install -e . pytest
 modelduel --version
 ```
 
-Si todo va bien, `modelduel --version` escribe `modelduel 0.2.0` (o la versión actual).
-
-**Cada vez que abras una terminal nueva** tienes que volver a activar el entorno (`.venv\Scripts\Activate.ps1` en Windows, `source .venv/bin/activate` en Linux y macOS) o no encontrará la orden `modelduel`.
-
-### Instalarlo sin clonar el proyecto
-
-Desde la versión 0.2.0 se publica en PyPI:
-
-```bash
-pip install "modelduel[pytest]"
-```
-
-(`[pytest]` instala también pytest, que hace falta para ejecutar los tests de las tareas; equivale a `pip install modelduel pytest`.) Así tienes la orden `modelduel` **con los ejemplos incluidos**:
-
-```bash
-modelduel demo                        # liga de tres modelos ficticios, informe en modelduel-demo/
-modelduel demo --out otra-carpeta     # elegir la carpeta de salida
-modelduel demo --copy MIS-EJEMPLOS    # copiar tareas y respuestas de ejemplo para usarlas de plantilla
-```
-
-También puedes instalar la última versión, aún sin publicar, desde GitHub: `pip install git+https://github.com/BertMarti/modelduel pytest`.
+**Cada vez que abras una terminal nueva** tienes que volver a activar el entorno (`.venv\Scripts\Activate.ps1` en Windows, `source .venv/bin/activate` en Linux y macOS) o no encontrará la orden `modelduel`. Lo mismo vale si instalas desde PyPI dentro de un entorno virtual.
 
 ---
 
 ## Tu primer duelo con la demo
 
-La demo no necesita claves ni cuesta nada: usa respuestas **grabadas y ficticias** de tres «modelos» llamados `alfa`, `beta` y `gamma` (proveedor `replay`): es una liga de tres contendientes. Desde la carpeta `modelduel` con el entorno activado (si lo instalaste desde PyPI, basta `modelduel demo`, que hace lo mismo con los ejemplos incluidos):
+La demo no necesita claves ni cuesta nada: usa respuestas **grabadas y ficticias** de tres «modelos» llamados `alfa`, `beta` y `gamma` (proveedor `replay`): es una liga de tres contendientes.
+
+### `modelduel demo`
+
+Con el paquete instalado (desde PyPI o desde GitHub), sin clonar nada:
+
+```bash
+modelduel demo                        # informe en modelduel-demo/
+modelduel demo --out otra-carpeta     # elegir la carpeta de salida
+modelduel demo --copy MIS-EJEMPLOS    # no ejecuta nada: copia las tareas y respuestas de ejemplo
+```
+
+`demo --copy` crea `MIS-EJEMPLOS/tasks` (las tres tareas) y `MIS-EJEMPLOS/replays` (las respuestas grabadas) y te dice cómo probarlas. Es el punto de partida más rápido para [crear tus propias tareas](#crear-tu-propia-tarea-paso-a-paso): copia una carpeta de tarea y cámbiala.
+
+### La misma demo con `run`
+
+`modelduel demo` hace lo mismo que esta orden, que puedes lanzar desde un clon del repositorio (con el entorno activado):
 
 ```bash
 modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out runs/demo
@@ -141,7 +152,7 @@ Cada línea `ok` o `--` es un intento: `ok` significa que superó **todos** los 
 - `index.html`: el informe. Ábrelo con doble clic en cualquier navegador.
 - `results.json`: todos los datos en bruto.
 
-`gamma` empata con `beta` en tareas y en tests, pero es mucho más barato, así que queda por delante: ese es el desempate por coste. Con `--a` y `--b` sigues teniendo el duelo de dos de siempre (`modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo`).
+`gamma` empata con `beta` en tareas y en tests, pero es mucho más barato, así que queda por delante: ese es el desempate por coste. Con `--a` y `--b` (o con solo dos `--model`) sigues teniendo el duelo de dos de siempre (`modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo`). Cómo se lee la clasificación se explica en [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos).
 
 Otras dos órdenes útiles:
 
@@ -457,6 +468,46 @@ Puedes pasar a `run` la carpeta con todas las tareas (`mis-tareas`) o la carpeta
 
 ---
 
+## Una liga de tres a seis modelos
+
+Para comparar más de dos modelos, repite `--model` (o `-m`) una vez por contendiente. Hacen falta entre **2 y 6 en total**:
+
+```bash
+modelduel run mis-tareas \
+  --model gemini:<modelo> --model openai:<modelo-1> --model openai:<modelo-2> \
+  --runs 3 --out runs/liga
+```
+
+- También puedes mezclar: `--a` y `--b` van los primeros y cada `--model` se añade después (`--a X --b Y --model Z` es una liga de tres: A=X, B=Y, C=Z).
+- Cada contendiente recibe una **letra** (`A` a `F`) por orden de aparición y un color. La letra es siempre la pista principal; el color, un refuerzo.
+- No puedes repetir el mismo `proveedor:modelo`: se rechaza antes de llamar a nadie. Para ver cuánto varía un modelo consigo mismo usa `--runs`.
+- Con más de seis contendientes la orden termina con un error.
+- Las llamadas a las APIs son `tareas × runs × contendientes`: con seis contendientes la factura se multiplica. Prueba antes con `replay` o con una sola tarea.
+
+### Cómo leer la clasificación
+
+En la consola, y arriba del informe de liga, hay una fila por contendiente, de mejor a peor. El orden sale de tres criterios, **en este orden**:
+
+1. **Tareas resueltas** (más es mejor): tareas con todos los tests en verde en todas las ejecuciones.
+2. **Tests superados** (más es mejor): suma de tests en verde.
+3. **Coste** (menos es mejor): solo desempata si **todos** los contendientes tienen precio y en la misma moneda; si no, no cuenta.
+
+Los empates completos **comparten posición**. En la demo:
+
+```text
+  #   Contendiente     Tareas   Tests   Tiempo   Tokens (ent/sal)        Coste
+  ----------------------------------------------------------------------------
+  1   A replay:alfa       2/3   31/32   10,1 s          1.401/703   0,0017 USD
+  2   C replay:gamma      2/3   30/32    3,7 s          1.314/426   0,0003 USD
+  3   B replay:beta       2/3   30/32   28,1 s        1.373/2.132   0,0248 USD
+```
+
+`alfa` va primero porque, con las mismas tareas resueltas que los demás (2 de 3), supera más tests (31 frente a 30). `gamma` y `beta` empatan en tareas y en tests, y `gamma` queda delante por ser más barato. Con tres tareas, una sola respuesta cambia el orden: léelo con cautela.
+
+Con tres o más contendientes, el informe HTML añade, debajo de la clasificación, una **comparativa** con una barra fina por contendiente y métrica, una **matriz por tarea** (tests superados y un estado escrito —«resuelta», «no resuelta», «sin hacer»…, para no depender del color) y el desplegable de código y salida de cada intento. En móvil, las tablas se desplazan en horizontal dentro de su propio marco (también con el teclado).
+
+---
+
 ## Leer el informe
 
 `index.html` es un único archivo: no necesita conexión, no usa JavaScript y se imprime bien. Con **dos** contendientes es un duelo enfrentado (lo que describe la lista de abajo); con **tres a seis** es una **liga**: cabecera con quién va primero, una **clasificación** (tareas resueltas, después tests superados y después coste, menos es mejor; los empates comparten posición), una comparativa con una barra fina por contendiente y métrica, una **matriz por tarea** (tests superados y si la tarea quedó resuelta) y el mismo desplegable de código y salida. Cada contendiente lleva una letra (`A` a `F`) junto a su color: la letra es la pista principal y el color, un refuerzo. En el duelo de dos, de arriba abajo:
@@ -490,9 +541,9 @@ Un «error del proveedor» no detiene el duelo: se anota y se sigue con el resto
 
 ---
 
-## Opciones: `--runs`, `--timeout`, `--resume` y `--prices`
+## Opciones: `--runs`, `--timeout`, `--retries`, `--resume` y `--prices`
 
-La orden `run` necesita `--out` y al menos dos contendientes (`--a` y `--b`, o `--model` varias veces); acepta además estas opciones:
+La orden `run` necesita `--out` y entre dos y seis contendientes (`--a` y `--b`, o `--model` varias veces); acepta además estas opciones:
 
 | Opción | Qué hace |
 |---|---|
@@ -518,9 +569,24 @@ Debe ser 1 o más; con `--runs 0` la orden termina con un error.
 
 Es el tiempo máximo, en segundos, que tienen **los tests** de una respuesta para ejecutarse (20 por defecto). Sirve para cortar bucles infinitos o soluciones muy lentas: al agotarse, el intento queda como «tiempo agotado». Admite decimales (`--timeout 2.5`) y debe ser mayor que 0. **No limita la espera al modelo:** eso lo controla la variable de entorno `MODELDUEL_HTTP_TIMEOUT` (180 s por defecto).
 
+### `--retries`
+
+Las APIs reales fallan a veces por motivos pasajeros. Con `--retries N` (3 por defecto; `--retries 0` lo desactiva), modelduel **reintenta solo** la llamada cuando el proveedor responde:
+
+- **HTTP 429** (límite de peticiones o cuota) o **500, 502, 503 y 504** (fallos del servidor).
+- **Cortes de una conexión ya abierta** (el servidor cierra a mitad de respuesta).
+
+La espera crece como 1, 2, 4… segundos (tope de 30 s) con algo de azar para que varios clientes no coincidan. Si el servidor manda la cabecera `Retry-After`, se respeta, salvo que pida esperar **más de 2 minutos**: entonces modelduel se rinde sin esperar. Cada reintento se avisa en consola:
+
+```text
+  ~~  openai:mi-modelo: reintento 1/3 en 1.2 s: HTTP 429 ...
+```
+
+**No** se reintenta lo que no suele arreglarse esperando: los errores de tu configuración (400, 401, 403, 404…), los **tiempos de espera agotados** (`MODELDUEL_HTTP_TIMEOUT`: reintentar triplicaría la espera), un **servidor apagado** (por ejemplo, Ollama sin arrancar) ni los errores de resolución de nombres (DNS). Si tras los reintentos la llamada sigue fallando, ese intento queda como «error del proveedor» y el duelo sigue con el resto; `--resume` puede repetirlo después. El tiempo del modelo que se anota es el del intento bueno, sin las esperas.
+
 ### `--resume`
 
-Un duelo con APIs reales puede tardar y costar dinero, así que `results.json` se guarda **tras cada intento** (con un archivo temporal que después reemplaza al anterior, de modo que nunca queda a medias). Si el duelo se corta —Ctrl+C, un apagón, la red—, lo hecho sigue en `results.json` y en un `index.html` parcial que muestra «Duelo incompleto: X de Y intentos».
+Un duelo con APIs reales puede tardar y costar dinero, así que `results.json` se guarda **tras cada intento** (con un archivo temporal que después reemplaza al anterior, de modo que nunca queda a medias). Si el duelo se corta —Ctrl+C, un apagón, la red—, lo hecho sigue en `results.json` (con `"status": "in_progress"`) y en un `index.html` parcial que muestra «Duelo incompleto: X de Y intentos». Un duelo terminado queda con `"status": "complete"`.
 
 Para continuar, repite **la misma orden** añadiendo `--resume`:
 
@@ -528,12 +594,21 @@ Para continuar, repite **la misma orden** añadiendo `--resume`:
 modelduel run mis-tareas --a gemini:<modelo> --b openai:<modelo> --runs 3 --out runs/duelo --resume
 ```
 
-- Se saltan los intentos ya terminados (se ven como `==  ...  · ya hecho`) y solo se llama a los modelos por lo que falta.
-- Los intentos que acabaron en «error del proveedor» se **repiten**.
-- Si has cambiado los contendientes, la orden se detiene con un error: mezclar modelos distintos daría un marcador sin sentido. Usa otra carpeta `--out`.
-- Si has cambiado una tarea, el límite de tiempo o el número de ejecuciones, avisa y sigue: la tarea cambiada se repite entera, el resto se conserva.
-- Si no hay `results.json` previo, empieza de cero.
-- **Sin `--resume`**, modelduel se niega a sobrescribir un duelo incompleto (bórralo o cambia de `--out`); uno completo sí se rehace, como siempre.
+Empieza con una línea como `Reanudando: 5 intentos ya hechos de 9; quedan 4.`; los intentos reutilizados se ven como `==  ...  · ya hecho` y solo se llama a los modelos por lo que falta. Los intentos que acabaron en «error del proveedor» se **repiten** (lo normal es reanudar precisamente por eso). El coste de los intentos reutilizados se recalcula con la tabla de precios actual.
+
+**Cuándo avisa y cuándo da error:**
+
+| Qué ha cambiado desde el duelo anterior | Qué pasa |
+|---|---|
+| Los **contendientes** (otro modelo, uno de más o de menos) | **Error** (código 2): mezclar modelos distintos daría un marcador sin sentido. Usa la misma configuración u otra carpeta `--out`. |
+| El `results.json` es de un formato **más nuevo** que el que entiende esta versión, o está dañado | **Error** (código 2). |
+| Una **tarea** (enunciado o tests) | **Aviso**: esa tarea se repite entera; el resto se conserva. |
+| Una tarea que **ya no está** en la carpeta | **Aviso**: se descarta. |
+| El límite `--timeout` o el número de `--runs` | **Aviso**: se conservan los intentos hechos. |
+| La **versión de modelduel** | **Aviso**: el enunciado que se envía a los modelos pudo cambiar. |
+| No hay `results.json` previo | Sin aviso: empieza de cero. |
+
+**Sin `--resume`**, modelduel se niega a sobrescribir un duelo incompleto (`... es un duelo incompleto. Continúalo con --resume o bórralo, o elige otra carpeta --out.`, código 2). Uno completo sí se rehace, como siempre.
 
 ### `--prices`
 
@@ -600,6 +675,15 @@ Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelo
 
 ---
 
+## Límites conocidos
+
+- **El veredicto del duelo de dos puede discrepar de la clasificación.** El texto «gana A por N» del informe de un duelo de dos cuenta **tests superados**, mientras que la clasificación (consola e informe de liga) ordena primero por **tareas resueltas**. Con pocas tareas pueden no coincidir: por ejemplo, un modelo supera más tests pero resuelve menos tareas por completo. Mira siempre las dos cosas y el código de cada respuesta. Está previsto unificar el criterio en v0.3.0 ([issue #15](https://github.com/BertMarti/modelduel/issues/15)).
+- Sin `--resume`, un `results.json` ilegible o de un formato más nuevo se sobrescribe sin aviso; solo se protege un duelo incompleto legible.
+- Un `Retry-After` de entre 30 y 120 s se respeta entero en cada reintento: con `--retries 3`, un proveedor saturado puede costar varios minutos por intento. Baja `--retries` si prefieres rendirte antes.
+- Los proveedores `gemini` y `openai` solo se han probado con respuestas simuladas, no contra las APIs reales.
+
+---
+
 ## Preguntas frecuentes y solución de problemas
 
 **«modelduel» no se reconoce como una orden.**
@@ -630,7 +714,7 @@ El código del modelo tiene un error de sintaxis o no define la función con el 
 Es un problema de tu tarea, no del modelo: `test_task.py` no contiene funciones que empiecen por `test`. Compruébalo con `modelduel list-tasks`, que muestra el número de tests de cada tarea.
 
 **Errores HTTP 429 («límite de peticiones o cuota agotada»).**
-El proveedor te está limitando: has superado el número de peticiones por minuto o se ha agotado tu cuota o saldo. Espera un poco y repite, revisa tu plan, o usa un modelo distinto. modelduel **reintenta solo** los 429, 500, 502, 503 y 504 y los cortes de conexión (hasta 3 veces, con `--retries N`; `0` lo desactiva): espera 1, 2, 4… segundos con algo de azar, respeta la cabecera `Retry-After` y avisa en consola de cada reintento. Si tras los reintentos sigue fallando, o si el servidor pide esperar más de 2 minutos, ese intento queda como «error del proveedor» y el duelo sigue. Los tiempos de espera agotados (`MODELDUEL_HTTP_TIMEOUT`) no se reintentan.
+El proveedor te está limitando: has superado el número de peticiones por minuto o se ha agotado tu cuota o saldo. Espera un poco y repite, revisa tu plan, o usa un modelo distinto. modelduel ya **reintenta solo** estos casos (ver [`--retries`](#--retries)). Si tras los reintentos sigue fallando, o si el servidor pide esperar más de 2 minutos, ese intento queda como «error del proveedor» y el duelo sigue; puedes repetirlo después con `--resume`.
 
 **Otros errores HTTP.** El mensaje incluye una pista: 400 (revisa el nombre del modelo), 401 y 403 (revisa la clave y los permisos), 404 (¿existe el modelo y es correcta `OPENAI_BASE_URL`?), y los 5xx son errores del servidor del proveedor.
 
@@ -638,7 +722,7 @@ El proveedor te está limitando: has superado el número de peticiones por minut
 El modelo no tiene precio en la tabla (añádelo con `--prices`) o el proveedor no devolvió el número de tokens.
 
 **¿Puedo comparar más de dos modelos?**
-No: cada duelo enfrenta a dos. Para comparar más, haz varios duelos.
+Sí, hasta seis: repite `--model`. Ver [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos).
 
 **¿Puedo usar tareas en otro lenguaje que no sea Python?**
 No: solo funciones de Python comprobadas con pytest.
