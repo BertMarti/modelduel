@@ -14,3 +14,6 @@ site/demo/
 .coverage
 .coverage.*
 htmlcov/
+
+# Grafo de conocimiento local (graphify)
+graphify-out/
