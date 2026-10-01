@@ -29,7 +29,8 @@ modelduel run examples/tasks --model replay:alfa --model replay:beta --model rep
 
 - Los tests **no pueden usar la red** ni claves reales: las APIs se simulan.
 - La demo debe terminar con código 0 y generar `runs/demo/index.html` y `runs/demo/results.json`. El CI comprueba además que `--a`/`--b` sigue dando el «Informe de duelo» (la carpeta `runs/` no se sube al repositorio).
-- El informe HTML no puede contener JavaScript.
+- El informe HTML y la página de clasificación no pueden contener JavaScript. El CI genera `site/leaderboard` con `modelduel leaderboard results --out site/leaderboard`.
+- `results/` son datos versionados (un `results.json` por duelo o liga): añade ahí los reales con el procedimiento de [`docs/USO.md`](docs/USO.md#clasificación-pública).
 
 ## Ramas y pull requests
 

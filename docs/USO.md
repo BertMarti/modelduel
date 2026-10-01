@@ -8,6 +8,7 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
 2. [Instalación](#instalación)
 3. [Tu primer duelo con la demo](#tu-primer-duelo-con-la-demo)
 4. [Un duelo real con modelos de verdad](#un-duelo-real-con-modelos-de-verdad)
+   - [OmniRoute](#omniroute)
    - [Gemini](#gemini)
    - [OpenAI](#openai)
    - [OpenRouter](#openrouter)
@@ -15,11 +16,12 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
 5. [Crear tu propia tarea paso a paso](#crear-tu-propia-tarea-paso-a-paso)
 6. [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos)
 7. [Leer el informe](#leer-el-informe)
-8. [Opciones: `--runs`, `--timeout`, `--retries`, `--resume` y `--prices`](#opciones---runs---timeout---retries---resume-y---prices)
-9. [Códigos de salida](#códigos-de-salida)
-10. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
-11. [Límites conocidos](#límites-conocidos)
-12. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
+8. [Clasificación pública](#clasificación-pública)
+9. [Opciones: `--runs`, `--timeout`, `--retries`, `--resume` y `--prices`](#opciones---runs---timeout---retries---resume-y---prices)
+10. [Códigos de salida](#códigos-de-salida)
+11. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
+12. [Límites conocidos](#límites-conocidos)
+13. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
 
 ---
 
@@ -555,6 +557,32 @@ Un «error del proveedor» no detiene el duelo: se anota y se sigue con el resto
 
 ---
 
+## Clasificación pública
+
+El repositorio publica en <https://bertmarti.github.io/modelduel/leaderboard/> una clasificación de modelos construida con los `results.json` de la carpeta [`results/`](https://github.com/BertMarti/modelduel/tree/main/results). El CI la regenera en cada cambio. Hoy contiene tres resultados de demostración con respuestas grabadas (`replay`) y precios ficticios.
+
+### Generarla en tu ordenador
+
+```bash
+modelduel leaderboard results --out runs/clasificacion
+```
+
+Crea `runs/clasificacion/index.html` (la clasificación y el histórico) y un informe por duelo en `runs/clasificacion/duelos/<id>/index.html`. Sirve para cualquier carpeta con `results.json` de modelduel, también la tuya.
+
+- **Cómo se ordena.** Cada modelo (`proveedor:modelo`) suma tareas, tests y coste de todos los duelos donde aparece. Se compara la **proporción** de tareas resueltas, después la de tests y después el coste por tarea (solo si todos tienen precio en la misma moneda). Con totales, un modelo ganaría solo por jugar más duelos. Los empates comparten posición.
+- **Mira el nº de duelos.** Un modelo con un solo duelo es una señal débil, igual que una sola ejecución.
+- Un `results.json` incompleto (`in_progress`) o ilegible es un error: termínalo con `--resume` antes de publicarlo.
+
+### Añadir resultados reales
+
+1. Lanza el duelo o la liga con tus tareas y guarda la salida: `modelduel run mis-tareas --a gemini:<modelo> --b omniroute:<modelo> --runs 3 --out runs/duelo-1`.
+2. Copia `runs/duelo-1/results.json` a `results/` con un nombre que sea la fecha y qué se enfrentó (el nombre, sin `.json`, es el id del duelo): `results/2026-10-02-gemini-vs-omniroute.json`.
+3. Genera la página para comprobarla (`modelduel leaderboard results --out runs/clasificacion`) y abre un pull request. El CI la publica al fusionarlo.
+
+`results/` es público: no incluyas claves ni tareas privadas (el `results.json` guarda el enunciado, las respuestas y el código de cada modelo).
+
+---
+
 ## Opciones: `--runs`, `--timeout`, `--retries`, `--resume` y `--prices`
 
 La orden `run` necesita `--out` y entre dos y seis contendientes (`--a` y `--b`, o `--model` varias veces); acepta además estas opciones:
@@ -707,6 +735,9 @@ Falta pytest en el entorno de Python que ejecuta modelduel. Instálalo en ese mi
 
 **Sale «Falta la variable de entorno GEMINI_API_KEY» (o `OPENAI_API_KEY`).**
 No has definido la clave en **esta** terminal. Las variables de entorno se pierden al cerrarla; vuelve a definirla como se explica en [Un duelo real](#un-duelo-real-con-modelos-de-verdad). Con `openai:` la clave solo es opcional si `OPENAI_BASE_URL` apunta a `localhost` (Ollama).
+
+**Sale «No hay resultados en …» con `leaderboard`.**
+La carpeta no existe o no tiene ningún `.json`. Copia ahí los `results.json` de tus duelos.
 
 **Sale «Proveedor … desconocido» o «Especificación … no válida».**
 Los contendientes se escriben `proveedor:modelo`, con uno de estos proveedores: `replay`, `gemini`, `openai`, `omniroute`.

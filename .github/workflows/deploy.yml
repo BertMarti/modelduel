@@ -34,6 +34,9 @@ jobs:
       - name: Generar el informe de demostración
         run: modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo
 
+      - name: Generar la clasificación pública
+        run: modelduel leaderboard results --out site/leaderboard
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

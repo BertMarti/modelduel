@@ -6,7 +6,7 @@
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-b5e853.svg)](https://github.com/BertMarti/modelduel/blob/main/LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-ff7eb6.svg)
 
-**Web:** <https://bertmarti.github.io/modelduel/> · **Informe de demostración:** <https://bertmarti.github.io/modelduel/demo/>
+**Web:** <https://bertmarti.github.io/modelduel/> · **Informe de demostración:** <https://bertmarti.github.io/modelduel/demo/> · **Clasificación pública:** <https://bertmarti.github.io/modelduel/leaderboard/>
 
 **Documentación:** [Guía de uso](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md) (instalación, duelos reales, crear tus tareas, liga, reintentos, reanudación y leer el informe) · [Registro de cambios](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md) · [Cómo contribuir](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md)
 
@@ -178,6 +178,10 @@ Las tarifas son por **millón de tokens**. Como los precios reales cambian a men
 
 Se busca primero por `proveedor:modelo` y después solo por `modelo`. Si un modelo no tiene precio, o el proveedor no devuelve tokens, el coste es **«sin datos»**: nunca se inventa. Los precios integrados de `replay:alfa` y `replay:beta` son **ficticios** y el informe lo indica.
 
+## Clasificación pública
+
+`modelduel leaderboard results/ --out site/leaderboard` agrega los `results.json` de una carpeta (uno por duelo o liga) y genera una página estática, sin JavaScript, con la clasificación por modelo y el histórico de duelos con enlace a cada informe. El CI la publica en la web a partir de [`results/`](https://github.com/BertMarti/modelduel/tree/main/results), que trae tres resultados de ejemplo con respuestas grabadas; la guía explica [cómo añadir resultados reales](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md#clasificación-pública).
+
 ## Más documentación
 
 - [`docs/USO.md`](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md): guía para personas usuarias, paso a paso y con solución de problemas.
@@ -198,6 +202,7 @@ src/modelduel/
 ├── results.py          # results.json y resumen del marcador
 ├── pricing.py          # tarifas y fórmula de coste
 ├── providers/          # replay, gemini, openai_compat (openai y omniroute)
+├── leaderboard.py      # clasificación pública: agregado de results/*.json y página estática
 └── report/             # informe HTML: duelo de dos y liga de 3 a 6 (string.Template + SVG)
 docs/USO.md             # guía de uso para personas usuarias
 CHANGELOG.md            # registro de cambios (Keep a Changelog)

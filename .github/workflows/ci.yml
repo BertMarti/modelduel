@@ -46,6 +46,9 @@ jobs:
       - name: Demo con respuestas grabadas (liga de tres)
         run: modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo
 
+      - name: Clasificación pública desde results/
+        run: modelduel leaderboard results --out site/leaderboard
+
       - name: Duelo de dos con --a y --b (compatibilidad con v0.1.0)
         shell: bash
         run: |
@@ -61,6 +64,11 @@ jobs:
           grep -q "Informe de liga" site/demo/index.html
           grep -q "Clasificación" site/demo/index.html
           if grep -qi "<script" site/demo/index.html; then echo "El informe no debe tener JavaScript"; exit 1; fi
+          test -s site/leaderboard/index.html
+          grep -q "Histórico de duelos" site/leaderboard/index.html
+          grep -q "Clasificación pública" site/leaderboard/index.html
+          test -s "$(ls site/leaderboard/duelos/*/index.html | head -n 1)"
+          if grep -qi "<script" site/leaderboard/index.html; then echo "La clasificación no debe tener JavaScript"; exit 1; fi
 
   package:
     name: Paquete (sdist, wheel y metadatos)

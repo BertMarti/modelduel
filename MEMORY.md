@@ -1,5 +1,5 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-09-30 por builder (v0.3.0 · #15 y #17)
+Última actualización: 2026-10-01 por builder (v0.4.0 · #23, #24 y #25)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
@@ -14,6 +14,10 @@ v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** e
   - #15 veredicto unificado con la clasificación (rama `agent/builder/15-veredicto-unificado`): HECHO, en PR.
   - #17 formato es-ES en el aviso de reintento (rama `agent/builder/17-aviso-reintento-es`, parte de la de #15): HECHO, en PR.
   - #18 y #19 bloqueadas hasta que Alberto publique el paquete en PyPI.
+- Hito **v0.4.0 «Pro»** (spec en `docs/specs/v0.4.md`; un PR por issue contra `main`, encadenados; v0.3.0 ya está etiquetada en `main`):
+  - #23 proveedor `omniroute:<modelo>` (rama `agent/builder/23-omniroute`, PR #26): HECHO, en PR.
+  - #24 clasificación pública: agregado, página y `modelduel leaderboard` (rama `agent/builder/24-clasificacion-publica`, parte de la de #23, PR #27): HECHO, en PR. Se fusiona después de #26.
+  - #25 publicar la clasificación en CI, web y documentación (rama `agent/builder/25-publicar-clasificacion`, parte de la de #24): HECHO, en PR. Se fusiona después de #27.
 
 Base heredada de v0.1.0:
 - CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
@@ -33,6 +37,8 @@ Base heredada de v0.1.0:
 - Web estática en `site/index.html`; la demo `site/demo/` se genera en el CI (está en `.gitignore`).
 - Tests pytest sin red (cobertura > 90 % exigida en el CI Ubuntu y Windows); despliegue a Pages en `deploy.yml`.
 - Documentación: `docs/USO.md`, `CONTRIBUTING.md`, `CHANGELOG.md` (en español, formato Keep a Changelog).
+- Omniroute (#23): `OmniRouteProvider` es una subclase de `OpenAIProvider` que solo cambia 6 atributos de clase (`PREFIX`, `BASE_URL_ENV`, `KEY_ENV`, `DEFAULT_BASE_URL`, `KEY_REQUIRED`, `DOWN_HINT`). `OMNIROUTE_BASE_URL` (por defecto `http://localhost:20128/v1`), `OMNIROUTE_API_KEY` opcional. `post_json` lanza `ConnectionFailed` (subclase de `ProviderError`) cuando nadie escucha (rechazada, DNS, red inalcanzable; los cortes de una conexión abierta y los tiempos agotados no) y el proveedor añade «Arranca OmniRoute con `omniroute serve`».
+- Clasificación (#24): `src/modelduel/leaderboard.py` + `report/leaderboard.html`. Cada `results/*.json` es un duelo (id = nombre del archivo); `aggregate` suma por `proveedor:modelo` y `rank_models` ordena **por proporciones** (tareas, tests, coste por tarea) con `rank_sides`; el coste solo se suma con precio en todos los duelos y una moneda. `build_leaderboard` escribe `index.html` y `duelos/<id>/index.html` regenerado desde el JSON. Duelo `in_progress` o carpeta vacía = `ResultsError` (exit 2). Las tablas hacen scroll horizontal dentro de una región con foco en móvil. `site/leaderboard/` se genera en el CI y el deploy (en `.gitignore`).
 
 ## Decisiones (por qué)
 - 2026-09-29: Proveedor `replay` con respuestas grabadas para que la demo y los tests funcionen sin claves ni coste.
@@ -94,6 +100,7 @@ Base heredada de v0.1.0:
 
 - 2026-09-30 (builder): #15 `results.rank_sides` y el veredicto comparten una única clave de ordenación (`_rank_key`: tareas resueltas, tests, coste); `decide(summary)` devuelve `(ganador, criterio)` mirando en qué posición de la clave difieren los dos primeros, y `costs_comparable` decide si el coste cuenta. El informe (`_verdict`) dice el criterio: «gana A por tareas resueltas (2 frente a 1)», «por tests superados (…, con las mismas tareas resueltas)», «por coste (…)» o «empate en tareas resueltas, tests y coste» (los costes se comparan redondeados a 6 decimales; con `--runs` > 1 ambos empates añaden «suma de N ejecuciones»; sin coste comparable: «empate en tareas resueltas y tests (sin coste comparable)»). Bajo los números grandes del marcador hay una etiqueta «tests superados» para que no se confundan con el criterio decisivo (una tarea resuelta pesa más que los tests sueltos).
 - 2026-09-30 (builder): #17 el aviso de reintento usa `report.html.fmt_seconds` (el mismo que la CLI y el informe): `1,2 s`, y `1 min 15,0 s` a partir de 60 s. `providers/base.py` importa ahora de `report.html` (no hay ciclo: el informe no importa proveedores). El mensaje «el servidor pide esperar N s» sigue con `:g` (es un error, no el aviso).
+- 2026-10-01 (builder): v0.4.0 compara por proporciones y no por totales para que un modelo con más duelos no gane por volumen; el coste nunca se convierte entre monedas. Los tres resultados sembrados de `results/` son `replay` con precios ficticios y se versionan (no se regeneran en el CI, así sus fechas no cambian).
 - 2026-09-30 (builder): `graphify-out/` (grafo local) está en `.gitignore`.
 
 ## Problemas conocidos
@@ -104,7 +111,8 @@ Base heredada de v0.1.0:
 - Un proceso que se desligue a propósito del árbol (`setsid`/doble fork en POSIX, `CREATE_BREAKAWAY_FROM_JOB` si el Job lo permitiera) puede sobrevivir. En Windows hay una ventana de milisegundos entre crear pytest y meterlo en el Job Object (Popen no permite crear el proceso suspendido).
 - El disco que pueda llenar una solución que imprime sin parar está acotado solo por el límite de tiempo (va al temporal de la ejecución, que se borra).
 - `<details>` cerrados no se despliegan al imprimir en navegadores sin `::details-content` (p. ej. Firefox antiguo); sin JavaScript no hay alternativa fiable.
-- Los proveedores `gemini` y `openai` solo se prueban con respuestas simuladas (sin red); no se han probado contra las APIs reales.
+- Los proveedores `gemini`, `openai` y `omniroute` solo se prueban con respuestas simuladas (sin red); no se han probado contra las APIs reales ni contra un OmniRoute en marcha (pendiente de Alberto).
+- La clasificación no distingue qué tareas se usaron en cada duelo: mezclar duelos con tareas distintas hace que las proporciones no sean del todo comparables.
 
 ## Registro de sesiones
 - 2026-09-29 lead (main): creación del repositorio y reparto del equipo.
@@ -119,3 +127,4 @@ Base heredada de v0.1.0:
 - 2026-09-30 docs · Claude Code Sonnet (agent/docs/9-documentacion-v0.2): #9 `CHANGELOG.md` (v0.1.0 y v0.2.0), guía de uso con PyPI, `demo`, `--retries`, `--resume` (avisos y errores comprobados ejecutando la herramienta con `replay`), liga y límites conocidos, README, web, `CONTRIBUTING.md` (publicar una versión, añadir un color a la paleta) y `MEMORY.md`.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/15-veredicto-unificado): #15 veredicto del duelo de dos con la misma ordenación que la clasificación y texto que indica el criterio decisivo; tests con los casos que antes discrepaban; CHANGELOG, USO y README al día.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/17-aviso-reintento-es): #17 aviso de reintento en formato es-ES con el formateador común; test del mensaje.
+- 2026-10-01 builder · Claude Code Sonnet (agent/builder/23-omniroute, 24-clasificacion-publica, 25-publicar-clasificacion): v0.4.0 «Pro»: spec `docs/specs/v0.4.md`, issues #23-#25, proveedor `omniroute:`, clasificación pública (`leaderboard`, `results/` sembrado con tres replay, página sin JS revisada con Chrome en escritorio y 390 px), CI/deploy/web/documentación.
