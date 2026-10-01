@@ -43,10 +43,14 @@ def best_sides(raw: dict[str, float | None], lower_is_better: bool) -> set[str]:
     return set() if len(winners) == len(known) else winners
 
 
-def mark(winner: bool) -> str:
+def mark(winner: bool, text: bool = False) -> str:
+    """Glifo del mejor; con ``text`` lleva también la palabra (nunca solo color ni solo forma)."""
     if not winner:
         return ""
-    return '<span class="mark" aria-hidden="true">●</span><span class="sr-only">(mejor)</span>'
+    shown = "▲ mejor" if text else "▲"
+    return (
+        f'<span class="mark" aria-hidden="true">{shown}</span><span class="sr-only">(mejor)</span>'
+    )
 
 
 def metric_block(label: str, hint: str, rows: list[Row], lower_is_better: bool = False) -> str:
@@ -62,7 +66,8 @@ def metric_block(label: str, hint: str, rows: list[Row], lower_is_better: bool =
         lines.append(
             f'<div class="lg-row">{tag(side)}<span class="lg-name">{e(name)}</span>'
             f"{svg_ratio_bar(ratio, side, text)}"
-            f'<span class="lg-val"><span class="num">{e(shown)}</span>{mark(side in winners)}'
+            f'<span class="lg-val"><span class="num">{e(shown)}</span>'
+            f"{mark(side in winners, text=True)}"
             f"{sub_html}</span></div>"
         )
     hint_html = f'<p class="hint">{e(hint)}</p>' if hint else ""

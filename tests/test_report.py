@@ -4,6 +4,7 @@ import re
 from modelduel.report import render_report, write_report
 from modelduel.report.html import fmt_cost, fmt_seconds
 from modelduel.results import summarize
+from tests.conftest import ROOT
 
 
 def _attempt(passed, total, **extra):
@@ -217,12 +218,30 @@ def test_contraste_aa_de_acentos_y_texto_atenuado():
             assert _contrast(screen[fg], screen[bg]) >= 4.5, (fg, bg)
     for fg in ("a", "b", "text", "muted"):
         assert _contrast(printed[fg], "#ffffff") >= 4.5, fg
-    # El valor «perdedor» se atenúa: sigue cumpliendo AA y no atenúa el texto secundario.
-    rule = re.search(r"\.metric \.val\.lose([^{]*)\{([^}]*)\}", html)
-    assert rule and ".num" in rule.group(1), "la atenuación debe aplicarse solo al número"
-    alpha = float(re.search(r"opacity:\s*([\d.]+)", rule.group(2)).group(1))
-    for fg in ("a", "b"):
-        assert _contrast(_blend(screen[fg], screen["bg"], alpha), screen["bg"]) >= 4.5, fg
+    # El «peor» valor ya no se atenúa con opacidad: se marca con glifo y texto.
+    assert not re.search(r"\.lose[^{]*\{[^}]*opacity", html)
+    assert _contrast(screen["muted"], screen["bg"]) >= 4.5
+
+
+def test_perdedor_con_glifo_y_texto_visibles():
+    html = render_report(copy.deepcopy(RESULTS))
+    assert '<span class="mark" aria-hidden="true">▲ mejor</span>' in html
+    assert '<span class="mark worse" aria-hidden="true">▼ peor</span>' in html
+    assert '<span class="sr-only">(peor)</span>' in html
+
+
+def test_enlaces_con_subrayado_visible_foco_y_vuelta_a_la_web():
+    html = render_report(copy.deepcopy(RESULTS))
+    assert re.search(r"(?m)^a \{[^}]*text-decoration-color:\s*var\(--muted\)", html)
+    assert "a:focus-visible" in html
+    assert 'href="https://bertmarti.github.io/modelduel/"' in html
+
+
+def test_tipografia_minima_de_12_px_en_pantalla():
+    css = (ROOT / "src" / "modelduel" / "report" / "style.css").read_text(encoding="utf-8")
+    screen = css.split("@media print")[0]
+    sizes = re.findall(r"font(?:-size)?:\s*(?:[\w.]+\s+)?(\d+(?:\.\d+)?)px", screen)
+    assert sizes and min(float(s) for s in sizes) >= 12
 
 
 def test_hoja_de_impresion_no_recorta_la_tabla():

@@ -143,7 +143,7 @@ def build_ranking(models: dict[str, dict]) -> str:
         label = f"{spec}: {tasks} de {tests} tareas resueltas ({_percent(tasks, tests)})"
         first = position == 1
         mark = (
-            '<span class="mark" aria-hidden="true">●</span><span class="sr-only">(primero)</span>'
+            '<span class="mark" aria-hidden="true">▲</span><span class="sr-only">(primero)</span>'
             if first
             else ""
         )

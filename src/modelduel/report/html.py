@@ -168,10 +168,15 @@ def metric_row(
         if winner == side:
             classes.append("win")
             mark = (
-                '<span class="mark" aria-hidden="true">●</span><span class="sr-only">(mejor)</span>'
+                '<span class="mark" aria-hidden="true">▲ mejor</span>'
+                '<span class="sr-only">(mejor)</span>'
             )
         elif winner is not None:
             classes.append("lose")
+            mark = (
+                '<span class="mark worse" aria-hidden="true">▼ peor</span>'
+                '<span class="sr-only">(peor)</span>'
+            )
         sub = f'<span class="sub">{e(subs[idx])}</span>' if subs[idx] else ""
         num = f'<span class="num">{e(shown[idx])}</span>'
         value = f"{mark}{num}" if side == "b" else f"{num}{mark}"
