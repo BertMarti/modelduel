@@ -6,6 +6,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.5.0] - 2026-10-01
+
+### Añadido
+
+- **Duelo en directo** en la web (`#demo`): reproduce en el navegador, durante unos 25 s, un duelo **pregrabado** (el primero de `demo/results.json`, que genera el CI): enunciado, cada modelo escribiendo su código a ritmo proporcional a su latencia, contadores de tokens, tests que caen uno a uno con ✓/✗ y texto, barras y marcador final con veredicto y enlace al informe completo. El veredicto es solo de esa tarea («En esta tarea (…, 1 de N), gana …») y avisa de que el informe completo agrega todas las tareas y puede dar otro orden. Sin servidor, sin claves y sin ejecutar nada. Pausar/Reanudar está siempre en el botón principal y Detener aparece mientras hay un duelo (al detener, el foco vuelve al botón principal); se pausa al cambiar de pestaña, no arranca solo y, con `prefers-reduced-motion`, avanza con «Siguiente». Si los datos grabados son largos se recortan avisando («… (recortado)», «mostrando 200 de N» tests). Sin JavaScript queda un enlace al informe estático. El script es vanilla (`site/demo.js`, diferido), escribe solo con `textContent` y su lógica se prueba con `node --test` ([#32](https://github.com/BertMarti/modelduel/issues/32)).
+- Job `web` en el CI: ejecuta `node --test tests/js` y comprueba que la portada solo carga su propio `demo.js`.
+
+### Cambiado
+
+- **Informes accesibles**: subrayado de enlaces visible y foco de teclado en todos los enlaces, el valor peor de cada métrica se marca con «▼ peor» (y el mejor con «▲ mejor») en lugar de atenuarlo con `opacity`, ningún texto por debajo de 12 px y un enlace «modelduel · web» en el pie ([#30](https://github.com/BertMarti/modelduel/issues/30)).
+- **Portada**: jerarquía de acciones (una primaria, una secundaria y enlaces), navegación de cinco enlaces, tabla de proveedores como región desplazable accesible con foco, y la fila de `omniroute`. Se retiran las barras fijas del hero, que no tenían letra ni significado ([#31](https://github.com/BertMarti/modelduel/issues/31)).
+
 ## [0.4.0] - 2026-10-01
 
 ### Añadido
@@ -79,7 +91,8 @@ Primera versión (MVP).
 - Revisión QA: árbol de procesos muerto al terminar, salida acotada, UTF-8 y BOM, tareas sin tests o con errores de sintaxis, errores de red y respuestas vacías de los proveedores, accesibilidad AA y cobertura mínima del 90 % (PR [#2](https://github.com/BertMarti/modelduel/pull/2)).
 - Guía de uso (`docs/USO.md`) y `CONTRIBUTING.md` (PR [#3](https://github.com/BertMarti/modelduel/pull/3)).
 
-[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.4.0...HEAD
+[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/BertMarti/modelduel/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/BertMarti/modelduel/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/BertMarti/modelduel/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/BertMarti/modelduel/compare/v0.1.0...v0.2.0

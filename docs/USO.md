@@ -97,6 +97,8 @@ modelduel --version
 
 ## Tu primer duelo con la demo
 
+Si solo quieres **ver** cómo es un duelo, abre el [duelo en directo](https://bertmarti.github.io/modelduel/#demo) de la web: reproduce, en unos 25 segundos, un duelo **pregrabado** (no llama a ningún modelo ni ejecuta código). Puedes pausarlo o detenerlo, y si tu sistema pide «reducir movimiento» avanza paso a paso con el botón «Siguiente». El veredicto que muestra es solo el de la primera tarea; el informe completo agrega todas las tareas y puede dar otro orden. Usa los datos de `demo/results.json`, el mismo `results.json` que genera `modelduel run`.
+
 La demo no necesita claves ni cuesta nada: usa respuestas **grabadas y ficticias** de tres «modelos» llamados `alfa`, `beta` y `gamma` (proveedor `replay`): es una liga de tres contendientes.
 
 ### `modelduel demo`
@@ -537,7 +539,7 @@ Con tres o más contendientes, el informe HTML añade, debajo de la clasificaci�
    - **Tiempo del modelo:** lo que tarda el modelo en responder (debajo, en pequeño, el tiempo de los tests). Menos es mejor.
    - **Tokens:** entrada y salida. Son las unidades en las que cobran los proveedores. Menos es mejor. (En Gemini, los tokens de razonamiento se cuentan como salida porque se facturan así.)
    - **Coste estimado:** calculado con la tabla de precios (ver `--prices`). Si el modelo no tiene precio o el proveedor no devolvió tokens, pone **«sin datos»**: nunca se inventa. Si los dos modelos tienen monedas distintas, avisa de que no son comparables.
-   - El punto `●` y el texto «(mejor)» marcan quién gana en cada fila.
+   - «▲ mejor» y «▼ peor» (glifo y texto, nunca solo color) marcan quién gana y quién pierde en cada fila; si hay empate no se marca ninguno.
 4. **Tests superados por tarea:** barras finas, una por contendiente y tarea.
 5. **Tabla por tarea:** los mismos números desglosados.
 6. **Código y salida de los tests:** un desplegable por tarea con el enunciado y, para cada intento, el estado, el código que escribió el modelo y la salida de pytest. **Léelo siempre**: dos modelos con la misma nota pueden haber escrito código muy distinto.
