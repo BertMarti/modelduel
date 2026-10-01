@@ -56,11 +56,11 @@ pip install "modelduel[pytest]"
 modelduel --version
 ```
 
-`[pytest]` instala también pytest; es lo mismo que `pip install modelduel pytest`. Escribe `modelduel 0.2.0` (o la versión actual) si todo va bien. Así tienes la orden `modelduel` **con las tareas y respuestas de ejemplo incluidas** (ver `modelduel demo` en la sección siguiente).
+`[pytest]` instala también pytest; es lo mismo que `pip install modelduel pytest`. Escribe `modelduel` seguido de la versión instalada si todo va bien. Así tienes la orden `modelduel` **con las tareas y respuestas de ejemplo incluidas** (ver `modelduel demo` en la sección siguiente).
 
-> **Ojo:** el paquete se publica en PyPI cuando se crea la *release* `v0.2.0` del repositorio. Hasta entonces `pip install modelduel` no lo encontrará y tienes que instalarlo desde GitHub (siguiente apartado).
+El paquete está en <https://pypi.org/project/modelduel/>.
 
-### Desde GitHub (la última versión, publicada o no)
+### Desde GitHub (la última versión, publicada o no en PyPI)
 
 ```bash
 pip install git+https://github.com/BertMarti/modelduel pytest

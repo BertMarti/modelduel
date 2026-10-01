@@ -2,6 +2,7 @@
 
 **Dos modelos, una tarea, los mismos tests.** `modelduel` enfrenta a dos modelos de IA (o a una liga de hasta seis) con un problema de programación, ejecuta tus tests sobre el código de cada uno y te da un informe con quién acierta, cuánto tarda y cuánto cuesta.
 
+[![PyPI](https://img.shields.io/pypi/v/modelduel.svg)](https://pypi.org/project/modelduel/)
 [![CI](https://github.com/BertMarti/modelduel/actions/workflows/ci.yml/badge.svg)](https://github.com/BertMarti/modelduel/actions/workflows/ci.yml)
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-b5e853.svg)](https://github.com/BertMarti/modelduel/blob/main/LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-ff7eb6.svg)
@@ -41,7 +42,7 @@ Los rankings de modelos miden tareas que no son las tuyas. La forma honesta de e
 - **Liga de 2 a 6 contendientes** con `--model` repetible: clasificación, comparativa, matriz por tarea y paleta de seis colores con contraste AA (siempre con su letra `A`-`F`).
 - **Reintentos** ante HTTP 429/5xx y cortes de conexión, con espera exponencial y `Retry-After` (`--retries`).
 - **Guardado incremental y `--resume`**: un corte no pierde lo ya hecho y el duelo se continúa con la misma orden.
-- **Publicación en PyPI** (`pip install modelduel`) y **`modelduel demo`**: prueba sin claves ni coste y `demo --copy` para empezar desde una plantilla.
+- **Publicación en PyPI** (`pip install "modelduel[pytest]"`) y **`modelduel demo`**: prueba sin claves ni coste y `demo --copy` para empezar desde una plantilla.
 
 Detalle en el [registro de cambios](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md).
 
@@ -54,8 +55,7 @@ pip install "modelduel[pytest]"     # o: pip install modelduel pytest
 modelduel demo                       # prueba sin claves ni coste, con los ejemplos incluidos
 ```
 
-> [!NOTE]
-> El paquete se publica en PyPI al crearse la *release* `v0.2.0`. Hasta entonces, instálalo desde GitHub: `pip install git+https://github.com/BertMarti/modelduel pytest`.
+El paquete está en [PyPI](https://pypi.org/project/modelduel/). Para probar la última versión sin publicar, instálalo desde GitHub: `pip install git+https://github.com/BertMarti/modelduel pytest`.
 
 `modelduel demo` enfrenta a tres modelos ficticios (respuestas grabadas) y escribe el informe en `modelduel-demo/`; `modelduel demo --copy MIS-EJEMPLOS` copia las tareas y respuestas de ejemplo para que las uses como plantilla.
 

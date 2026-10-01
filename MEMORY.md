@@ -1,7 +1,9 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-10-01 por builder (v0.6.0 · #38-#41: informe Markdown y capturas del duelo en directo)
+Última actualización: 2026-10-01 por builder (#18 y #19: PyPI ya publicado, avisos retirados, insignia y enlace)
 
 ## Estado actual
+**PyPI ya no está pendiente:** modelduel 0.6.0 está publicado en <https://pypi.org/project/modelduel/>. Cada Release de GitHub publica en PyPI (Trusted Publishing, `release.yml`) y es irreversible; la versión de `pyproject.toml` debe coincidir con la etiqueta `vX.Y.Z` de la Release. Instalación recomendada: `pip install "modelduel[pytest]"`. #18 y #19 (insignia, enlace y avisos retirados): HECHO, en PR.
+
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
 - #4 reintentos ante 429/5xx (rama `agent/builder/4-reintentos`): HECHO, en PR.
 - #5 guardado incremental y `--resume` (rama `agent/builder/5-guardado-incremental`, parte de la de #4): HECHO, en PR.
@@ -13,7 +15,7 @@ v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** e
 - Hito **v0.3.0** (un PR por issue contra `main`, encadenados como antes):
   - #15 veredicto unificado con la clasificación (rama `agent/builder/15-veredicto-unificado`): HECHO, en PR.
   - #17 formato es-ES en el aviso de reintento (rama `agent/builder/17-aviso-reintento-es`, parte de la de #15): HECHO, en PR.
-  - #18 y #19 bloqueadas hasta que Alberto publique el paquete en PyPI.
+  - #18 y #19 (esperaban a PyPI): hechas tras publicar la 0.6.0.
 - Hito **v0.4.0 «Pro»** (spec en `docs/specs/v0.4.md`; un PR por issue contra `main`, encadenados; v0.3.0 ya está etiquetada en `main`):
   - #23 proveedor `omniroute:<modelo>` (rama `agent/builder/23-omniroute`, PR #26): HECHO, en PR.
   - #24 clasificación pública: agregado, página y `modelduel leaderboard` (rama `agent/builder/24-clasificacion-publica`, parte de la de #23, PR #27): HECHO, en PR. Se fusiona después de #26.
@@ -108,9 +110,9 @@ Base heredada de v0.1.0:
 1. Alberto: fusionar los PR de v0.2.0 en orden (#10, #11, #12, #13, #14 de QA y por último el #16 de documentación) con «Create a merge commit».
    - Para publicar en PyPI: registrar el *trusted publisher* (PyPI > Your projects > Publishing > "Add a new pending publisher": proyecto `modelduel`, propietario `BertMarti`, repositorio `modelduel`, workflow `release.yml`, environment `pypi`), crear el environment `pypi` en GitHub (Settings > Environments) y crear la Release `v0.2.0`.
 2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
-3. Tras fusionar y publicar: quitar de README, `docs/USO.md` y la web el aviso «se publica al crear la release», comprobar `pip install "modelduel[pytest]"` y `modelduel demo` desde un entorno limpio, y actualizar enlaces (README/web) con el badge de PyPI si se desea.
-4. Alberto: fusionar los PR de v0.5.0 en orden (#34, #35, #36 y #37) con «Create a merge commit»; (`v0.5.0` ya está etiquetada; no hay release de GitHub: PyPI pendiente) y revisar el duelo en directo desplegado en <https://bertmarti.github.io/modelduel/#demo>.
-5. Alberto: fusionar los PR de v0.6.0 en orden (#42, #43, #45 y el de documentación y versión) con «Create a merge commit»; el PNG de las capturas del curso ya está regenerado en el repo del curso. Sigue sin haber release ni etiqueta (PyPI pendiente).
+3. (Hecho con 0.6.0: avisos retirados, insignia y enlace a PyPI; `pip install "modelduel[pytest]"` y `modelduel demo` comprobados en un entorno limpio.)
+4. Alberto: fusionar los PR de v0.5.0 en orden (#34, #35, #36 y #37) con «Create a merge commit»; (`v0.5.0` ya está etiquetada) y revisar el duelo en directo desplegado en <https://bertmarti.github.io/modelduel/#demo>.
+5. Alberto: fusionar los PR de v0.6.0 en orden (#42, #43, #45 y el de documentación y versión) con «Create a merge commit»; el PNG de las capturas del curso ya está regenerado en el repo del curso. La release v0.6.0 ya está publicada en PyPI.
 
 - 2026-09-30 (builder): #15 `results.rank_sides` y el veredicto comparten una única clave de ordenación (`_rank_key`: tareas resueltas, tests, coste); `decide(summary)` devuelve `(ganador, criterio)` mirando en qué posición de la clave difieren los dos primeros, y `costs_comparable` decide si el coste cuenta. El informe (`_verdict`) dice el criterio: «gana A por tareas resueltas (2 frente a 1)», «por tests superados (…, con las mismas tareas resueltas)», «por coste (…)» o «empate en tareas resueltas, tests y coste» (los costes se comparan redondeados a 6 decimales; con `--runs` > 1 ambos empates añaden «suma de N ejecuciones»; sin coste comparable: «empate en tareas resueltas y tests (sin coste comparable)»). Bajo los números grandes del marcador hay una etiqueta «tests superados» para que no se confundan con el criterio decisivo (una tarea resuelta pesa más que los tests sueltos).
 - 2026-09-30 (builder): #17 el aviso de reintento usa `report.html.fmt_seconds` (el mismo que la CLI y el informe): `1,2 s`, y `1 min 15,0 s` a partir de 60 s. `providers/base.py` importa ahora de `report.html` (no hay ciclo: el informe no importa proveedores). El mensaje «el servidor pide esperar N s» sigue con `:g` (es un error, no el aviso).
