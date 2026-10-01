@@ -44,12 +44,14 @@ HOSTILE = [
     "```\nfence\n```",
     "~~~\nfence\n~~~",
     "<!-- comentario -->",
+    "GH-1 gh-2 Gh-33",
+    "commit 3f786850e387550fdab836ed7e6dc881de23001b y 3f78685 y abcdef1234",
     "x" * 5000,
 ]
 
 
-def _hostile_results(payload: str) -> dict:
-    """Un results.json con ``payload`` en todos los campos de texto."""
+def _hostile_results(payload: str, n_sides: int = 2) -> dict:
+    """Un results.json de ``n_sides`` contendientes con ``payload`` en todos los textos."""
     r = copy.deepcopy(RESULTS)
     r["version"] = payload
     r["created_at"] = payload
@@ -60,7 +62,10 @@ def _hostile_results(payload: str) -> dict:
     r["tasks"][0]["id"] = payload
     r["tasks"][0]["difficulty"] = payload
     r["tasks"][0]["statement"] = payload
-    for side in ("a", "b"):
+    for side in ALL_SIDES[2:n_sides]:
+        r["contenders"][side] = {"spec": f"z{side}:" + payload, "price": None}
+        r["tasks"][0]["results"][side] = copy.deepcopy(r["tasks"][0]["results"]["b"])
+    for side in ALL_SIDES[:n_sides]:
         r["tasks"][0]["results"][side][0]["status"] = payload
         r["tasks"][0]["results"][side][0]["message"] = payload
         r["tasks"][0]["results"][side][0]["code"] = payload
@@ -73,6 +78,12 @@ def _structure(md: str) -> list[str]:
     """Líneas que Markdown leería como título, lista, cita, bloque de código o regla."""
     block = r"\s*(#|>|[-+*] |\d+[.)] |```|~~~|=+$|-{3,}$)"
     return [line[:14] for line in md.splitlines() if re.match(block, line)]
+
+
+def _sin_referencias_de_github(text: str) -> None:
+    """GitHub enlaza GH-1 y los SHA (7 a 40 hexadecimales) tras leer el Markdown."""
+    assert not re.search(r"(?i)\bgh-\d", text)
+    assert not re.search("(?<!" + chr(0x200B) + r")\b[0-9a-fA-F]{7,40}\b", text)
 
 
 def _stripped(text: str) -> str:
@@ -92,6 +103,7 @@ def test_md_text_no_deja_sintaxis_activa(payload):
         assert char not in bare, (char, out)
     assert not re.search(r"www\.", bare, re.I)
     assert "://" not in bare
+    _sin_referencias_de_github(out)
     # GitHub enlaza menciones, correos y referencias tras leer el Markdown: la barra no basta.
     assert not re.search("[@#](?!" + chr(0x200B) + ")", out)
     assert not any(
@@ -153,7 +165,6 @@ def test_veredicto_por_tests_y_empate():
     r["tasks"][0]["results"]["b"] = [_attempt(4, 4, cost=None)]
     md = render_markdown(r)
     assert "empate en tareas resueltas y tests" in md
-    r["tasks"][0]["results"]["a"] = [_attempt(3, 4)]
     r["tasks"][0]["results"]["a"] = [_attempt(2, 4)]
     r["tasks"][0]["results"]["b"] = [_attempt(3, 4)]
     assert "gana **B**" in render_markdown(r)
@@ -201,9 +212,11 @@ def test_write_markdown(tmp_path):
 # ---------------------------------------------------------------- hostil
 
 
+@pytest.mark.parametrize("n_sides", [2, 3, 6])
 @pytest.mark.parametrize("payload", HOSTILE)
-def test_un_results_hostil_no_inyecta_nada(payload):
-    md = render_markdown(_hostile_results(payload))
+def test_un_results_hostil_no_inyecta_nada(payload, n_sides):
+    md = render_markdown(_hostile_results(payload, n_sides))
+    _sin_referencias_de_github(md)
     # Los únicos code spans son los nuestros (opciones de la línea de órdenes).
     bare = _stripped(md).replace("`--runs N`", "").replace("`--resume`", "")
     # Nuestras marcas no usan estos caracteres: si aparecen sin escapar, es inyección.
@@ -212,7 +225,7 @@ def test_un_results_hostil_no_inyecta_nada(payload):
     assert "://" not in bare.replace("https://bertmarti.github.io/modelduel/", "")
     assert not re.search(r"www\.", bare, re.I)
     # La estructura (títulos, listas, citas, bloques) es la de un informe con datos normales.
-    assert _structure(md) == _structure(render_markdown(_hostile_results("normal")))
+    assert _structure(md) == _structure(render_markdown(_hostile_results("normal", n_sides)))
     # Tablas: mismo número de barras sin escapar en cada fila de un bloque.
     block: list[int] = []
     for line in md.splitlines() + [""]:
@@ -246,3 +259,27 @@ def test_resultados_con_tipos_inesperados_dan_error_no_markdown():
     r["tasks"][0]["results"]["a"][0]["passed"] = "<b>x</b>"
     with pytest.raises((TypeError, ValueError, KeyError, AttributeError)):
         render_markdown(r)
+
+
+def test_invisibles_de_direccion_y_juntador_se_quitan():
+    for char in (0x061C, 0x2060, 0x202E, 0x2066, 0x200F):
+        assert md_text("a" + chr(char) + "b") == "ab"
+
+
+def test_gh_y_sha_no_se_enlazan_pero_se_leen_igual():
+    out = md_text("GH-1 gh-22 3f786850e387550fdab836ed7e6dc881de23001b 3f78685")
+    assert (
+        out.replace(chr(0x200B), "")
+        == "GH-1 gh-22 3f786850e387550fdab836ed7e6dc881de23001b 3f78685"
+    )
+    assert "1234" in md_text("Coste 1234") and chr(0x200B) not in md_text("Coste 1234")
+
+
+def test_write_markdown_no_deja_a_cero_el_informe_previo_si_el_render_falla(tmp_path):
+    previo = tmp_path / "informe.md"
+    previo.write_text("informe bueno\n", encoding="utf-8")
+    roto = copy.deepcopy(RESULTS)
+    roto["tasks"][0]["results"]["a"][0]["status"] = ["x"]
+    with pytest.raises((TypeError, ValueError, KeyError, AttributeError)):
+        write_markdown(roto, tmp_path)
+    assert previo.read_text(encoding="utf-8") == "informe bueno\n"
