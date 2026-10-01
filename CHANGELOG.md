@@ -16,7 +16,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Seguridad
 
-- Todo texto procedente de `results.json` se trata como dato no fiable en el Markdown: se aplana a una línea, se quitan controles y marcas de dirección Unicode, y se escapan barras de tabla, backticks, HTML, enlaces, imágenes, entidades y autoenlaces. Como GitHub enlaza `@usuario`, `#12` y correos después de leer el Markdown (comprobado con la API de renderizado de GFM), se inserta un espacio de ancho cero tras `@` y `#`. Hay tests de regresión con contenido hostil ([#38](https://github.com/BertMarti/modelduel/issues/38)).
+- Todo texto procedente de `results.json` se trata como dato no fiable en el Markdown: se aplana a una línea, se quitan controles y marcas de dirección Unicode, y se escapan barras de tabla, backticks, HTML, enlaces, imágenes, entidades y autoenlaces. Como GitHub enlaza `@usuario`, `#12`, `GH-12`, los SHA de commit (7 a 40 hexadecimales) y correos después de leer el Markdown (comprobado con la API de renderizado de GFM), se inserta un espacio de ancho cero tras `@` y `#`, dentro de `GH-12` y dentro de cada SHA. Un `results.json` que falla al renderizar ya no deja a cero un `informe.md` previo, y el informe parcial de un Ctrl+C respeta `--format`. Hay tests de regresión con contenido hostil ([#38](https://github.com/BertMarti/modelduel/issues/38)).
 
 ## [0.5.0] - 2026-10-01
 

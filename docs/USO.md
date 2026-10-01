@@ -575,11 +575,11 @@ modelduel report runs/demo/results.json --format md --out runs/demo
 modelduel run examples/tasks --model replay:alfa --model replay:beta --format html,md --out runs/demo
 ```
 
-`--format` admite `html` (por defecto), `md` o `html,md`. Con `md` solo se escribe `informe.md` (en `run`, `results.json` se guarda siempre). Un formato desconocido es un error de uso (código 2) y se comprueba antes de llamar a las APIs.
+`--format` admite `html` (por defecto), `md` o `html,md`. Con `md` solo se escribe `informe.md` (en `run`, `results.json` se guarda siempre; el informe parcial de un Ctrl+C también respeta `--format`). Un formato desconocido es un error de uso (código 2) y se comprueba antes de llamar a las APIs.
 
 `informe.md` lleva, en este orden: el título (o «Informe de liga» con tres o más contendientes), el aviso de duelo incompleto si lo es, el **marcador** (una fila por contendiente, de mejor a peor: tareas, tests, tiempo, tokens y coste), el **veredicto** con el criterio que decide (tareas resueltas, tests superados o coste, el mismo orden que la clasificación), una **tabla por tarea** con los tests de cada contendiente y su estado si no fue `ok`, y los **avisos**: «una sola ejecución es una señal débil» y la nota de precios ficticios o de monedas no comparables. No copia el código ni la salida de los modelos: para eso está el HTML.
 
-**Seguridad.** Todo texto que sale de `results.json` (nombres de modelo, títulos de tarea, estados, monedas, fechas) es dato no fiable, así que el Markdown lo aplana a una línea y escapa lo que sería sintaxis: barras verticales de tabla, backticks, `<` y `>`, corchetes y paréntesis, imágenes, entidades, direcciones `http://` y `www.`, y el inicio de lista o título. GitHub, además, enlaza `@usuario`, `#12` y los correos **después** de leer el Markdown, así que se inserta un espacio de ancho cero tras `@` y `#` (invisible al leer; si copias el texto, ahí está). Por eso un `results.json` ajeno no puede colar enlaces, HTML, menciones ni filas en tu comentario.
+**Seguridad.** Todo texto que sale de `results.json` (nombres de modelo, títulos de tarea, estados, monedas, fechas) es dato no fiable, así que el Markdown lo aplana a una línea y escapa lo que sería sintaxis: barras verticales de tabla, backticks, `<` y `>`, corchetes y paréntesis, imágenes, entidades, direcciones `http://` y `www.`, y el inicio de lista o título. GitHub, además, enlaza `@usuario`, `#12`, `GH-12`, los SHA de commit (7 a 40 hexadecimales) y los correos **después** de leer el Markdown, así que se inserta un espacio de ancho cero tras `@` y `#`, dentro de `GH-12` y dentro de cada SHA (invisible al leer; si copias el texto, ahí está). Por eso un `results.json` ajeno no puede colar enlaces, HTML, menciones ni filas en tu comentario.
 
 ---
 
@@ -655,7 +655,7 @@ La espera crece como 1, 2, 4… segundos (tope de 30 s) con algo de azar para qu
 
 ### `--resume`
 
-Un duelo con APIs reales puede tardar y costar dinero, así que `results.json` se guarda **tras cada intento** (con un archivo temporal que después reemplaza al anterior, de modo que nunca queda a medias). Si el duelo se corta —Ctrl+C, un apagón, la red—, lo hecho sigue en `results.json` (con `"status": "in_progress"`) y en un `index.html` parcial que muestra «Duelo incompleto: X de Y intentos». Un duelo terminado queda con `"status": "complete"`.
+Un duelo con APIs reales puede tardar y costar dinero, así que `results.json` se guarda **tras cada intento** (con un archivo temporal que después reemplaza al anterior, de modo que nunca queda a medias). Si el duelo se corta —Ctrl+C, un apagón, la red—, lo hecho sigue en `results.json` (con `"status": "in_progress"`) y en un informe parcial (`index.html`, o `informe.md` si pediste `--format md`) que muestra «Duelo incompleto: X de Y intentos». Un duelo terminado queda con `"status": "complete"`.
 
 Para continuar, repite **la misma orden** añadiendo `--resume`:
 

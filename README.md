@@ -102,7 +102,7 @@ modelduel list-tasks examples/tasks
 | `--format F` | Formatos del informe: `html` (por defecto), `md` o `html,md`. `results.json` se guarda siempre. También lo acepta `report`. |
 | `--prices f.json` | Tabla de precios adicional (ver «Coste»). |
 | `--replays DIR` | Carpeta de respuestas grabadas para `replay` (por defecto, `replays/` junto a la carpeta de tareas). |
-| `--out DIR` | Carpeta donde se escriben `results.json` e `index.html`. Se comprueba antes de llamar a las APIs. |
+| `--out DIR` | Carpeta donde se escriben `results.json` y el informe (`index.html`, `informe.md` o los dos, según `--format`). Se comprueba antes de llamar a las APIs. |
 
 Códigos de salida: `0` duelo completado (aunque los modelos fallen tests), `1` no se pudieron escribir los resultados, `2` error de uso o de configuración (argumentos, tareas, proveedores, precios, `results.json`) y `130` interrumpido con Ctrl+C.
 
