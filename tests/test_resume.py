@@ -498,3 +498,18 @@ def test_save_results_usa_os_replace_de_verdad_sobre_un_archivo_existente(tmp_pa
         save_results({"tasks": [], "contenders": {}, "n": i}, path)
     assert json.loads(path.read_text(encoding="utf-8"))["n"] == 2
     assert [p.name for p in tmp_path.iterdir()] == ["results.json"]
+
+
+def test_ctrl_c_respeta_el_formato_pedido(cli_args, cut):
+    args, out = cli_args
+    cut.cut_at = 4
+    assert main([*args, "--format", "md"]) == 130
+    assert "Duelo incompleto: 3 de 6 intentos" in (out / "informe.md").read_text(encoding="utf-8")
+    assert not (out / "index.html").exists()
+
+
+def test_ctrl_c_con_html_y_md_escribe_los_dos(cli_args, cut):
+    args, out = cli_args
+    cut.cut_at = 4
+    assert main([*args, "--format", "html,md"]) == 130
+    assert (out / "index.html").is_file() and (out / "informe.md").is_file()

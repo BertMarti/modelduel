@@ -41,6 +41,7 @@ EXIT_INTERRUPTED = 130
 
 
 FORMATS = ("html", "md")
+_WRITERS = {"html": write_report, "md": write_markdown}
 
 
 class OutputError(Exception):
@@ -349,7 +350,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             created_at=(previous or {}).get("created_at"),
         )
     except KeyboardInterrupt:
-        return _interrupted(latest.get("results"), args.out)
+        return _interrupted(latest.get("results"), args.out, formats)
     report_paths = _write_outputs(results, args.out, formats, with_json=True)
     print()
     print(scoreboard(results))
@@ -382,14 +383,15 @@ def _load_previous(results_path: Path, resume: bool) -> dict | None:
     return None
 
 
-def _interrupted(results: dict | None, out: Path) -> int:
+def _interrupted(results: dict | None, out: Path, formats: tuple[str, ...]) -> int:
     """Ctrl+C: lo hecho ya está en ``results.json``; se deja también el informe parcial."""
     print("\nmodelduel: interrumpido.", file=sys.stderr)
     if results is not None:
         try:
             results["summary"] = summarize(results)
-            write_report(results, out)
-        except (OSError, KeyError, TypeError, ValueError, AttributeError):
+            for name in formats:
+                _WRITERS[name](results, out)
+        except (OSError, KeyError, TypeError, ValueError, AttributeError, OverflowError):
             pass
         print(
             f"Lo hecho hasta ahora está en {out / 'results.json'}. "
@@ -446,7 +448,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     _prepare_out(args.out)
     try:
         paths = _write_outputs(results, args.out, formats, with_json=False)
-    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError) as exc:
         raise ResultsError(
             f"{args.results} no parece un results.json de modelduel ({type(exc).__name__}: {exc})."
         ) from exc
@@ -460,7 +462,7 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
         index = build_leaderboard(args.results, args.out)
     except OSError as exc:
         raise OutputError(f"no se pudo escribir en {args.out}: {exc.strerror or exc}.") from exc
-    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError) as exc:
         raise ResultsError(
             f"hay un results.json que no parece de modelduel ({type(exc).__name__}: {exc})."
         ) from exc
@@ -481,8 +483,7 @@ def _write_outputs(
     try:
         if with_json:
             save_results(results, out / "results.json")
-        writers = {"html": write_report, "md": write_markdown}
-        return [writers[name](results, out) for name in formats]
+        return [_WRITERS[name](results, out) for name in formats]
     except OSError as exc:
         raise OutputError(f"no se pudo escribir en {out}: {exc.strerror or exc}.") from exc
 

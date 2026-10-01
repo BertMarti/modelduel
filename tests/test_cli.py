@@ -271,3 +271,39 @@ def test_format_repetido_se_escribe_una_vez(examples_dir, tmp_path):
     out = tmp_path / "rep"
     assert _duel(examples_dir, out, "--format", "md,md") == 0
     assert (out / "informe.md").is_file()
+
+
+def test_report_md_con_results_roto_no_deja_el_informe_previo_a_cero(
+    examples_dir, tmp_path, capsys
+):
+    base = tmp_path / "base"
+    assert _duel(examples_dir, base) == 0
+    out = tmp_path / "md"
+    assert main(["report", str(base / "results.json"), "--format", "md", "--out", str(out)]) == 0
+    previo = (out / "informe.md").read_text(encoding="utf-8")
+    assert previo
+    roto = json.loads((base / "results.json").read_text(encoding="utf-8"))
+    roto["tasks"][0]["results"]["a"][0]["status"] = ["x"]
+    (base / "roto.json").write_text(json.dumps(roto), encoding="utf-8")
+    assert (
+        main(["report", str(base / "roto.json"), "--format", "md", "--out", str(out)]) == EXIT_USAGE
+    )
+    assert "no parece un results.json" in capsys.readouterr().err
+    assert (out / "informe.md").read_text(encoding="utf-8") == previo
+
+
+def test_report_md_con_numero_desbordado_es_error_de_uso_no_traza(examples_dir, tmp_path, capsys):
+    base = tmp_path / "base"
+    assert _duel(examples_dir, base) == 0
+    texto = (base / "results.json").read_text(encoding="utf-8")
+    assert '"passed": ' in texto
+    (base / "grande.json").write_text(
+        texto.replace('"passed": ', '"passed": 1e400, "x": ', 1), encoding="utf-8"
+    )
+    out = tmp_path / "o"
+    assert (
+        main(["report", str(base / "grande.json"), "--format", "md", "--out", str(out)])
+        == EXIT_USAGE
+    )
+    err = capsys.readouterr().err
+    assert "no parece un results.json" in err and "Traceback" not in err
