@@ -34,6 +34,10 @@ class ProviderError(Exception):
     """Error de un proveedor (configuración, red o respuesta inesperada)."""
 
 
+class ConnectionFailed(ProviderError):
+    """No hay nadie escuchando: conexión rechazada, DNS o red inalcanzable."""
+
+
 @dataclass
 class Response:
     text: str
@@ -216,7 +220,7 @@ def _post_once(
         message = redact(f"No se pudo conectar con {url}: {exc.reason}", secrets)
         if _is_connection_cut(exc.reason):
             raise TransientError(message) from None
-        raise ProviderError(message) from None
+        raise ConnectionFailed(message) from None
     except TimeoutError:
         raise ProviderError(f"La petición a {url} superó {timeout:g} s.") from None
     except (OSError, http.client.HTTPException) as exc:

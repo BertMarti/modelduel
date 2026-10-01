@@ -7,10 +7,10 @@ from pathlib import Path
 
 from modelduel.providers.base import DEFAULT_RETRIES, Provider, ProviderError, Response
 from modelduel.providers.gemini import GeminiProvider
-from modelduel.providers.openai_compat import OpenAIProvider
+from modelduel.providers.openai_compat import OmniRouteProvider, OpenAIProvider
 from modelduel.providers.replay import ReplayProvider
 
-PROVIDERS = ("replay", "gemini", "openai")
+PROVIDERS = ("replay", "gemini", "openai", "omniroute")
 
 __all__ = ["Provider", "ProviderError", "Response", "get_provider", "parse_spec", "PROVIDERS"]
 
@@ -37,4 +37,6 @@ def get_provider(
         return ReplayProvider(model, replay_dirs)
     if kind == "gemini":
         return GeminiProvider(model, retries, on_retry)
+    if kind == "omniroute":
+        return OmniRouteProvider(model, retries, on_retry)
     return OpenAIProvider(model, retries, on_retry)

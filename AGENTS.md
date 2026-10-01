@@ -17,7 +17,7 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 
 ## Estructura
 - `src/modelduel/cli.py` punto de entrada.
-- `src/modelduel/providers/` proveedores: `replay` (grabado), `gemini` (API de Google), `openai` (cualquier API compatible con OpenAI: OpenRouter, Ollama…).
+- `src/modelduel/providers/` proveedores: `replay` (grabado), `gemini` (API de Google), `openai` (cualquier API compatible con OpenAI: OpenRouter, Ollama…), `omniroute` (preset de `openai` para el router local OmniRoute).
 - `src/modelduel/runner.py` extrae el código de la respuesta y ejecuta los tests en un directorio temporal con límite de tiempo.
 - `src/modelduel/report/` informe HTML: duelo de dos (`html.py`, `template.html`) y liga de 3 a 6 (`league.py`, `league.html`); el CSS común está en `style.css`.
 - `src/modelduel/resume.py` reanudación de duelos cortados (`--resume`).
