@@ -1,5 +1,5 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-10-01 por builder (v0.4.0 · #23, #24 y #25)
+Última actualización: 2026-10-01 por builder (v0.4.0 · #23, #24 y #25; arreglos de la revisión en #27)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
@@ -38,7 +38,7 @@ Base heredada de v0.1.0:
 - Tests pytest sin red (cobertura > 90 % exigida en el CI Ubuntu y Windows); despliegue a Pages en `deploy.yml`.
 - Documentación: `docs/USO.md`, `CONTRIBUTING.md`, `CHANGELOG.md` (en español, formato Keep a Changelog).
 - Omniroute (#23): `OmniRouteProvider` es una subclase de `OpenAIProvider` que solo cambia 6 atributos de clase (`PREFIX`, `BASE_URL_ENV`, `KEY_ENV`, `DEFAULT_BASE_URL`, `KEY_REQUIRED`, `DOWN_HINT`). `OMNIROUTE_BASE_URL` (por defecto `http://localhost:20128/v1`), `OMNIROUTE_API_KEY` opcional. `post_json` lanza `ConnectionFailed` (subclase de `ProviderError`) cuando nadie escucha (rechazada, DNS, red inalcanzable; los cortes de una conexión abierta y los tiempos agotados no) y el proveedor añade «Arranca OmniRoute con `omniroute serve`».
-- Clasificación (#24): `src/modelduel/leaderboard.py` + `report/leaderboard.html`. Cada `results/*.json` es un duelo (id = nombre del archivo); `aggregate` suma por `proveedor:modelo` y `rank_models` ordena **por proporciones** (tareas, tests, coste por tarea) con `rank_sides`; el coste solo se suma con precio en todos los duelos y una moneda. `build_leaderboard` escribe `index.html` y `duelos/<id>/index.html` regenerado desde el JSON. Duelo `in_progress` o carpeta vacía = `ResultsError` (exit 2). Las tablas hacen scroll horizontal dentro de una región con foco en móvil. `site/leaderboard/` se genera en el CI y el deploy (en `.gitignore`).
+- Clasificación (#24): `src/modelduel/leaderboard.py` + `report/leaderboard.html`. Cada `results/*.json` es un duelo (id = nombre del archivo); `aggregate` suma por `proveedor:modelo` y `rank_models` ordena **por proporciones** (tareas, tests, coste por intento: con `--runs N` el coste ya suma N intentos por tarea) con `rank_sides`; el coste solo se suma con precio en todos los duelos y una moneda. `build_leaderboard` escribe `index.html` y `duelos/<id>/index.html` regenerado desde el JSON. Duelo `in_progress`, carpeta vacía o datos con formato inesperado = `ResultsError` (exit 2). Los informes `duelos/<id>/` se regeneran desde JSON de terceros: todo texto del JSON va escapado (también la moneda del veredicto) y `failed`/`errors` pasan por `int()`; hay un test de regresión con JSON malicioso que revisa todos los archivos generados. Las tablas hacen scroll horizontal dentro de una región con foco en móvil. `site/leaderboard/` se genera en el CI y el deploy (en `.gitignore`).
 
 ## Decisiones (por qué)
 - 2026-09-29: Proveedor `replay` con respuestas grabadas para que la demo y los tests funcionen sin claves ni coste.

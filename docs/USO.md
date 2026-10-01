@@ -569,7 +569,7 @@ modelduel leaderboard results --out runs/clasificacion
 
 Crea `runs/clasificacion/index.html` (la clasificación y el histórico) y un informe por duelo en `runs/clasificacion/duelos/<id>/index.html`. Sirve para cualquier carpeta con `results.json` de modelduel, también la tuya.
 
-- **Cómo se ordena.** Cada modelo (`proveedor:modelo`) suma tareas, tests y coste de todos los duelos donde aparece. Se compara la **proporción** de tareas resueltas, después la de tests y después el coste por tarea (solo si todos tienen precio en la misma moneda). Con totales, un modelo ganaría solo por jugar más duelos. Los empates comparten posición.
+- **Cómo se ordena.** Cada modelo (`proveedor:modelo`) suma tareas, tests y coste de todos los duelos donde aparece. Se compara la **proporción** de tareas resueltas, después la de tests y después el coste por intento (solo si todos tienen precio en la misma moneda). Con totales, un modelo ganaría solo por jugar más duelos. Los empates comparten posición.
 - **Mira el nº de duelos.** Un modelo con un solo duelo es una señal débil, igual que una sola ejecución.
 - Un `results.json` incompleto (`in_progress`) o ilegible es un error: termínalo con `--resume` antes de publicarlo.
 

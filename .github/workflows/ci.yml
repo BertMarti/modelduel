@@ -68,7 +68,7 @@ jobs:
           grep -q "Histórico de duelos" site/leaderboard/index.html
           grep -q "Clasificación pública" site/leaderboard/index.html
           test -s "$(ls site/leaderboard/duelos/*/index.html | head -n 1)"
-          if grep -qi "<script" site/leaderboard/index.html; then echo "La clasificación no debe tener JavaScript"; exit 1; fi
+          if grep -rqi "<script" site/leaderboard; then echo "La clasificación y sus informes no deben tener JavaScript"; exit 1; fi
 
   package:
     name: Paquete (sdist, wheel y metadatos)
