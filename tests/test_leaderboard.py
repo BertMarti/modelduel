@@ -2,6 +2,7 @@
 
 import json
 import re
+from html.parser import HTMLParser
 
 import pytest
 
@@ -296,3 +297,112 @@ def test_la_pagina_es_accesible_y_legible_en_movil_e_impresion(folder):
     assert html.count('role="img"') == html.count("<svg")
     assert 'scope="row"' in html and 'role="region"' in html
     assert "@media (max-width: 720px)" in html and "@media print" in html
+
+
+PAYLOADS = ("<script>alert(1)</script>", "<img src=x onerror=alert(2)>")
+
+
+def _evil(sides: dict, currency: str, n_tasks: int = 2) -> dict:
+    """Resultados de un tercero con HTML en todos los campos de texto que llegan a un informe."""
+    results = make_results("2026-03-01T10:00:00+00:00", sides, n_tasks=n_tasks)
+    results["version"] = PAYLOADS[0]
+    results["created_at"] = "2026-03-01T10:00:00+00:00"
+    for side in sides:
+        results["contenders"][side]["price"] = {"currency": currency, "fictitious": False}
+    for task in results["tasks"]:
+        task["title"] = PAYLOADS[0]
+        task["difficulty"] = PAYLOADS[1]
+        task["statement"] = PAYLOADS[1]
+        for attempts in task["results"].values():
+            for attempt in attempts:
+                attempt["message"] = PAYLOADS[0]
+                attempt["code"] = PAYLOADS[1]
+                attempt["output"] = PAYLOADS[0]
+                attempt["response"] = PAYLOADS[1]
+    return results
+
+
+class _Tags(HTMLParser):
+    """Etiquetas y atributos que un navegador vería de verdad (el texto escapado no cuenta)."""
+
+    def __init__(self):
+        super().__init__()
+        self.found: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        self.found.append(tag)
+        self.found.extend(name for name, _value in attrs)
+
+
+def _assert_nothing_unescaped(out):
+    files = [f for f in out.rglob("*") if f.is_file()]
+    assert files
+    for file in files:
+        text = file.read_text(encoding="utf-8")
+        for needle in ("<script>alert", "<img src=x"):
+            assert needle not in text, f"{needle} sin escapar en {file}"
+        parser = _Tags()
+        parser.feed(text)
+        assert not {"script", "img", "onerror"} & set(parser.found), f"HTML inyectado en {file}"
+
+
+def test_json_malicioso_no_inyecta_html_en_ningun_archivo_generado(tmp_path):
+    base = tmp_path / "r"
+    # Duelo de dos que se decide por coste: la moneda entra en el texto del veredicto.
+    duel = _evil(
+        {"a": (PAYLOADS[0], 3, 0.1, "USD"), "b": (PAYLOADS[1], 3, 0.5, "USD")}, PAYLOADS[1]
+    )
+    league = _evil(
+        {
+            "a": (PAYLOADS[0], 3, 0.1, "USD"),
+            "b": (PAYLOADS[1], 2, 0.2, "USD"),
+            "c": ("x:c", 1, 0.3, "USD"),
+        },
+        PAYLOADS[0],
+    )
+    write(base, "duelo-a'b&c", duel)  # <, > y " no valen en nombres de archivo de Windows
+    write(base, "liga", league)
+    out = tmp_path / "salida"
+    build_leaderboard(base, out)
+    _assert_nothing_unescaped(out)
+
+
+def test_failed_no_numerico_da_un_error_limpio_y_no_publica_nada(tmp_path):
+    base = tmp_path / "r"
+    results = make_results(
+        "2026-03-01T10:00:00+00:00", {"a": ("x:a", 1, 0.1, "USD"), "b": ("x:b", 2, 0.1, "USD")}
+    )
+    results["tasks"][0]["results"]["a"][0]["failed"] = PAYLOADS[1]
+    write(base, "d", results)
+    out = tmp_path / "salida"
+    with pytest.raises(ResultsError, match="no parece de modelduel"):
+        build_leaderboard(base, out)
+    assert not (out / "index.html").exists()
+
+
+def test_el_coste_por_tarea_se_divide_entre_los_intentos_totales():
+    # Con --runs 2 el coste suma el doble de intentos: 0,6 en 6 intentos (0,1 cada uno) es más
+    # barato que 0,4 en 3 (0,133 cada uno), aunque por tarea resuelta parezca lo contrario.
+    def model(spec, cost, attempts):
+        return {
+            "spec": spec,
+            "duels": 1,
+            "tasks_solved": 3,
+            "tasks_total": 3,
+            "tests_passed": 12,
+            "tests_total": 12,
+            "attempts_total": attempts,
+            "cost": cost,
+            "currency": "USD",
+            "fictitious": False,
+        }
+
+    models = {"x:doble": model("x:doble", 0.6, 6), "x:simple": model("x:simple", 0.4, 3)}
+    assert [r["spec"] for _p, r in rank_models(models)] == ["x:doble", "x:simple"]
+
+
+def test_el_agregado_cuenta_los_intentos_de_todas_las_ejecuciones():
+    duels = load_duels(ROOT / "results")
+    assert (
+        aggregate(duels)["replay:gamma"]["attempts_total"] == 3 + 6
+    )  # la liga y el duelo con --runs 2

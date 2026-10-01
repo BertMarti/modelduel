@@ -68,13 +68,20 @@ def aggregate(duels: list[Duel]) -> dict[str, dict]:
                     "tasks_total": 0,
                     "tests_passed": 0,
                     "tests_total": 0,
+                    "attempts_total": 0,
                     "costs": [],
                     "currencies": set(),
                     "fictitious": False,
                 },
             )
             model["duels"] += 1
-            for key in ("tasks_solved", "tasks_total", "tests_passed", "tests_total"):
+            for key in (
+                "tasks_solved",
+                "tasks_total",
+                "tests_passed",
+                "tests_total",
+                "attempts_total",
+            ):
                 model[key] += data[key]
             model["costs"].append(data["cost"])
             model["currencies"].add(data["currency"])
@@ -96,13 +103,14 @@ def rank_models(models: dict[str, dict]) -> list[tuple[int, dict]]:
     """Clasificación ``[(posición, modelo)]`` con el criterio de los informes, pero por tasas.
 
     Un modelo con más duelos no gana por acumular: se compara la proporción de tareas resueltas,
-    después la de tests y después el coste por tarea (solo si es comparable).
+    después la de tests y después el coste por intento (solo si es comparable).
     """
     rates = {
         spec: {
             "tasks_solved": _rate(m["tasks_solved"], m["tasks_total"]),
             "tests_passed": _rate(m["tests_passed"], m["tests_total"]),
-            "cost": None if m["cost"] is None else _rate(m["cost"], m["tasks_total"]),
+            # Por intento, no por tarea: con --runs N el coste ya suma N intentos por tarea.
+            "cost": None if m["cost"] is None else _rate(m["cost"], m["attempts_total"]),
             "currency": m["currency"],
         }
         for spec, m in models.items()
@@ -216,8 +224,15 @@ def build_leaderboard(folder: Path, out: Path) -> Path:
     """Genera ``out/index.html`` y un informe por duelo en ``out/duelos/<id>/``."""
     duels = load_duels(folder)
     out = Path(out)
-    for duel in duels:
-        write_report(duel.results, out / "duelos" / duel.id)
+    try:
+        for duel in duels:
+            write_report(duel.results, out / "duelos" / duel.id)
+        page = render_leaderboard(duels)
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        # Datos ajenos con campos que no son lo que deberían: error limpio, no una traza.
+        raise ResultsError(
+            f"hay un results.json que no parece de modelduel ({type(exc).__name__}: {exc})."
+        ) from exc
     index = out / "index.html"
-    index.write_text(render_leaderboard(duels), encoding="utf-8")
+    index.write_text(page, encoding="utf-8")
     return index

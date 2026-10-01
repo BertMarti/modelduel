@@ -357,7 +357,8 @@ def _attempt_html(attempt: dict, runs: int) -> str:
         head.append(f"<strong>Ejecución {e(attempt.get('run', '?'))}</strong>")
     head.append(f"{e(attempt['passed'])}/{e(attempt['total'])} tests")
     if attempt["status"] == "ok":
-        failing = attempt["failed"] + attempt["errors"]
+        # int(): un results.json ajeno con texto aquí da un error limpio, no HTML ni un TypeError.
+        failing = int(attempt["failed"]) + int(attempt["errors"])
         head.append("resuelta" if attempt["solved"] else plural(failing, "falla", "fallan"))
     else:
         head.append(e(STATUS_LABELS.get(attempt["status"], attempt["status"])))
@@ -427,8 +428,8 @@ def _verdict(summary: dict, runs: int = 1) -> str:
             f"con las mismas tareas resueltas){summed}"
         )
     return (
-        f"{who} por coste ({fmt_cost(win['cost'], win['currency'])} frente a "
-        f"{fmt_cost(lose['cost'], lose['currency'])}, con las mismas tareas resueltas y tests)"
+        f"{who} por coste ({e(fmt_cost(win['cost'], win['currency']))} frente a "
+        f"{e(fmt_cost(lose['cost'], lose['currency']))}, con las mismas tareas resueltas y tests)"
     )
 
 

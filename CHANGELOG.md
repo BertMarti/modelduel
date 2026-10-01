@@ -11,6 +11,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **Proveedor `omniroute:<modelo>`** para el router local OmniRoute (API compatible con OpenAI, `http://localhost:20128/v1`; `OMNIROUTE_BASE_URL` y `OMNIROUTE_API_KEY` opcional). Es un preset de `openai:`: mismos reintentos y errores, más el aviso «Arranca OmniRoute con `omniroute serve`» si el servidor no responde ([#23](https://github.com/BertMarti/modelduel/issues/23)).
 - **Clasificación pública**: `modelduel leaderboard results/ --out DIR` agrega los `results.json` de una carpeta (uno por duelo o liga) y genera una página estática, sin JavaScript, con la clasificación por modelo (proporción de tareas resueltas, tests, nº de duelos y coste) y el histórico de duelos con un informe regenerado de cada uno. Se compara por proporciones, no por totales, para que jugar más duelos no dé ventaja. La carpeta `results/` trae tres duelos y ligas `replay` de ejemplo ([#24](https://github.com/BertMarti/modelduel/issues/24)).
 
+### Corregido
+
+- Los informes regenerados desde un `results.json` ajeno ya no inyectan HTML: la moneda del veredicto «gana A por coste (…)» se escapa y un `failed` o `errors` que no sea un número da un error limpio. En la clasificación, el coste se compara por intento (con `--runs N` contaba N veces).
+
 ## [0.3.0] - 2026-10-01
 
 ### Cambiado
