@@ -97,7 +97,7 @@ modelduel --version
 
 ## Tu primer duelo con la demo
 
-Si solo quieres **ver** cómo es un duelo, abre el [duelo en directo](https://bertmarti.github.io/modelduel/#demo) de la web: reproduce, en unos 25 segundos, un duelo **pregrabado** (no llama a ningún modelo ni ejecuta código). Puedes pausarlo o detenerlo, y si tu sistema pide «reducir movimiento» avanza paso a paso con el botón «Siguiente». Usa los datos de `demo/results.json`, el mismo `results.json` que genera `modelduel run`.
+Si solo quieres **ver** cómo es un duelo, abre el [duelo en directo](https://bertmarti.github.io/modelduel/#demo) de la web: reproduce, en unos 25 segundos, un duelo **pregrabado** (no llama a ningún modelo ni ejecuta código). Puedes pausarlo o detenerlo, y si tu sistema pide «reducir movimiento» avanza paso a paso con el botón «Siguiente». El veredicto que muestra es solo el de la primera tarea; el informe completo agrega todas las tareas y puede dar otro orden. Usa los datos de `demo/results.json`, el mismo `results.json` que genera `modelduel run`.
 
 La demo no necesita claves ni cuesta nada: usa respuestas **grabadas y ficticias** de tres «modelos» llamados `alfa`, `beta` y `gamma` (proveedor `replay`): es una liga de tres contendientes.
 
