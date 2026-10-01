@@ -6,6 +6,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.6.0] - 2026-10-01
+
+### Añadido
+
+- **Informe en Markdown**: `modelduel report results.json --format md --out DIR` y `modelduel run ... --format html,md` generan `informe.md`, listo para pegar en un PR o un issue de GitHub: marcador, veredicto con su criterio, tabla por tarea y por contendiente (duelo de dos y liga), coste y avisos («una sola ejecución es una señal débil»). `--format` acepta `html` (por defecto), `md` o `html,md`; un formato desconocido es un error de uso. No copia el código ni la salida de los modelos ([#38](https://github.com/BertMarti/modelduel/issues/38), [#39](https://github.com/BertMarti/modelduel/issues/39)).
+- El CI genera y comprueba el informe Markdown de la demo.
+- **Imagen social** de la web: `site/og.png` (1200×630) y las metas `og:image`, `og:image:width`, `og:image:height`, `og:image:alt` y `twitter:card=summary_large_image` ([#44](https://github.com/BertMarti/modelduel/issues/44)).
+
+### Seguridad
+
+- Todo texto procedente de `results.json` se trata como dato no fiable en el Markdown: se aplana a una línea, se quitan controles y marcas de dirección Unicode, y se escapan barras de tabla, backticks, HTML, enlaces, imágenes, entidades y autoenlaces. Como GitHub enlaza `@usuario`, `#12`, `GH-12`, los SHA de commit (7 a 40 hexadecimales) y correos después de leer el Markdown (comprobado con la API de renderizado de GFM), se inserta un espacio de ancho cero tras `@` y `#`, dentro de `GH-12` y dentro de cada SHA. Un `results.json` que falla al renderizar ya no deja a cero un `informe.md` previo, y el informe parcial de un Ctrl+C respeta `--format`. Hay tests de regresión con contenido hostil ([#38](https://github.com/BertMarti/modelduel/issues/38)).
+
 ## [0.5.0] - 2026-10-01
 
 ### Añadido
@@ -91,7 +103,8 @@ Primera versión (MVP).
 - Revisión QA: árbol de procesos muerto al terminar, salida acotada, UTF-8 y BOM, tareas sin tests o con errores de sintaxis, errores de red y respuestas vacías de los proveedores, accesibilidad AA y cobertura mínima del 90 % (PR [#2](https://github.com/BertMarti/modelduel/pull/2)).
 - Guía de uso (`docs/USO.md`) y `CONTRIBUTING.md` (PR [#3](https://github.com/BertMarti/modelduel/pull/3)).
 
-[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.5.0...HEAD
+[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/BertMarti/modelduel/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/BertMarti/modelduel/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/BertMarti/modelduel/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/BertMarti/modelduel/compare/v0.2.0...v0.3.0

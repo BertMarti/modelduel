@@ -26,7 +26,12 @@
 
 Los rankings de modelos miden tareas que no son las tuyas. La forma honesta de elegir es hacer tu propia comparativa: el mismo enunciado, los mismos tests y los números a la vista. modelduel convierte ese ejercicio en una orden.
 
-## Novedades de v0.5.0
+## Novedades de v0.6.0
+
+- **Informe en Markdown**: `modelduel report results.json --format md --out DIR` (y `run ... --format html,md`) genera `informe.md`, listo para pegar en un PR o un issue de GitHub: marcador, veredicto con su criterio, tabla por tarea y por contendiente, coste y avisos. Todo lo que viene de `results.json` se trata como dato no fiable y se escapa (barras de tabla, backticks, HTML, enlaces, menciones y referencias).
+- Imagen social (`og:image`, `twitter:card`) en la web.
+
+### Antes (v0.5.0)
 
 - **Duelo en directo** en la web: un duelo pregrabado que se reproduce en el navegador (código escribiéndose, tests cayendo, marcador), con pausa y sin servidor ni claves.
 - Informes y portada más legibles: enlaces con foco visible, «▲ mejor» / «▼ peor» con glifo y texto, y una navegación más corta.
@@ -79,6 +84,9 @@ modelduel run examples/tasks --a gemini:<modelo> --b openai:<modelo> --runs 3 --
 # Regenerar el HTML a partir de los resultados
 modelduel report runs/duelo/results.json --out runs/duelo
 
+# Informe en Markdown para pegar en un PR o un issue (informe.md)
+modelduel report runs/duelo/results.json --format md --out runs/duelo
+
 # Ver las tareas de una carpeta
 modelduel list-tasks examples/tasks
 ```
@@ -91,9 +99,10 @@ modelduel list-tasks examples/tasks
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
 | `--retries N` | Reintentos ante HTTP 429/500/502/503/504 y cortes de conexión, con espera exponencial y respetando `Retry-After` (3 por defecto; `0` los desactiva). |
 | `--resume` | Continúa el duelo de `--out` saltando los intentos ya terminados (ver «Cortes y reanudación»). |
+| `--format F` | Formatos del informe: `html` (por defecto), `md` o `html,md`. `results.json` se guarda siempre. También lo acepta `report`. |
 | `--prices f.json` | Tabla de precios adicional (ver «Coste»). |
 | `--replays DIR` | Carpeta de respuestas grabadas para `replay` (por defecto, `replays/` junto a la carpeta de tareas). |
-| `--out DIR` | Carpeta donde se escriben `results.json` e `index.html`. Se comprueba antes de llamar a las APIs. |
+| `--out DIR` | Carpeta donde se escriben `results.json` y el informe (`index.html`, `informe.md` o los dos, según `--format`). Se comprueba antes de llamar a las APIs. |
 
 Códigos de salida: `0` duelo completado (aunque los modelos fallen tests), `1` no se pudieron escribir los resultados, `2` error de uso o de configuración (argumentos, tareas, proveedores, precios, `results.json`) y `130` interrumpido con Ctrl+C.
 
@@ -197,7 +206,7 @@ Se busca primero por `proveedor:modelo` y después solo por `modelo`. Si un mode
 
 ```text
 src/modelduel/
-├── cli.py              # run, report, list-tasks, demo
+├── cli.py              # run, report, leaderboard, list-tasks, demo
 ├── tasks.py            # carga de tareas y recuento de tests
 ├── extract.py          # extracción del bloque de código
 ├── runner.py           # prompt + ejecución de pytest en temporal con límite
@@ -208,7 +217,7 @@ src/modelduel/
 ├── pricing.py          # tarifas y fórmula de coste
 ├── providers/          # replay, gemini, openai_compat (openai y omniroute)
 ├── leaderboard.py      # clasificación pública: agregado de results/*.json y página estática
-└── report/             # informe HTML: duelo de dos y liga de 3 a 6 (string.Template + SVG)
+└── report/             # informe HTML (duelo de dos y liga de 3 a 6, string.Template + SVG) y Markdown (`markdown.py`)
 docs/USO.md             # guía de uso para personas usuarias
 CHANGELOG.md            # registro de cambios (Keep a Changelog)
 examples/tasks/         # tareas originales de ejemplo

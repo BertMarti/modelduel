@@ -15,6 +15,7 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 - Tests: `pytest`
 - Clasificación: `modelduel leaderboard results --out site/leaderboard`
 - JS: `node --test "tests/js/*.test.cjs"` (solo `site/demo.js`; Node no es dependencia del paquete)
+- Informe Markdown: `modelduel report results.json --format md --out DIR` (o `run ... --format html,md`) escribe `informe.md`.
 - Demo: `modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo`
 
 ## Estructura
@@ -22,6 +23,7 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 - `src/modelduel/providers/` proveedores: `replay` (grabado), `gemini` (API de Google), `openai` (cualquier API compatible con OpenAI: OpenRouter, Ollama…), `omniroute` (preset de `openai` para el router local OmniRoute).
 - `src/modelduel/runner.py` extrae el código de la respuesta y ejecuta los tests en un directorio temporal con límite de tiempo.
 - `src/modelduel/report/` informe HTML: duelo de dos (`html.py`, `template.html`) y liga de 3 a 6 (`league.py`, `league.html`); el CSS común está en `style.css`.
+- `src/modelduel/report/markdown.py` informe Markdown (`informe.md`, para pegar en un PR o issue): `render_markdown` y `md_text`, el **único** camino de los textos de `results.json` (dato no fiable) al Markdown. Aplana a una línea, quita controles y marcas bidi, escapa la sintaxis y añade un espacio de ancho cero tras `@` y `#`, dentro de `GH-<n>` y dentro de los SHA de commit de 7 a 40 hex (GitHub enlaza menciones, referencias, SHA y correos después de leer el Markdown, así que la barra invertida no basta). `write_markdown` calcula el texto antes de abrir el archivo. No copia código ni salida de los modelos. Pruebas con contenido hostil en `tests/test_markdown.py`.
 - `src/modelduel/leaderboard.py` clasificación pública: agrega `results/*.json` por modelo (por proporciones) y genera `site/leaderboard` (plantilla `report/leaderboard.html`); orden `modelduel leaderboard`.
 - `results/` resultados versionados (un `results.json` por duelo o liga; siembra: tres de `replay`).
 - `src/modelduel/resume.py` reanudación de duelos cortados (`--resume`).
