@@ -16,7 +16,7 @@
 <style>
 :root {
   --bg: #0f0f11; --panel: #151518; --text: #e8e8ea; --muted: #8d8d96; --line: #2a2a2f;
-  --a: #b5e853; --b: #ff7eb6; --c: #4fd1e5;
+  --a: #b5e853; --b: #ff7eb6; --c: #4fd1e5; --d: #ffb833; --e: #b79cff; --f: #ff8a65;
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -53,7 +53,7 @@ h1 .vs { color: var(--muted); font-weight: 400; font-size: .42em; letter-spacing
 .btn:not(.primary):hover { border-color: var(--text); }
 .btn:focus-visible { outline-offset: 3px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.d { color: #ffb833; } .e { color: #b79cff; } .f { color: #ff8a65; }
+.d { color: var(--d); } .e { color: var(--e); } .f { color: var(--f); }
 button.btn { background: none; color: var(--text); cursor: pointer; }
 button.btn.primary { background: var(--text); color: var(--bg); }
 button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
@@ -70,7 +70,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .demo-panel { min-width: 0; color: var(--text); }
 .demo-who { display: flex; gap: 8px; align-items: baseline; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 2px solid currentColor; font: 600 13px/1.4 var(--mono); overflow-wrap: anywhere; }
 .demo-panel.a .demo-who { color: var(--a); } .demo-panel.b .demo-who { color: var(--b); } .demo-panel.c .demo-who { color: var(--c); }
-.demo-panel.d .demo-who { color: #ffb833; } .demo-panel.e .demo-who { color: #b79cff; } .demo-panel.f .demo-who { color: #ff8a65; }
+.demo-panel.d .demo-who { color: var(--d); } .demo-panel.e .demo-who { color: var(--e); } .demo-panel.f .demo-who { color: var(--f); }
 .demo-who .tag { display: inline-block; min-width: 22px; padding: 1px 5px; border: 1px solid currentColor; font: 600 12px/1.5 var(--mono); text-align: center; }
 .demo-code { height: 210px; margin: 0 0 8px; padding: 12px 14px; font: 12.5px/1.5 var(--mono); overflow: auto; color: var(--text); }
 .demo-code:focus-visible, .demo-statement:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
@@ -82,14 +82,15 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .demo-bar { height: 6px; background: var(--line); }
 .demo-fill { height: 100%; width: 0; background: currentColor; transition: width .3s linear; }
 .demo-panel.a .demo-fill { background: var(--a); } .demo-panel.b .demo-fill { background: var(--b); } .demo-panel.c .demo-fill { background: var(--c); }
-.demo-panel.d .demo-fill { background: #ffb833; } .demo-panel.e .demo-fill { background: #b79cff; } .demo-panel.f .demo-fill { background: #ff8a65; }
+.demo-panel.d .demo-fill { background: var(--d); } .demo-panel.e .demo-fill { background: var(--e); } .demo-panel.f .demo-fill { background: var(--f); }
 .demo-result { border-top: 1px solid var(--line); padding-top: 22px; }
 .demo-board { list-style: none; margin: 0 0 14px; padding: 0; font: 14px/1.5 var(--mono); }
 .demo-board li { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .demo-board .tag { display: inline-block; min-width: 22px; padding: 1px 5px; margin-right: 10px; border: 1px solid currentColor; font: 600 12px/1.5 var(--mono); text-align: center; }
 .demo-board li.a .tag { color: var(--a); } .demo-board li.b .tag { color: var(--b); } .demo-board li.c .tag { color: var(--c); }
-.demo-board li.d .tag { color: #ffb833; } .demo-board li.e .tag { color: #b79cff; } .demo-board li.f .tag { color: #ff8a65; }
+.demo-board li.d .tag { color: var(--d); } .demo-board li.e .tag { color: var(--e); } .demo-board li.f .tag { color: var(--f); }
 .demo-verdict { font: 600 15px/1.5 var(--mono); margin: 0 0 16px; }
+.demo-caveat { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
 .demo-more { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .demo-fill { transition: none; } }
 section { padding: 56px 0; border-top: 1px solid var(--line); }
@@ -127,7 +128,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
   .lede { font-size: 18px; }
 }
 @media print {
-  :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; }
+  :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; --c: #0e7490; --d: #a15c00; --e: #6d3fd6; --f: #c2410c; }
   html, body { background: #fff; color: #111; }
   nav .links, .cta, .skip, .demo-controls { display: none; }
   }
@@ -170,7 +171,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
     <span class="demo-clock" id="demo-clock" aria-hidden="true"></span>
   </div>
   <p id="demo-live" class="sr-only" role="status" aria-live="polite"></p>
-  <p id="demo-error" class="demo-error" hidden></p>
+  <p id="demo-error" class="demo-error" role="alert" hidden></p>
   <div id="demo-stage" class="demo-stage" hidden></div>
   <p class="demo-foot">Resultado pregrabado con respuestas de ejemplo (<code>replay</code>). <a href="demo/">Ver el informe completo</a>.</p>
 </section>

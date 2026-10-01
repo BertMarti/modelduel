@@ -15,6 +15,11 @@
   var WRITE_S = PHASES[1].end - PHASES[0].end; // lo que tarda el contendiente más lento en escribir
   var MAX_TESTS = 200;
   var MAX_CODE = 4000;
+  var MAX_STATEMENT = 1500;
+  var MAX_TITLE = 120;
+  var MAX_SPEC = 80;
+  var NOTE = String.fromCharCode(10) + "… (recortado)"; // aviso al final de lo recortado
+  var CAVEAT = "El informe completo agrega todas las tareas y puede dar otro orden.";
   var MAX_SIDES = 6;
   var SIDES = "abcdef";
 
@@ -27,6 +32,14 @@
   function count(x) {
     var n = num(x);
     return n === null || n < 0 ? 0 : Math.floor(n);
+  }
+  // Recorta sin partir un par sustituto; `note` avisa de que hay más (nunca se recorta en silencio).
+  function clip(str, max, note) {
+    if (str.length <= max) return str;
+    var cut = max;
+    var c = str.charCodeAt(cut - 1);
+    if (c >= 0xd800 && c <= 0xdbff) cut--;
+    return str.slice(0, cut) + (note || "…");
   }
   function phaseAt(t) {
     for (var i = 0; i < PHASES.length; i++) if (t <= PHASES[i].end) return i;
@@ -50,7 +63,8 @@
   }
   // Un estado por test, de la línea de progreso de pytest («....FF..»); si no cuadra, passed/total.
   function testMarks(attempt, total) {
-    var n = Math.min(count(total), MAX_TESTS);
+    var all = count(total);
+    var n = Math.min(all, MAX_TESTS);
     var chars = "";
     String(attempt.output || "")
       .split("\n")
@@ -60,13 +74,14 @@
       });
     var kinds = { ".": "pass", F: "fail", E: "fail", s: "skip", x: "skip", X: "skip" };
     var marks = [];
-    var passed = Math.min(count(attempt.passed), n);
+    var passed = Math.min(count(attempt.passed), all);
     // Solo se fía de la línea de progreso si cuadra con total y passed.
-    if (chars.length === n && chars.split(".").length - 1 === passed) {
+    if (chars.length === all && chars.split(".").length - 1 === passed) {
       for (var i = 0; i < n; i++) marks.push(kinds[chars[i]]);
       return marks;
     }
-    for (var j = 0; j < n; j++) marks.push(j < passed ? "pass" : "fail");
+    // Con más de MAX_TESTS solo se lista un tramo; el reparto se reescala para que se vea el real.
+    for (var j = 0; j < n; j++) marks.push(j / n < passed / (all || 1) ? "pass" : "fail");
     return marks;
   }
   function fmtSeconds(s) {
@@ -95,13 +110,13 @@
       var meta = contenders[side] && typeof contenders[side] === "object" ? contenders[side] : {};
       sides.push({
         side: side,
-        spec: String(meta.spec || side),
-        code: String(a.code || "").slice(0, MAX_CODE),
+        spec: clip(String(meta.spec || side), MAX_SPEC),
+        code: clip(String(a.code || ""), MAX_CODE, NOTE),
         latency: num(a.latency_s),
         tokensIn: count(a.input_tokens),
         tokensOut: count(a.output_tokens),
-        total: marks.length,
-        passed: Math.min(count(a.passed), marks.length),
+        total: total, // el real; `marks` es solo el tramo que se lista (MAX_TESTS)
+        passed: Math.min(count(a.passed), total),
         marks: marks,
       });
     }
@@ -113,8 +128,9 @@
       })
     );
     return {
-      title: String(task.title || task.id || "Tarea"),
-      statement: String(task.statement || "").slice(0, 1500),
+      title: clip(String(task.title || task.id || "Tarea"), MAX_TITLE),
+      taskCount: data.tasks.length,
+      statement: clip(String(task.statement || ""), MAX_STATEMENT, NOTE),
       sides: sides,
       maxLatency: maxLatency,
     };
@@ -138,21 +154,23 @@
       var missing = r.total - r.passed;
       r.mark = solved
         ? i === 0
-          ? "▲ gana"
+          ? "▲ primero"
           : "✓ resuelve"
         : "✗ falla " + missing + (missing === 1 ? " test" : " tests");
     });
     var top = rows[0];
     var who = top.side.toUpperCase() + " (" + top.spec + ")";
+    // El veredicto es solo de esta tarea: el informe agrega todas y puede ordenar distinto.
+    var scope = "En esta tarea («" + plan.title + "», 1 de " + plan.taskCount + ")";
     var text =
       top.total > 0 && top.passed === top.total
-        ? "Gana " + who + ": " + top.passed + "/" + top.total + " tests en " + fmtSeconds(top.latency) + ". Resultado pregrabado."
-        : "Ninguno resuelve la tarea; el más cercano es " + who + " con " + top.passed + "/" + top.total + " tests. Resultado pregrabado.";
+        ? scope + ", gana " + who + ": " + top.passed + "/" + top.total + " tests en " + fmtSeconds(top.latency) + ". Resultado pregrabado."
+        : scope + " ninguno resuelve la tarea; el más cercano es " + who + " con " + top.passed + "/" + top.total + " tests. Resultado pregrabado.";
     return { rows: rows, text: text };
   }
 
   var core = {
-    PHASES: PHASES, DURATION: DURATION, WRITE_S: WRITE_S, MAX_TESTS: MAX_TESTS,
+    PHASES: PHASES, DURATION: DURATION, WRITE_S: WRITE_S, MAX_TESTS: MAX_TESTS, MAX_CODE: MAX_CODE, CAVEAT: CAVEAT,
     phaseAt: phaseAt, typedLength: typedLength, tokensAt: tokensAt, testsDone: testsDone,
     testMarks: testMarks, fmtSeconds: fmtSeconds, fmtInt: fmtInt, prepare: prepare, verdict: verdict,
   };
@@ -199,6 +217,7 @@
     head.appendChild(el("h3", "", plan.title));
     var statement = el("pre", "demo-statement", plan.statement);
     statement.tabIndex = 0;
+    statement.setAttribute("role", "group");
     statement.setAttribute("aria-label", "Enunciado de la tarea");
     head.appendChild(statement);
     var grid = el("div", "demo-grid");
@@ -210,6 +229,7 @@
       title.appendChild(el("span", "", s.spec));
       var code = el("pre", "demo-code");
       code.tabIndex = 0;
+      code.setAttribute("role", "group");
       code.setAttribute("aria-label", "Código de " + s.side.toUpperCase());
       var tokens = el("p", "demo-tokens");
       var list = el("ol", "demo-tests");
@@ -243,6 +263,7 @@
     });
     box.appendChild(rows);
     box.appendChild(el("p", "demo-verdict", result.text));
+    box.appendChild(el("p", "demo-caveat", CAVEAT));
     var more = el("p", "demo-more");
     var link = el("a", "btn", "Ver el informe completo");
     link.href = "demo/";
@@ -277,7 +298,8 @@
         p.tokens,
         "Tokens: entrada " + fmtInt(s.tokensIn) + " · salida " + fmtInt(tokensAt(s.tokensOut, progress)) + " de " + fmtInt(s.tokensOut)
       );
-      var done = testsDone(s.total, t);
+      var shown = s.marks.length;
+      var done = testsDone(shown, t);
       if (done !== p.done) {
         p.done = done;
         var passed = 0;
@@ -292,8 +314,11 @@
             li.className = "";
           }
         });
+        // Con más tests de los que se listan, el contador se reescala y acaba en el dato real.
+        if (shown < s.total) passed = shown ? Math.round((s.passed * done) / shown) : 0;
         p.fill.style.width = (s.total ? (passed / s.total) * 100 : 0) + "%";
-        p.label.textContent = passed + "/" + s.total + " tests superados";
+        p.label.textContent =
+          passed + "/" + s.total + " tests superados" + (shown < s.total ? " (mostrando " + shown + " de " + s.total + ")" : "");
       }
     });
   }
@@ -326,6 +351,7 @@
     render();
   }
   function run() {
+    stopTimer();
     last = performance.now();
     timer = setInterval(tick, 100);
     state = "running";
@@ -348,6 +374,7 @@
       t = 0;
       render();
       run();
+      if (document.hidden) pause(); // no arranca en una pestaña que nadie ve
     }
   }
   function next() {
@@ -366,6 +393,7 @@
     setText(clock, "");
     setText(live, "Duelo detenido.");
     label();
+    main.focus(); // «Detener» acaba de ocultarse: el foco vuelve al botón principal, no a body
   }
   function load() {
     if (loading) return;

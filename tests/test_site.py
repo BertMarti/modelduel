@@ -188,16 +188,48 @@ def test_results_json_generado_en_el_ci_se_puede_reproducir(tmp_path):
         "const d=JSON.parse(require('fs').readFileSync(process.argv[2],'utf8'));"
         "const p=c.prepare(d);const v=c.verdict(p);"
         "console.log(JSON.stringify({sides:p.sides.map(s=>[s.side,s.passed,s.total,s.code.length>0]),"
-        "marks:p.sides.map(s=>s.marks.length),top:v.rows[0].side}))"
+        "marks:p.sides.map(s=>s.marks.length),top:v.rows[0].side,text:v.text,marks0:v.rows[0].mark}))"
     )
     done = subprocess.run(
         ["node", "-e", script, str(DEMO_JS), str(out / "results.json")],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=True,
     )
     result = json.loads(done.stdout)
     assert [s[0] for s in result["sides"]] == ["a", "b", "c"]
     assert all(s[3] for s in result["sides"]), "cada contendiente trae su código grabado"
     assert result["marks"] == [s[2] for s in result["sides"]]
-    assert result["top"] in ("a", "c")
+    # A y C resuelven la tarea; C es la más rápida. El informe completo puede ordenar distinto
+    # (agrega todas las tareas), así que el veredicto del directo habla solo de esta tarea.
+    assert result["top"] == "c"
+    assert result["marks0"] == "▲ primero"
+    assert result["text"].startswith(
+        "En esta tarea («" + data["tasks"][0]["title"] + "», 1 de 3), gana C"
+    )
+
+
+def test_el_fallo_de_carga_se_anuncia_y_la_salvedad_del_informe_esta_en_el_script():
+    html, _ = _parse()
+    assert re.search(r'<p id="demo-error"[^>]*role="alert"', html)
+    js = DEMO_JS.read_text(encoding="utf-8")
+    assert "El informe completo agrega todas las tareas y puede dar otro orden." in js
+    assert "(recortado)" in js and "mostrando" in js
+
+
+def test_contraste_aa_de_toda_la_paleta_de_la_portada():
+    from tests.test_report import _contrast, _css_vars
+
+    html, _ = _parse()
+    css = html.split("<style>")[1].split("</style>")[0]
+    screen = _css_vars(css.split(":root {")[1].split("}")[0])
+    printed = _css_vars(css.split("@media print")[1].split("}")[0])
+    accents = ("a", "b", "c", "d", "e", "f")
+    for fg in (*accents, "text", "muted"):
+        for bg in ("bg", "panel"):
+            assert _contrast(screen[fg], screen[bg]) >= 4.5, (fg, bg)
+    for fg in (*accents, "text", "muted"):
+        assert _contrast(printed[fg], "#ffffff") >= 4.5, fg
+    # Los acentos d, e y f no se repiten como colores sueltos fuera de las variables.
+    assert "#ffb833" not in css.split(":root {")[1].split("}")[1]
