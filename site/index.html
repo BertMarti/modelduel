@@ -31,9 +31,11 @@ a:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .skip:focus { top: 12px; }
 .a { color: var(--a); } .b { color: var(--b); } .c { color: var(--c); } .muted { color: var(--muted); }
 nav { display: flex; justify-content: space-between; align-items: center; padding: 26px 0; border-bottom: 1px solid var(--line); font: 13px var(--mono); }
-nav .links { display: flex; gap: 22px; flex-wrap: wrap; }
+nav .links { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
 nav .links a { text-decoration: none; color: var(--muted); }
 nav .links a:hover { color: var(--text); }
+nav .links a.gh { color: var(--text); border: 1px solid var(--line); padding: 6px 12px; }
+nav .links a.gh:hover { border-color: var(--text); }
 .brand { font-weight: 700; letter-spacing: -.02em; }
 .hero { padding: 88px 0 64px; }
 .eyebrow { font: 12px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
@@ -41,15 +43,15 @@ h1 { font: 700 clamp(44px, 9vw, 96px)/.98 var(--mono); letter-spacing: -.05em; m
 h1 .vs { color: var(--muted); font-weight: 400; font-size: .42em; letter-spacing: 0; vertical-align: .45em; }
 .lede { font-size: 20px; max-width: 640px; margin: 0 0 34px; color: var(--text); }
 .lede em { font-style: normal; color: var(--muted); }
-.duel-bars { display: grid; gap: 10px; max-width: 520px; margin: 0 0 40px; }
-.duel-bars div { display: grid; grid-template-columns: 1fr 58px; gap: 14px; align-items: center; font: 12px var(--mono); }
-.duel-bars svg { width: 100%; height: 6px; display: block; }
-.duel-bars span { text-align: right; }
-.cta { display: flex; gap: 14px; flex-wrap: wrap; }
+.cta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.cta .alt { font: 600 14px var(--mono); color: var(--muted); padding: 13px 4px; }
+.cta .alt:hover { color: var(--text); }
+.hero-note { font: 13px/1.5 var(--mono); color: var(--muted); margin: 18px 0 0; }
 .btn { font: 600 14px var(--mono); padding: 13px 20px; border: 1px solid var(--line); text-decoration: none; display: inline-block; }
 .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
 .btn.primary:hover { background: var(--a); border-color: var(--a); }
 .btn:not(.primary):hover { border-color: var(--text); }
+.btn:focus-visible { outline-offset: 3px; }
 section { padding: 56px 0; border-top: 1px solid var(--line); }
 h2 { font: 600 13px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 22px; }
 h3 { font: 600 17px/1.4 var(--mono); margin: 0 0 8px; }
@@ -67,15 +69,16 @@ p code, li code, td code { background: var(--panel); border: 1px solid var(--lin
 .steps p { color: var(--muted); font-size: 15px; }
 table { width: 100%; border-collapse: collapse; font-size: 15px; }
 th, td { text-align: left; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { font: 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+th { font: 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
 tbody th { font: 15px/1.6 var(--mono); letter-spacing: 0; text-transform: none; color: var(--text); white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
+.table-wrap:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .warning { border: 1px solid var(--line); border-left: 3px solid var(--b); background: var(--panel); padding: 22px 24px; }
 .warning h2 { color: var(--b); margin-bottom: 12px; }
 .warning p:last-child { margin: 0; }
 .formula { font: 15px/1.6 var(--mono); padding: 18px; border: 1px solid var(--line); margin-bottom: 16px; }
 .tree { color: var(--muted); }
-footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8 var(--mono); color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 24px; }
+footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8 var(--mono); color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 24px; }
 @media (max-width: 720px) {
   .wrap { padding: 0 16px; }
   .hero { padding: 56px 0 44px; }
@@ -87,8 +90,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
   :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; }
   html, body { background: #fff; color: #111; }
   nav .links, .cta, .skip { display: none; }
-  .duel-bars svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-}
+  }
 </style>
 </head>
 <body>
@@ -98,13 +100,10 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
   <span class="brand">modelduel</span>
   <span class="links">
     <a href="#instalar">Instalar</a>
-    <a href="#novedades">Novedades</a>
-    <a href="#tareas">Tareas</a>
-    <a href="#proveedores">Proveedores</a>
-    <a href="demo/">Demo</a>
+    <a href="demo/">Informe de demostración</a>
     <a href="leaderboard/">Clasificación</a>
     <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">Guía de uso</a>
-    <a href="https://github.com/BertMarti/modelduel">GitHub</a>
+    <a class="gh" href="https://github.com/BertMarti/modelduel">GitHub</a>
   </span>
 </nav>
 
@@ -112,16 +111,12 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 12px/1.8
   <div class="eyebrow">CLI · Python 3.12 · sin dependencias</div>
   <h1><span class="a">modelo</span> <span class="vs">vs</span> <span class="b">modelo</span></h1>
   <p class="lede">Dos modelos, una tarea, los mismos tests. <strong>modelduel</strong> pide el código a dos modelos de IA (o a una liga de hasta seis), ejecuta tus tests sobre cada respuesta y te da un informe con quién acierta, cuánto tarda y cuánto cuesta. <em>Tu propia comparativa, sin fiarte de rankings ajenos.</em></p>
-  <div class="duel-bars" aria-hidden="true">
-    <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="97" height="6" fill="#b5e853"/></svg><span class="a">31/32</span></div>
-    <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="94" height="6" fill="#ff7eb6"/></svg><span class="b">30/32</span></div>
-    <div><svg viewBox="0 0 100 6" preserveAspectRatio="none"><rect x="0" y="2.5" width="100" height="1" fill="#2a2a2f"/><rect x="0" y="0" width="94" height="6" fill="#4fd1e5"/></svg><span class="c">30/32</span></div>
-  </div>
   <div class="cta">
     <a class="btn primary" href="demo/">Ver el informe de demostración</a>
     <a class="btn" href="leaderboard/">Clasificación pública</a>
-    <a class="btn" href="https://github.com/BertMarti/modelduel">Código en GitHub</a>
+    <a class="alt" href="https://github.com/BertMarti/modelduel">Código en GitHub</a>
   </div>
+  <p class="hero-note">Informe generado con respuestas grabadas: sin claves, sin coste.</p>
 </header>
 
 <main id="contenido">
@@ -185,12 +180,13 @@ def test_basico():
 
 <section aria-labelledby="proveedores">
   <h2 id="proveedores">Proveedores</h2>
-  <div class="table-wrap">
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Proveedores, tabla desplazable">
   <table>
     <thead><tr><th scope="col">Especificación</th><th scope="col">Qué usa</th><th scope="col">Variables de entorno</th></tr></thead>
     <tbody>
       <tr><th scope="row">replay:&lt;nombre&gt;</th><td>Respuestas grabadas en <code>examples/replays/&lt;nombre&gt;/&lt;tarea&gt;.md</code>. Sin red ni coste.</td><td>—</td></tr>
       <tr><th scope="row">gemini:&lt;modelo&gt;</th><td>API REST <code>generateContent</code> de Google.</td><td><code>GEMINI_API_KEY</code></td></tr>
+      <tr><th scope="row">omniroute:&lt;modelo&gt;</th><td>El router local OmniRoute (API compatible con OpenAI).</td><td><code>OMNIROUTE_BASE_URL</code>, <code>OMNIROUTE_API_KEY</code> (opcional)</td></tr>
       <tr><th scope="row">openai:&lt;modelo&gt;</th><td>Cualquier API compatible con Chat Completions: OpenAI, OpenRouter, Ollama…</td><td><code>OPENAI_API_KEY</code>, <code>OPENAI_BASE_URL</code></td></tr>
     </tbody>
   </table>
@@ -229,6 +225,7 @@ def test_basico():
 
 <footer>
   <span>modelduel · licencia MIT</span>
+  <span>En esta página: <a href="#novedades">Novedades</a> · <a href="#tareas">Tareas</a> · <a href="#proveedores">Proveedores</a></span>
   <span>Construido por un equipo de agentes de IA (Claude Code) supervisado por Alberto Martínez</span>
   <span><a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">Guía de uso</a> · <a href="https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md">Cambios</a> · <a href="https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md">Contribuir</a> · <a href="https://github.com/BertMarti/modelduel">github.com/BertMarti/modelduel</a></span>
 </footer>

@@ -67,3 +67,31 @@ def test_accesibilidad_basica():
     assert any(t == "a" and a.get("class") == "skip" for t, a in c.tags), (
         "falta el salto al contenido"
     )
+
+
+def test_jerarquia_de_llamadas_a_la_accion_y_navegacion():
+    html, c = _parse()
+    nav = html.split('<nav aria-label="Principal">')[1].split("</nav>")[0]
+    assert nav.count("<a ") <= 5, "la navegación principal debe ser corta"
+    primarias = [a for t, a in c.tags if t == "a" and "primary" in a.get("class", "").split()]
+    assert len(primarias) == 1, "solo una llamada a la acción primaria"
+    assert "duel-bars" not in html, "las barras fijas de la portada se retiraron"
+
+
+def test_tabla_de_proveedores_es_una_region_desplazable_accesible():
+    _, c = _parse()
+    wraps = [a for t, a in c.tags if t == "div" and a.get("class") == "table-wrap"]
+    assert wraps
+    for a in wraps:
+        assert a.get("tabindex") == "0"
+        assert a.get("role") == "region"
+        assert a.get("aria-label")
+    html = SITE.read_text(encoding="utf-8")
+    assert ".table-wrap:focus-visible" in html and "a:focus-visible" in html
+
+
+def test_ningun_texto_de_la_portada_baja_de_12_px():
+    html = SITE.read_text(encoding="utf-8")
+    css = html.split("<style>")[1].split("</style>")[0].split("@media print")[0]
+    sizes = re.findall(r"font(?:-size)?:\s*(?:[\w.]+\s+)?(\d+(?:\.\d+)?)px", css)
+    assert sizes and min(float(s) for s in sizes) >= 12
