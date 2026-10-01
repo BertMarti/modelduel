@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="modelduel $version">
+<meta name="description" content="Clasificación pública de modelos de IA programando: tareas resueltas, tests superados y coste, agregados de los duelos publicados de modelduel.">
+<meta name="theme-color" content="#0f0f11">
+<title>Clasificación pública · modelduel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230f0f11'/%3E%3Crect x='2' y='4' width='5' height='8' fill='%23b5e853'/%3E%3Crect x='9' y='4' width='5' height='8' fill='%23ff7eb6'/%3E%3C/svg%3E">
+<style>
+$css
+/* Clasificación pública */
+.skip { position: absolute; left: 16px; top: -48px; padding: 8px 12px; background: var(--text); color: var(--bg); font: 600 13px var(--mono); z-index: 1; }
+.skip:focus { top: 12px; }
+a:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.topnav { display: flex; gap: 22px; flex-wrap: wrap; font: 13px/1.4 var(--mono); margin: 0 0 40px; }
+.topnav a { color: var(--muted); text-decoration: none; }
+.topnav a:hover { color: var(--text); text-decoration: underline; }
+.topnav .brand { color: var(--text); font-weight: 700; letter-spacing: -.02em; margin-right: auto; }
+.lb h1 { font-size: clamp(34px, 7vw, 72px); }
+.lb .podium { font-size: 17px; }
+.lb td, .lb th { vertical-align: top; }
+.lb table { margin-top: 0; }
+.lb th.lft, .lb td.who, .lb th.when { text-align: left; padding-left: 0; padding-right: 16px; }
+.lb tbody th.rk { font: 600 16px/1.3 var(--mono); color: var(--text); text-transform: none; letter-spacing: 0; text-align: left; padding-left: 0; width: 44px; }
+.lb td.who, .lb th.when { font: 14px/1.4 var(--mono); color: var(--text); text-transform: none; letter-spacing: 0; white-space: normal; overflow-wrap: normal; }
+.lb th.when { font-weight: 400; white-space: nowrap; }
+.lb table.models { min-width: 600px; }
+.lb table.history { min-width: 780px; }
+.lb table.history td.who { min-width: 150px; }
+.lb .sub { display: block; font: 12px/1.4 var(--mono); color: var(--muted); margin-top: 2px; }
+.lb td.rate { min-width: 150px; }
+.lb td.rate .num { font: 600 18px/1.2 var(--mono); }
+.lb td.rate svg { display: block; width: 100%; height: 6px; margin: 6px 0 4px; }
+.lb tr.first td, .lb tr.first th { border-bottom-color: var(--muted); }
+.lb td a { color: var(--text); text-decoration-color: var(--muted); }
+.lb .how { max-width: 68ch; }
+.lb .how p { margin: 0 0 12px; font-size: 15px; }
+.lb .how code { font-family: var(--mono); font-size: .92em; background: var(--panel); border: 1px solid var(--line); padding: 1px 5px; }
+@media (max-width: 720px) {
+  .topnav { gap: 14px 18px; margin-bottom: 28px; }
+  .lb td.rate { min-width: 120px; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
+<div class="wrap lb">
+<nav class="topnav" aria-label="Navegación">
+  <a class="brand" href="https://bertmarti.github.io/modelduel/">modelduel</a>
+  <a href="https://bertmarti.github.io/modelduel/demo/">Demo</a>
+  <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">Guía de uso</a>
+  <a href="https://github.com/BertMarti/modelduel">GitHub</a>
+</nav>
+<header>
+  <div class="eyebrow"><span>modelduel</span><span>Resultados versionados en el repositorio</span><span>v$version</span></div>
+  <h1>Clasificación pública</h1>
+  <p class="lede">$lede</p>
+</header>
+
+<main id="contenido">
+<p class="podium">$podium</p>
+
+<h2>Modelos</h2>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Clasificación de modelos, tabla desplazable">
+<table class="models">
+  <caption>Orden: proporción de tareas resueltas, después de tests superados y después coste por tarea (menos es mejor). Los empates comparten posición.</caption>
+  <thead>
+    <tr><th scope="col" class="lft">Pos.</th><th scope="col" class="lft">Modelo</th><th scope="col">Tareas resueltas</th><th scope="col">Tests superados</th><th scope="col">Duelos</th><th scope="col">Coste</th></tr>
+  </thead>
+  <tbody>
+$ranking_rows
+  </tbody>
+</table>
+</div>
+
+<h2>Histórico de duelos</h2>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Histórico de duelos, tabla desplazable">
+<table class="history">
+  <caption>Del más reciente al más antiguo. Cada informe se genera desde el results.json versionado en el repositorio.</caption>
+  <thead>
+    <tr><th scope="col" class="lft">Fecha</th><th scope="col" class="lft">Duelo</th><th scope="col" class="lft">Contendientes</th><th scope="col" class="lft">Primero</th><th scope="col">Informe</th></tr>
+  </thead>
+  <tbody>
+$history_rows
+  </tbody>
+</table>
+</div>
+
+<h2>Cómo se calcula</h2>
+<div class="how">
+  <p>Cada modelo suma sus tareas, tests y costes en todos los duelos donde aparece. Se compara la proporción, no el total, para que jugar más duelos no dé ventaja. Una sola ejecución es una señal débil: mira el nº de duelos.</p>
+  <p>Para añadir resultados reales: <code>modelduel run mis-tareas --a PROVEEDOR:MODELO --b PROVEEDOR:MODELO --out runs/duelo</code> y copia <code>runs/duelo/results.json</code> a <code>results/</code> con un nombre como <code>2026-10-02-duelo-x-y.json</code>.</p>
+  <p class="muted">$price_note</p>
+</div>
+</main>
+
+<footer>
+  <span>Generado con modelduel v$version</span>
+  <span>Los duelos con precios ficticios o respuestas grabadas son de demostración.</span>
+</footer>
+</div>
+</body>
+</html>

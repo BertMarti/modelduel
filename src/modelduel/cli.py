@@ -12,6 +12,7 @@ from pathlib import Path
 from modelduel import __version__
 from modelduel.demo import DEMO_MODELS, examples_dir
 from modelduel.duel import run_duel
+from modelduel.leaderboard import build_leaderboard
 from modelduel.pricing import PricingError, load_prices
 from modelduel.providers import ProviderError, get_provider
 from modelduel.providers.base import DEFAULT_RETRIES
@@ -165,6 +166,13 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("results", type=Path, help="ruta a results.json")
     report.add_argument("--out", type=Path, required=True, metavar="DIR", help="carpeta de salida")
 
+    board = sub.add_parser(
+        "leaderboard",
+        help="genera la página de clasificación a partir de una carpeta de results.json",
+    )
+    board.add_argument("results", type=Path, help="carpeta con los results.json (uno por duelo)")
+    board.add_argument("--out", type=Path, required=True, metavar="DIR", help="carpeta de salida")
+
     lst = sub.add_parser("list-tasks", help="lista las tareas de una carpeta")
     lst.add_argument("tasks", type=Path, help="carpeta de tareas")
     return parser
@@ -182,6 +190,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_demo(args)
         if args.command == "report":
             return cmd_report(args)
+        if args.command == "leaderboard":
+            return cmd_leaderboard(args)
         return cmd_list_tasks(args)
     except (TaskError, ProviderError, PricingError, ResultsError, RunnerError, ResumeError) as exc:
         print(f"modelduel: error: {exc}", file=sys.stderr)
@@ -410,6 +420,19 @@ def cmd_report(args: argparse.Namespace) -> int:
             f"{args.results} no parece un results.json de modelduel ({type(exc).__name__}: {exc})."
         ) from exc
     print(f"Informe regenerado: {html_path}")
+    return 0
+
+
+def cmd_leaderboard(args: argparse.Namespace) -> int:
+    try:
+        index = build_leaderboard(args.results, args.out)
+    except OSError as exc:
+        raise OutputError(f"no se pudo escribir en {args.out}: {exc.strerror or exc}.") from exc
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        raise ResultsError(
+            f"hay un results.json que no parece de modelduel ({type(exc).__name__}: {exc})."
+        ) from exc
+    print(f"Clasificación generada: {index}")
     return 0
 
 

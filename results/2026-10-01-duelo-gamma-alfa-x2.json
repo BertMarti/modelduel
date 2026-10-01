@@ -1,0 +1,338 @@
+{
+  "schema": 1,
+  "tool": "modelduel",
+  "version": "0.3.0",
+  "created_at": "2026-10-01T00:25:17+00:00",
+  "status": "complete",
+  "runs": 2,
+  "timeout_s": 20.0,
+  "contenders": {
+    "a": {
+      "spec": "replay:gamma",
+      "price": {
+        "input": 0.1,
+        "output": 0.4,
+        "currency": "USD",
+        "fictitious": true,
+        "source": "builtin"
+      }
+    },
+    "b": {
+      "spec": "replay:alfa",
+      "price": {
+        "input": 0.4,
+        "output": 1.6,
+        "currency": "USD",
+        "fictitious": true,
+        "source": "builtin"
+      }
+    }
+  },
+  "tasks": [
+    {
+      "id": "slugify",
+      "title": "Convertir un texto en slug",
+      "difficulty": "fácil",
+      "statement": "# Convertir un texto en slug\n\nEscribe una función de Python con esta firma exacta:\n\n```python\ndef slugify(text: str, separator: str = \"-\") -> str:\n```\n\nDebe convertir cualquier texto en un *slug* apto para una URL siguiendo estas reglas:\n\n1. El resultado va en minúsculas.\n2. Las letras con tilde, diéresis u otros diacríticos se convierten en su letra base\n   (`á` → `a`, `ñ` → `n`, `ü` → `u`, `ç` → `c`).\n3. Solo se conservan letras ASCII (`a`-`z`) y dígitos (`0`-`9`).\n4. Cualquier secuencia de uno o más caracteres no conservados (espacios, signos de\n   puntuación, barras, guiones, puntos…) se sustituye por **un único** `separator`.\n5. El resultado nunca empieza ni termina con el separador.\n6. Si no queda ningún carácter conservado, devuelve la cadena vacía `\"\"`.\n\nEjemplos:\n\n- `slugify(\"Canción de Añoranza\")` → `\"cancion-de-anoranza\"`\n- `slugify(\"Python 3.12 en 2026\")` → `\"python-3-12-en-2026\"`\n- `slugify(\"Árbol Genealógico\", separator=\"_\")` → `\"arbol_genealogico\"`",
+      "fingerprint": "dfd0f944edf642c6",
+      "tests_expected": 8,
+      "results": {
+        "a": [
+          {
+            "status": "ok",
+            "passed": 8,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "total": 8,
+            "duration_s": 0.383,
+            "output": "........                                                                 [100%]\n8 passed in 0.06s",
+            "message": "",
+            "solved": true,
+            "latency_s": 0.92,
+            "input_tokens": 388,
+            "output_tokens": 96,
+            "cost": 7.72e-05,
+            "code": "import re\nimport unicodedata\n\n\ndef slugify(text: str, separator: str = \"-\") -> str:\n    plain = \"\".join(\n        char for char in unicodedata.normalize(\"NFD\", text) if not unicodedata.combining(char)\n    )\n    return separator.join(re.findall(r\"[a-z0-9]+\", plain.lower()))\n",
+            "response": "",
+            "run": 1
+          },
+          {
+            "status": "ok",
+            "passed": 8,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "total": 8,
+            "duration_s": 0.385,
+            "output": "........                                                                 [100%]\n8 passed in 0.06s",
+            "message": "",
+            "solved": true,
+            "latency_s": 0.92,
+            "input_tokens": 388,
+            "output_tokens": 96,
+            "cost": 7.72e-05,
+            "code": "import re\nimport unicodedata\n\n\ndef slugify(text: str, separator: str = \"-\") -> str:\n    plain = \"\".join(\n        char for char in unicodedata.normalize(\"NFD\", text) if not unicodedata.combining(char)\n    )\n    return separator.join(re.findall(r\"[a-z0-9]+\", plain.lower()))\n",
+            "response": "",
+            "run": 2
+          }
+        ],
+        "b": [
+          {
+            "status": "ok",
+            "passed": 8,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "total": 8,
+            "duration_s": 0.386,
+            "output": "........                                                                 [100%]\n8 passed in 0.06s",
+            "message": "",
+            "solved": true,
+            "latency_s": 2.84,
+            "input_tokens": 412,
+            "output_tokens": 188,
+            "cost": 0.0004656,
+            "code": "import re\nimport unicodedata\n\n\ndef slugify(text: str, separator: str = \"-\") -> str:\n    normalized = unicodedata.normalize(\"NFKD\", text)\n    ascii_text = normalized.encode(\"ascii\", \"ignore\").decode(\"ascii\").lower()\n    parts = re.split(r\"[^a-z0-9]+\", ascii_text)\n    return separator.join(part for part in parts if part)\n",
+            "response": "",
+            "run": 1
+          },
+          {
+            "status": "ok",
+            "passed": 8,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "total": 8,
+            "duration_s": 0.387,
+            "output": "........                                                                 [100%]\n8 passed in 0.06s",
+            "message": "",
+            "solved": true,
+            "latency_s": 2.84,
+            "input_tokens": 412,
+            "output_tokens": 188,
+            "cost": 0.0004656,
+            "code": "import re\nimport unicodedata\n\n\ndef slugify(text: str, separator: str = \"-\") -> str:\n    normalized = unicodedata.normalize(\"NFKD\", text)\n    ascii_text = normalized.encode(\"ascii\", \"ignore\").decode(\"ascii\").lower()\n    parts = re.split(r\"[^a-z0-9]+\", ascii_text)\n    return separator.join(part for part in parts if part)\n",
+            "response": "",
+            "run": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "merge_intervals",
+      "title": "Fusionar intervalos",
+      "difficulty": "media",
+      "statement": "# Fusionar intervalos\n\nEscribe una función de Python con esta firma exacta:\n\n```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n```\n\nRecibe una lista de intervalos **cerrados** `(inicio, fin)` de números enteros y devuelve\nuna lista nueva con los intervalos fusionados:\n\n1. El resultado está ordenado por `inicio` y ningún par de intervalos del resultado se\n   solapa ni se toca.\n2. Dos intervalos que se solapan o que **comparten un extremo** se fusionan:\n   `(1, 3)` y `(3, 5)` → `(1, 5)`.\n3. Dos intervalos consecutivos que no comparten ningún punto **no** se fusionan:\n   `(1, 2)` y `(3, 4)` siguen separados.\n4. La entrada puede venir desordenada y puede contener intervalos de un solo punto,\n   como `(5, 5)`.\n5. La lista de entrada no se modifica.\n6. Si algún intervalo tiene `inicio > fin`, lanza `ValueError`.\n7. Una lista vacía devuelve `[]`.\n8. Cada intervalo del resultado es una tupla `(inicio, fin)`.\n\nEjemplo:\n\n```python\nmerge_intervals([(8, 10), (1, 3), (2, 6), (15, 18)])\n# [(1, 6), (8, 10), (15, 18)]\n```",
+      "fingerprint": "003b0fcf61f9ffbc",
+      "tests_expected": 8,
+      "results": {
+        "a": [
+          {
+            "status": "ok",
+            "passed": 6,
+            "failed": 2,
+            "errors": 0,
+            "skipped": 0,
+            "total": 8,
+            "duration_s": 0.496,
+            "output": "...F.F..                                                                 [100%]\n================================== FAILURES ===================================\n______________ test_intervalos_que_comparten_extremo_se_fusionan ______________\ntest_task.py:19: in test_intervalos_que_comparten_extremo_se_fusionan\n    assert merge_intervals([(3, 5), (1, 3), (5, 7)]) == [(1, 7)]\nE   assert [(1, 3), (3, 5), (5, 7)] == [(1, 7)]\nE     \nE     At index 0 diff: (1, 3) != (1, 7)\nE     Left contains 2 more items, first extra item: (3, 5)\nE     Use -v to get more diff\n______________________ test_intervalos_de_un_solo_punto _______________________\ntest_task.py:27: in test_intervalos_de_un_solo_punto\n    assert merge_intervals([(5, 5), (1, 2), (2, 2), (7, 7)]) == [(1, 2), (5, 5), (7, 7)]\nE   assert [(1, 2), (2, ...5, 5), (7, 7)] == [(1, 2), (5, 5), (7, 7)]\nE     \nE     At index 1 diff: (2, 2) != (5, 5)\nE     Left contains one more item: (7, 7)\nE     Use -v to get more diff\n=========================== short test summary info ===========================\nFAILED test_task.py::test_intervalos_que_comparten_extremo_se_fusionan - asse...\nFAILED test_task.py::test_intervalos_de_un_solo_punto - assert [(1, 2), (2, ....\n2 failed, 6 passed in 0.16s",
+            "message": "",
+            "solved": false,
+            "latency_s": 1.21,
+            "input_tokens": 436,
+            "output_tokens": 142,
+            "cost": 0.0001004,
+            "code": "def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    merged: list[tuple[int, int]] = []\n    for start, end in sorted(intervals):\n        if start > end:\n            raise ValueError(f\"Intervalo no válido: {(start, end)}\")\n        if merged and start < merged[-1][1]:\n            merged[-1] = (merged[-1][0], max(merged[-1][1], end))\n        else:\n            merged.append((start, end))\n    return merged\n",
+            "response": "",
+            "run": 1
+          },
+          {
+            "status": "ok",
+            "passed": 6,
+            "failed": 2,
+            "errors": 0,
+            "skipped": 0,
+            "total": 8,
+            "duration_s": 0.48,
+            "output": "...F.F..                                                                 [100%]\n================================== FAILURES ===================================\n______________ test_intervalos_que_comparten_extremo_se_fusionan ______________\ntest_task.py:19: in test_intervalos_que_comparten_extremo_se_fusionan\n    assert merge_intervals([(3, 5), (1, 3), (5, 7)]) == [(1, 7)]\nE   assert [(1, 3), (3, 5), (5, 7)] == [(1, 7)]\nE     \nE     At index 0 diff: (1, 3) != (1, 7)\nE     Left contains 2 more items, first extra item: (3, 5)\nE     Use -v to get more diff\n______________________ test_intervalos_de_un_solo_punto _______________________\ntest_task.py:27: in test_intervalos_de_un_solo_punto\n    assert merge_intervals([(5, 5), (1, 2), (2, 2), (7, 7)]) == [(1, 2), (5, 5), (7, 7)]\nE   assert [(1, 2), (2, ...5, 5), (7, 7)] == [(1, 2), (5, 5), (7, 7)]\nE     \nE     At index 1 diff: (2, 2) != (5, 5)\nE     Left contains one more item: (7, 7)\nE     Use -v to get more diff\n=========================== short test summary info ===========================\nFAILED test_task.py::test_intervalos_que_comparten_extremo_se_fusionan - asse...\nFAILED test_task.py::test_intervalos_de_un_solo_punto - assert [(1, 2), (2, ....\n2 failed, 6 passed in 0.15s",
+            "message": "",
+            "solved": false,
+            "latency_s": 1.21,
+            "input_tokens": 436,
+            "output_tokens": 142,
+            "cost": 0.0001004,
+            "code": "def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    merged: list[tuple[int, int]] = []\n    for start, end in sorted(intervals):\n        if start > end:\n            raise ValueError(f\"Intervalo no válido: {(start, end)}\")\n        if merged and start < merged[-1][1]:\n            merged[-1] = (merged[-1][0], max(merged[-1][1], end))\n        else:\n            merged.append((start, end))\n    return merged\n",
+            "response": "",
+            "run": 2
+          }
+        ],
+        "b": [
+          {
+            "status": "ok",
+            "passed": 8,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "total": 8,
+            "duration_s": 0.4,
+            "output": "........                                                                 [100%]\n8 passed in 0.06s",
+            "message": "",
+            "solved": true,
+            "latency_s": 3.37,
+            "input_tokens": 468,
+            "output_tokens": 241,
+            "cost": 0.0005728,
+            "code": "def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    for start, end in intervals:\n        if start > end:\n            raise ValueError(f\"Intervalo inválido: ({start}, {end})\")\n\n    merged: list[tuple[int, int]] = []\n    for start, end in sorted(intervals):\n        if merged and start <= merged[-1][1]:\n            last_start, last_end = merged[-1]\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n",
+            "response": "",
+            "run": 1
+          },
+          {
+            "status": "ok",
+            "passed": 8,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "total": 8,
+            "duration_s": 0.38,
+            "output": "........                                                                 [100%]\n8 passed in 0.05s",
+            "message": "",
+            "solved": true,
+            "latency_s": 3.37,
+            "input_tokens": 468,
+            "output_tokens": 241,
+            "cost": 0.0005728,
+            "code": "def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    for start, end in intervals:\n        if start > end:\n            raise ValueError(f\"Intervalo inválido: ({start}, {end})\")\n\n    merged: list[tuple[int, int]] = []\n    for start, end in sorted(intervals):\n        if merged and start <= merged[-1][1]:\n            last_start, last_end = merged[-1]\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n",
+            "response": "",
+            "run": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "parse_duration",
+      "title": "Convertir una duración a segundos",
+      "difficulty": "difícil",
+      "statement": "# Convertir una duración a segundos\n\nEscribe una función de Python con esta firma exacta:\n\n```python\ndef parse_duration(text: str) -> int:\n```\n\nRecibe una duración escrita por una persona, como `\"1h 30m 15s\"`, y devuelve el total en\nsegundos (`5415` en ese ejemplo).\n\nFormato válido:\n\n1. La duración está formada por uno o más **componentes** `<entero><unidad>`, sin espacio\n   entre el número y la unidad.\n2. Las unidades son `d` (días), `h` (horas), `m` (minutos) y `s` (segundos), en\n   minúsculas o mayúsculas.\n3. Los componentes pueden ir juntos (`\"1h30m\"`) o separados por espacios, y se admiten\n   espacios al principio y al final.\n4. Cada unidad aparece **como mucho una vez** y siempre en orden descendente:\n   `d`, luego `h`, luego `m`, luego `s`. Se pueden omitir unidades (`\"2d 5s\"` es válido).\n5. El número es un entero sin signo; `\"0s\"` es válido y vale `0`.\n\nCualquier otra cosa debe lanzar `ValueError`, por ejemplo: cadena vacía o solo espacios,\nun número sin unidad (`\"10\"`), una unidad desconocida (`\"5x\"`), una unidad repetida\n(`\"1h 2h\"`), unidades fuera de orden (`\"30m 1h\"`), signos (`\"-5m\"`), decimales (`\"1.5h\"`)\no texto sobrante (`\"1h y 5m\"`).",
+      "fingerprint": "5331414b907f36cc",
+      "tests_expected": 16,
+      "results": {
+        "a": [
+          {
+            "status": "ok",
+            "passed": 16,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "total": 16,
+            "duration_s": 0.388,
+            "output": "................                                                         [100%]\n16 passed in 0.06s",
+            "message": "",
+            "solved": true,
+            "latency_s": 1.58,
+            "input_tokens": 490,
+            "output_tokens": 188,
+            "cost": 0.00012419999999999998,
+            "code": "import re\n\n_PATTERN = re.compile(\n    r\"\\s*(?:(\\d+)d)?(?:\\s*(\\d+)h)?(?:\\s*(\\d+)m)?(?:\\s*(\\d+)s)?\\s*\", re.IGNORECASE\n)\n\n\ndef parse_duration(text: str) -> int:\n    match = _PATTERN.fullmatch(text)\n    if match is None or all(group is None for group in match.groups()):\n        raise ValueError(f\"Duración no válida: {text!r}\")\n    days, hours, minutes, seconds = (int(group or 0) for group in match.groups())\n    return ((days * 24 + hours) * 60 + minutes) * 60 + seconds\n",
+            "response": "",
+            "run": 1
+          },
+          {
+            "status": "ok",
+            "passed": 16,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "total": 16,
+            "duration_s": 0.394,
+            "output": "................                                                         [100%]\n16 passed in 0.06s",
+            "message": "",
+            "solved": true,
+            "latency_s": 1.58,
+            "input_tokens": 490,
+            "output_tokens": 188,
+            "cost": 0.00012419999999999998,
+            "code": "import re\n\n_PATTERN = re.compile(\n    r\"\\s*(?:(\\d+)d)?(?:\\s*(\\d+)h)?(?:\\s*(\\d+)m)?(?:\\s*(\\d+)s)?\\s*\", re.IGNORECASE\n)\n\n\ndef parse_duration(text: str) -> int:\n    match = _PATTERN.fullmatch(text)\n    if match is None or all(group is None for group in match.groups()):\n        raise ValueError(f\"Duración no válida: {text!r}\")\n    days, hours, minutes, seconds = (int(group or 0) for group in match.groups())\n    return ((days * 24 + hours) * 60 + minutes) * 60 + seconds\n",
+            "response": "",
+            "run": 2
+          }
+        ],
+        "b": [
+          {
+            "status": "ok",
+            "passed": 15,
+            "failed": 1,
+            "errors": 0,
+            "skipped": 0,
+            "total": 16,
+            "duration_s": 0.488,
+            "output": "...............F                                                         [100%]\n================================== FAILURES ===================================\n_______________ test_unidades_fuera_de_orden_lanzan_valueerror ________________\ntest_task.py:41: in test_unidades_fuera_de_orden_lanzan_valueerror\n    with pytest.raises(ValueError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE ValueError\n=========================== short test summary info ===========================\nFAILED test_task.py::test_unidades_fuera_de_orden_lanzan_valueerror - Failed:...\n1 failed, 15 passed in 0.15s",
+            "message": "",
+            "solved": false,
+            "latency_s": 3.91,
+            "input_tokens": 521,
+            "output_tokens": 274,
+            "cost": 0.0006468,
+            "code": "import re\n\n_SECONDS = {\"d\": 86_400, \"h\": 3_600, \"m\": 60, \"s\": 1}\n_FORMAT = re.compile(r\"(?:\\s*\\d+[dhms])+\\s*\", re.IGNORECASE)\n_COMPONENT = re.compile(r\"(\\d+)([dhms])\", re.IGNORECASE)\n\n\ndef parse_duration(text: str) -> int:\n    if not _FORMAT.fullmatch(text):\n        raise ValueError(f\"Duración no válida: {text!r}\")\n\n    total = 0\n    seen: set[str] = set()\n    for number, unit in _COMPONENT.findall(text):\n        unit = unit.lower()\n        if unit in seen:\n            raise ValueError(f\"Unidad repetida: {unit!r}\")\n        seen.add(unit)\n        total += int(number) * _SECONDS[unit]\n    return total\n",
+            "response": "",
+            "run": 1
+          },
+          {
+            "status": "ok",
+            "passed": 15,
+            "failed": 1,
+            "errors": 0,
+            "skipped": 0,
+            "total": 16,
+            "duration_s": 0.478,
+            "output": "...............F                                                         [100%]\n================================== FAILURES ===================================\n_______________ test_unidades_fuera_de_orden_lanzan_valueerror ________________\ntest_task.py:41: in test_unidades_fuera_de_orden_lanzan_valueerror\n    with pytest.raises(ValueError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE ValueError\n=========================== short test summary info ===========================\nFAILED test_task.py::test_unidades_fuera_de_orden_lanzan_valueerror - Failed:...\n1 failed, 15 passed in 0.15s",
+            "message": "",
+            "solved": false,
+            "latency_s": 3.91,
+            "input_tokens": 521,
+            "output_tokens": 274,
+            "cost": 0.0006468,
+            "code": "import re\n\n_SECONDS = {\"d\": 86_400, \"h\": 3_600, \"m\": 60, \"s\": 1}\n_FORMAT = re.compile(r\"(?:\\s*\\d+[dhms])+\\s*\", re.IGNORECASE)\n_COMPONENT = re.compile(r\"(\\d+)([dhms])\", re.IGNORECASE)\n\n\ndef parse_duration(text: str) -> int:\n    if not _FORMAT.fullmatch(text):\n        raise ValueError(f\"Duración no válida: {text!r}\")\n\n    total = 0\n    seen: set[str] = set()\n    for number, unit in _COMPONENT.findall(text):\n        unit = unit.lower()\n        if unit in seen:\n            raise ValueError(f\"Unidad repetida: {unit!r}\")\n        seen.add(unit)\n        total += int(number) * _SECONDS[unit]\n    return total\n",
+            "response": "",
+            "run": 2
+          }
+        ]
+      }
+    }
+  ],
+  "updated_at": "2026-10-01T00:25:22+00:00",
+  "summary": {
+    "a": {
+      "tests_passed": 60,
+      "tests_total": 64,
+      "tasks_solved": 2,
+      "tasks_total": 3,
+      "attempts_solved": 4,
+      "attempts_total": 6,
+      "latency_s": 7.42,
+      "test_time_s": 2.526,
+      "input_tokens": 2628,
+      "output_tokens": 852,
+      "tokens_complete": true,
+      "cost": 0.0006035999999999999,
+      "currency": "USD",
+      "fictitious_price": true
+    },
+    "b": {
+      "tests_passed": 62,
+      "tests_total": 64,
+      "tasks_solved": 2,
+      "tasks_total": 3,
+      "attempts_solved": 4,
+      "attempts_total": 6,
+      "latency_s": 20.24,
+      "test_time_s": 2.519,
+      "input_tokens": 2802,
+      "output_tokens": 1406,
+      "tokens_complete": true,
+      "cost": 0.0033704,
+      "currency": "USD",
+      "fictitious_price": true
+    }
+  }
+}
