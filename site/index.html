@@ -212,9 +212,10 @@ modelduel report runs/duelo/results.json --out runs/duelo</code></pre>
 </section>
 
 <section aria-labelledby="novedades">
-  <h2 id="novedades">Novedades de v0.6.0</h2>
+  <h2 id="novedades">Novedades de v0.7.0</h2>
   <ul>
-    <li><strong>Informe en Markdown</strong>: <code>modelduel report results.json --format md --out DIR</code> genera <code>informe.md</code>, listo para pegar en un PR o un issue, con el texto de <code>results.json</code> escapado.</li>
+    <li><strong>Señal de vida</strong>: si una llamada a un modelo tarda más de unos 10 s, modelduel avisa cada 10 s por <code>stderr</code> de que sigue esperando. El límite de red por defecto baja a 90 s (<code>MODELDUEL_HTTP_TIMEOUT</code> lo cambia).</li>
+    <li>Desde v0.6.0: <strong>informe en Markdown</strong>: <code>modelduel report results.json --format md --out DIR</code> genera <code>informe.md</code>, listo para pegar en un PR o un issue, con el texto de <code>results.json</code> escapado.</li>
     <li>Desde v0.5.0: el <strong>duelo en directo</strong> de esta página y los informes más legibles. Desde v0.4.0: proveedor <code>omniroute:</code> y <a href="leaderboard/">clasificación pública</a>. Desde v0.2.0: liga de 2 a 6, reintentos y <code>--resume</code>.</li>
   </ul>
   <p>Todos los cambios, en el <a href="https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md">registro de cambios</a>; el uso paso a paso, en la <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">guía de uso</a>.</p>

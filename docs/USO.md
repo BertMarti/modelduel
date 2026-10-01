@@ -300,7 +300,7 @@ modelduel run examples/tasks --a openai:<modelo-local> --b gemini:<modelo> --out
 
 Con una dirección local (`localhost`, `127.0.0.1`…) **no hace falta `OPENAI_API_KEY`**. Si la dirección no es local, sí es obligatoria.
 
-Los modelos locales pueden ser lentos: si las peticiones se cortan por tiempo, sube el límite de red con la variable `MODELDUEL_HTTP_TIMEOUT` (segundos; 180 por defecto), por ejemplo `$env:MODELDUEL_HTTP_TIMEOUT = "600"` en PowerShell o `export MODELDUEL_HTTP_TIMEOUT=600` en Linux y macOS.
+Los modelos locales pueden ser lentos: si las peticiones se cortan por tiempo, sube el límite de red con la variable `MODELDUEL_HTTP_TIMEOUT` (segundos; 90 por defecto), por ejemplo `$env:MODELDUEL_HTTP_TIMEOUT = "600"` en PowerShell o `export MODELDUEL_HTTP_TIMEOUT=600` en Linux y macOS.
 
 Para volver a usar OpenAI de verdad después de OpenRouter u Ollama, quita la variable: `Remove-Item Env:OPENAI_BASE_URL` (PowerShell) o `unset OPENAI_BASE_URL` (Linux y macOS), o cierra la terminal.
 
@@ -636,7 +636,7 @@ Debe ser 1 o más; con `--runs 0` la orden termina con un error.
 
 ### `--timeout`
 
-Es el tiempo máximo, en segundos, que tienen **los tests** de una respuesta para ejecutarse (20 por defecto). Sirve para cortar bucles infinitos o soluciones muy lentas: al agotarse, el intento queda como «tiempo agotado». Admite decimales (`--timeout 2.5`) y debe ser mayor que 0. **No limita la espera al modelo:** eso lo controla la variable de entorno `MODELDUEL_HTTP_TIMEOUT` (180 s por defecto).
+Es el tiempo máximo, en segundos, que tienen **los tests** de una respuesta para ejecutarse (20 por defecto). Sirve para cortar bucles infinitos o soluciones muy lentas: al agotarse, el intento queda como «tiempo agotado». Admite decimales (`--timeout 2.5`) y debe ser mayor que 0. **No limita la espera al modelo:** eso lo controla la variable de entorno `MODELDUEL_HTTP_TIMEOUT` (90 s por defecto).
 
 ### `--retries`
 
@@ -652,6 +652,18 @@ La espera crece como 1, 2, 4… segundos (tope de 30 s) con algo de azar para qu
 ```
 
 **No** se reintenta lo que no suele arreglarse esperando: los errores de tu configuración (400, 401, 403, 404…), los **tiempos de espera agotados** (`MODELDUEL_HTTP_TIMEOUT`: reintentar triplicaría la espera), un **servidor apagado** (por ejemplo, Ollama sin arrancar) ni los errores de resolución de nombres (DNS). Si tras los reintentos la llamada sigue fallando, ese intento queda como «error del proveedor» y el duelo sigue con el resto; `--resume` puede repetirlo después. El tiempo del modelo que se anota es el del intento bueno, sin las esperas.
+
+#### Si parece colgado
+
+Una llamada a un modelo puede tardar (un proveedor saturado, un modelo que razona…). Si lleva más de unos 10 s, modelduel lo dice por `stderr`, cada 10 s, hasta que llega la respuesta o se corta:
+
+```text
+  ··  esperando a gemini:gemini-3.5-flash (tarea slugify)… 30 s
+```
+
+No se muestra con `replay:` (no hay red) y no cambia lo que sale por `stdout`. **Si parece colgado, es que espera respuesta; Ctrl+C guarda lo hecho y `--resume` lo retoma.**
+
+El límite de cada petición HTTP es de **90 s** por defecto (antes, 180 s). Se cambia con la variable de entorno `MODELDUEL_HTTP_TIMEOUT`, en segundos y mayor que 0: `export MODELDUEL_HTTP_TIMEOUT=300` (Linux y macOS) o `$env:MODELDUEL_HTTP_TIMEOUT = "300"` (PowerShell). Súbela con modelos lentos (locales o de razonamiento largo) y bájala si prefieres rendirte antes. Al agotarse, ese intento queda como «error del proveedor» y no se reintenta.
 
 ### `--resume`
 

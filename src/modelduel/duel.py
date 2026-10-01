@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
 
 from modelduel import __version__
@@ -16,6 +17,7 @@ from modelduel.tasks import Task
 
 Progress = Callable[[str], None]
 Update = Callable[[dict], None]
+HeartbeatFactory = Callable[[str], AbstractContextManager]
 
 
 def run_duel(
@@ -28,10 +30,13 @@ def run_duel(
     on_update: Update | None = None,
     reuse: dict[Key, dict] | None = None,
     created_at: str | None = None,
+    heartbeat: HeartbeatFactory | None = None,
 ) -> dict:
     """Enfrenta a los contendientes. ``on_update`` recibe los resultados tras cada intento.
 
     ``reuse`` son intentos ya hechos (de ``plan_resume``) que se copian en lugar de repetirse.
+    ``heartbeat(etiqueta)`` devuelve un gestor de contexto que envuelve cada llamada a un
+    proveedor real (no a ``replay:``) para mostrar que sigue esperando.
     """
     progress = progress or (lambda _msg: None)
     on_update = on_update or (lambda _results: None)
@@ -86,7 +91,7 @@ def run_duel(
                     progress(_progress_line(task, side, run, runs, reuse[key], reused=True))
                     continue
                 attempt = run_attempt(
-                    task, prompt, providers[side], contender_prices[side], timeout
+                    task, prompt, providers[side], contender_prices[side], timeout, heartbeat
                 )
                 attempt["run"] = run
                 attempts = entry["results"][side]
@@ -113,10 +118,17 @@ def _reused(attempt: dict, price: Price | None) -> dict:
 
 
 def run_attempt(
-    task: Task, prompt: str, provider: Provider, price: Price | None, timeout: float
+    task: Task,
+    prompt: str,
+    provider: Provider,
+    price: Price | None,
+    timeout: float,
+    heartbeat: HeartbeatFactory | None = None,
 ) -> dict:
+    live = heartbeat is not None and not provider.spec.startswith("replay:")
     try:
-        response = provider.complete(prompt, task_id=task.id)
+        with heartbeat(f"{provider.spec} (tarea {task.id})") if live else nullcontext():
+            response = provider.complete(prompt, task_id=task.id)
     except Exception as exc:  # noqa: BLE001 - un intento fallido no debe tumbar todo el duelo
         message = clean_text(str(exc) if isinstance(exc, ProviderError) else _unexpected(exc))
         test_run = TestRun(status="provider_error", total=task.expected_tests, message=message)

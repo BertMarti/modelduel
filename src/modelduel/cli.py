@@ -12,6 +12,7 @@ from pathlib import Path
 from modelduel import __version__
 from modelduel.demo import DEMO_MODELS, examples_dir
 from modelduel.duel import run_duel
+from modelduel.heartbeat import Heartbeat
 from modelduel.leaderboard import build_leaderboard
 from modelduel.pricing import PricingError, load_prices
 from modelduel.providers import ProviderError, get_provider
@@ -348,6 +349,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             on_update=on_update,
             reuse=reuse,
             created_at=(previous or {}).get("created_at"),
+            heartbeat=lambda label: Heartbeat(label, _alive),
         )
     except KeyboardInterrupt:
         return _interrupted(latest.get("results"), args.out, formats)
@@ -359,6 +361,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     for path in report_paths:
         print(f"  Informe     {path}")
     return 0
+
+
+def _alive(line: str) -> None:
+    """Señal de vida de una llamada larga: por stderr, para no mezclarla con el resultado."""
+    print(line, file=sys.stderr, flush=True)
 
 
 def _load_previous(results_path: Path, resume: bool) -> dict | None:

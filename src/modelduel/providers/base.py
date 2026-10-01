@@ -19,7 +19,7 @@ from typing import Protocol
 
 from modelduel.report.html import fmt_seconds
 
-DEFAULT_HTTP_TIMEOUT = 180.0
+DEFAULT_HTTP_TIMEOUT = 90.0
 DEFAULT_RETRIES = 3
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 USER_AGENT = "modelduel (+https://github.com/BertMarti/modelduel)"

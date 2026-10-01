@@ -27,12 +27,17 @@
 
 Los rankings de modelos miden tareas que no son las tuyas. La forma honesta de elegir es hacer tu propia comparativa: el mismo enunciado, los mismos tests y los números a la vista. modelduel convierte ese ejercicio en una orden.
 
-## Novedades de v0.6.0
+## Novedades de v0.7.0
+
+- **Señal de vida**: si una llamada a un proveedor real tarda más de unos 10 s (por ejemplo, tras «reintento 2/3» con un 503), modelduel escribe por `stderr` cada 10 s `  ··  esperando a gemini:gemini-3.5-flash (tarea slugify)… 30 s`. Si parece colgado, es que espera respuesta; Ctrl+C guarda lo hecho y `--resume` lo retoma.
+- El límite por defecto de las peticiones HTTP baja de 180 s a **90 s** (`MODELDUEL_HTTP_TIMEOUT` lo cambia).
+
+### Antes (v0.6.0)
 
 - **Informe en Markdown**: `modelduel report results.json --format md --out DIR` (y `run ... --format html,md`) genera `informe.md`, listo para pegar en un PR o un issue de GitHub: marcador, veredicto con su criterio, tabla por tarea y por contendiente, coste y avisos. Todo lo que viene de `results.json` se trata como dato no fiable y se escapa (barras de tabla, backticks, HTML, enlaces, menciones y referencias).
 - Imagen social (`og:image`, `twitter:card`) en la web.
 
-### Antes (v0.5.0)
+#### v0.5.0
 
 - **Duelo en directo** en la web: un duelo pregrabado que se reproduce en el navegador (código escribiéndose, tests cayendo, marcador), con pausa y sin servidor ni claves.
 - Informes y portada más legibles: enlaces con foco visible, «▲ mejor» / «▼ peor» con glifo y texto, y una navegación más corta.
@@ -156,7 +161,7 @@ Las tres tareas de ejemplo son originales y de dificultad creciente: `slugify`, 
 
 - **OpenRouter:** `OPENAI_BASE_URL=https://openrouter.ai/api/v1` y tu clave de OpenRouter en `OPENAI_API_KEY`.
 - **Ollama:** `OPENAI_BASE_URL=http://localhost:11434/v1`. En servidores locales la clave no es obligatoria.
-- `MODELDUEL_HTTP_TIMEOUT` cambia el límite de las peticiones HTTP (180 s por defecto).
+- `MODELDUEL_HTTP_TIMEOUT` cambia el límite de las peticiones HTTP (90 s por defecto; antes, 180 s). Si una llamada tarda más de unos 10 s, modelduel avisa cada 10 s por `stderr` («esperando a …»).
 
 Las claves se leen **solo** de variables de entorno: nunca de archivos del repositorio, nunca en la URL (Gemini recibe la clave en una cabecera) y nunca en los mensajes de error ni en el informe. Tampoco llegan al subproceso que ejecuta el código de los modelos.
 

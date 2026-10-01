@@ -203,7 +203,7 @@ def test_error_http_con_cuerpo_no_json(monkeypatch):
 def test_tiempo_de_espera_de_red_en_espanol(monkeypatch, raises):
     monkeypatch.delenv("MODELDUEL_HTTP_TIMEOUT", raising=False)
     _fake_urlopen(monkeypatch, raises=raises)
-    with pytest.raises(ProviderError, match="superó 180 s"):
+    with pytest.raises(ProviderError, match="superó 90 s"):
         post_json("https://x.test", {}, {})
 
 
