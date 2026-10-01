@@ -6,9 +6,10 @@ from pathlib import Path
 
 from modelduel.report.html import render_versus
 from modelduel.report.league import render_league
+from modelduel.report.markdown import render_markdown
 from modelduel.results import sides_of, summarize
 
-__all__ = ["render_report", "write_report"]
+__all__ = ["render_markdown", "render_report", "write_markdown", "write_report"]
 
 
 def render_report(results: dict) -> str:
@@ -23,4 +24,13 @@ def write_report(results: dict, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / "index.html"
     path.write_text(render_report(results), encoding="utf-8")
+    return path
+
+
+def write_markdown(results: dict, out_dir: Path) -> Path:
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / "informe.md"
+    with path.open("w", encoding="utf-8", newline="") as handle:  # LF también en Windows
+        handle.write(render_markdown(results))
     return path
