@@ -6,6 +6,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.4.0] - 2026-10-01
+
 ### Añadido
 
 - **Proveedor `omniroute:<modelo>`** para el router local OmniRoute (API compatible con OpenAI, `http://localhost:20128/v1`; `OMNIROUTE_BASE_URL` y `OMNIROUTE_API_KEY` opcional). Es un preset de `openai:`: mismos reintentos y errores, más el aviso «Arranca OmniRoute con `omniroute serve`» si el servidor no responde ([#23](https://github.com/BertMarti/modelduel/issues/23)).
@@ -77,7 +79,8 @@ Primera versión (MVP).
 - Revisión QA: árbol de procesos muerto al terminar, salida acotada, UTF-8 y BOM, tareas sin tests o con errores de sintaxis, errores de red y respuestas vacías de los proveedores, accesibilidad AA y cobertura mínima del 90 % (PR [#2](https://github.com/BertMarti/modelduel/pull/2)).
 - Guía de uso (`docs/USO.md`) y `CONTRIBUTING.md` (PR [#3](https://github.com/BertMarti/modelduel/pull/3)).
 
-[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.3.0...HEAD
+[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/BertMarti/modelduel/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/BertMarti/modelduel/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/BertMarti/modelduel/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/BertMarti/modelduel/releases/tag/v0.1.0
