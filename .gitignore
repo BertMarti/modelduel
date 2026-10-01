@@ -9,8 +9,9 @@ build/
 .env
 runs/
 
-# Demo generada en el CI
+# Demo y clasificación generadas en el CI
 site/demo/
+site/leaderboard/
 .coverage
 .coverage.*
 htmlcov/

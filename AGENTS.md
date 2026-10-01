@@ -13,6 +13,7 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 - Entorno: `python -m venv .venv` y `pip install -e ".[dev]"`
 - Lint: `ruff check . && ruff format --check .`
 - Tests: `pytest`
+- Clasificación: `modelduel leaderboard results --out site/leaderboard`
 - Demo: `modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo`
 
 ## Estructura
@@ -20,6 +21,8 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 - `src/modelduel/providers/` proveedores: `replay` (grabado), `gemini` (API de Google), `openai` (cualquier API compatible con OpenAI: OpenRouter, Ollama…), `omniroute` (preset de `openai` para el router local OmniRoute).
 - `src/modelduel/runner.py` extrae el código de la respuesta y ejecuta los tests en un directorio temporal con límite de tiempo.
 - `src/modelduel/report/` informe HTML: duelo de dos (`html.py`, `template.html`) y liga de 3 a 6 (`league.py`, `league.html`); el CSS común está en `style.css`.
+- `src/modelduel/leaderboard.py` clasificación pública: agrega `results/*.json` por modelo (por proporciones) y genera `site/leaderboard` (plantilla `report/leaderboard.html`); orden `modelduel leaderboard`.
+- `results/` resultados versionados (un `results.json` por duelo o liga; siembra: tres de `replay`).
 - `src/modelduel/resume.py` reanudación de duelos cortados (`--resume`).
 - `examples/tasks/` tareas de ejemplo originales (enunciado + tests) y `examples/replays/` respuestas grabadas.
 - `site/` web estática del proyecto.

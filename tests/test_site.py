@@ -50,8 +50,11 @@ def test_enlaces_internos_y_externos():
         if href.startswith("#"):
             assert href[1:] in c.ids, f"ancla rota: {href}"
         else:
-            assert href == "demo/" or href.startswith("https://github.com/BertMarti/modelduel")
+            assert href in ("demo/", "leaderboard/") or href.startswith(
+                "https://github.com/BertMarti/modelduel"
+            )
     assert "demo/" in hrefs
+    assert "leaderboard/" in hrefs
 
 
 def test_accesibilidad_basica():
