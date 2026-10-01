@@ -16,7 +16,7 @@
 <style>
 :root {
   --bg: #0f0f11; --panel: #151518; --text: #e8e8ea; --muted: #8d8d96; --line: #2a2a2f;
-  --a: #b5e853; --b: #ff7eb6; --c: #4fd1e5;
+  --a: #b5e853; --b: #ff7eb6; --c: #4fd1e5; --d: #ffb833; --e: #b79cff; --f: #ff8a65;
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -52,6 +52,47 @@ h1 .vs { color: var(--muted); font-weight: 400; font-size: .42em; letter-spacing
 .btn.primary:hover { background: var(--a); border-color: var(--a); }
 .btn:not(.primary):hover { border-color: var(--text); }
 .btn:focus-visible { outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.d { color: var(--d); } .e { color: var(--e); } .f { color: var(--f); }
+button.btn { background: none; color: var(--text); cursor: pointer; }
+button.btn.primary { background: var(--text); color: var(--bg); }
+button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+/* Duelo en directo */
+.demo-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 22px 0 0; }
+[hidden] { display: none !important; }
+.demo-clock { font: 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 6px; }
+.demo-error { margin: 14px 0 0; padding: 12px 16px; border: 1px solid var(--line); border-left: 3px solid var(--b); font: 13px/1.5 var(--mono); }
+.demo-foot { margin: 22px 0 0; font-size: 14px; color: var(--muted); }
+.demo-stage { margin-top: 26px; }
+.demo-task h3, .demo-result h3 { font: 600 12px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.demo-statement { max-height: 170px; overflow: auto; white-space: pre-wrap; font: 13px/1.55 var(--sans); color: var(--muted); margin: 0 0 22px; }
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap: 22px; margin-bottom: 26px; }
+.demo-panel { min-width: 0; color: var(--text); }
+.demo-who { display: flex; gap: 8px; align-items: baseline; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 2px solid currentColor; font: 600 13px/1.4 var(--mono); overflow-wrap: anywhere; }
+.demo-panel.a .demo-who { color: var(--a); } .demo-panel.b .demo-who { color: var(--b); } .demo-panel.c .demo-who { color: var(--c); }
+.demo-panel.d .demo-who { color: var(--d); } .demo-panel.e .demo-who { color: var(--e); } .demo-panel.f .demo-who { color: var(--f); }
+.demo-who .tag { display: inline-block; min-width: 22px; padding: 1px 5px; border: 1px solid currentColor; font: 600 12px/1.5 var(--mono); text-align: center; }
+.demo-code { height: 210px; margin: 0 0 8px; padding: 12px 14px; font: 12.5px/1.5 var(--mono); overflow: auto; color: var(--text); }
+.demo-code:focus-visible, .demo-statement:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.demo-tokens, .demo-count { margin: 0 0 8px; font: 12px/1.4 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.demo-tests { list-style: none; margin: 0 0 8px; padding: 0; max-height: 200px; overflow: auto; font: 12.5px/1.6 var(--mono); color: var(--muted); }
+.demo-tests li { margin: 0; }
+.demo-tests li.pass { color: var(--text); }
+.demo-tests li.fail { color: var(--text); font-weight: 700; text-decoration: underline; text-decoration-style: wavy; text-underline-offset: 3px; }
+.demo-bar { height: 6px; background: var(--line); }
+.demo-fill { height: 100%; width: 0; background: currentColor; transition: width .3s linear; }
+.demo-panel.a .demo-fill { background: var(--a); } .demo-panel.b .demo-fill { background: var(--b); } .demo-panel.c .demo-fill { background: var(--c); }
+.demo-panel.d .demo-fill { background: var(--d); } .demo-panel.e .demo-fill { background: var(--e); } .demo-panel.f .demo-fill { background: var(--f); }
+.demo-result { border-top: 1px solid var(--line); padding-top: 22px; }
+.demo-board { list-style: none; margin: 0 0 14px; padding: 0; font: 14px/1.5 var(--mono); }
+.demo-board li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.demo-board .tag { display: inline-block; min-width: 22px; padding: 1px 5px; margin-right: 10px; border: 1px solid currentColor; font: 600 12px/1.5 var(--mono); text-align: center; }
+.demo-board li.a .tag { color: var(--a); } .demo-board li.b .tag { color: var(--b); } .demo-board li.c .tag { color: var(--c); }
+.demo-board li.d .tag { color: var(--d); } .demo-board li.e .tag { color: var(--e); } .demo-board li.f .tag { color: var(--f); }
+.demo-verdict { font: 600 15px/1.5 var(--mono); margin: 0 0 16px; }
+.demo-caveat { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+.demo-more { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .demo-fill { transition: none; } }
 section { padding: 56px 0; border-top: 1px solid var(--line); }
 h2 { font: 600 13px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 22px; }
 h3 { font: 600 17px/1.4 var(--mono); margin: 0 0 8px; }
@@ -87,9 +128,9 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
   .lede { font-size: 18px; }
 }
 @media print {
-  :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; }
+  :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; --c: #0e7490; --d: #a15c00; --e: #6d3fd6; --f: #c2410c; }
   html, body { background: #fff; color: #111; }
-  nav .links, .cta, .skip { display: none; }
+  nav .links, .cta, .skip, .demo-controls { display: none; }
   }
 </style>
 </head>
@@ -99,8 +140,8 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
 <nav aria-label="Principal">
   <span class="brand">modelduel</span>
   <span class="links">
+    <a href="#demo">Duelo en directo</a>
     <a href="#instalar">Instalar</a>
-    <a href="demo/">Informe de demostración</a>
     <a href="leaderboard/">Clasificación</a>
     <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">Guía de uso</a>
     <a class="gh" href="https://github.com/BertMarti/modelduel">GitHub</a>
@@ -112,14 +153,29 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
   <h1><span class="a">modelo</span> <span class="vs">vs</span> <span class="b">modelo</span></h1>
   <p class="lede">Dos modelos, una tarea, los mismos tests. <strong>modelduel</strong> pide el código a dos modelos de IA (o a una liga de hasta seis), ejecuta tus tests sobre cada respuesta y te da un informe con quién acierta, cuánto tarda y cuánto cuesta. <em>Tu propia comparativa, sin fiarte de rankings ajenos.</em></p>
   <div class="cta">
-    <a class="btn primary" href="demo/">Ver el informe de demostración</a>
-    <a class="btn" href="leaderboard/">Clasificación pública</a>
-    <a class="alt" href="https://github.com/BertMarti/modelduel">Código en GitHub</a>
+    <a class="btn primary" href="#demo">Ver un duelo en directo</a>
+    <a class="btn" href="demo/">Informe de demostración</a>
+    <a class="alt" href="leaderboard/">Clasificación pública</a>
   </div>
-  <p class="hero-note">Informe generado con respuestas grabadas: sin claves, sin coste.</p>
+  <p class="hero-note">Un duelo pregrabado, en tu navegador: sin claves ni coste.</p>
 </header>
 
 <main id="contenido">
+<section id="demo" aria-labelledby="demo-titulo">
+  <h2 id="demo-titulo">Duelo en directo</h2>
+  <p>Mira cómo se resuelve una tarea: cada modelo escribe su código, los tests caen uno a uno y sale el marcador. Dura unos 25 segundos y puedes pausarlo o detenerlo cuando quieras. <strong>Es un resultado pregrabado</strong>: no se llama a ningún modelo ni se ejecuta código.</p>
+  <p class="demo-nojs">Esta reproducción necesita JavaScript. <a href="demo/">Ver el informe estático del mismo duelo</a>.</p>
+  <div class="demo-controls" hidden>
+    <button type="button" class="btn primary" id="demo-main">Ver un duelo en directo</button>
+    <button type="button" class="btn" id="demo-stop" hidden>Detener</button>
+    <span class="demo-clock" id="demo-clock" aria-hidden="true"></span>
+  </div>
+  <p id="demo-live" class="sr-only" role="status" aria-live="polite"></p>
+  <p id="demo-error" class="demo-error" role="alert" hidden></p>
+  <div id="demo-stage" class="demo-stage" hidden></div>
+  <p class="demo-foot">Resultado pregrabado con respuestas de ejemplo (<code>replay</code>). <a href="demo/">Ver el informe completo</a>.</p>
+</section>
+
 <section aria-labelledby="que">
   <h2 id="que">Qué hace</h2>
   <div class="steps">
@@ -230,5 +286,6 @@ def test_basico():
   <span><a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">Guía de uso</a> · <a href="https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md">Cambios</a> · <a href="https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md">Contribuir</a> · <a href="https://github.com/BertMarti/modelduel">github.com/BertMarti/modelduel</a></span>
 </footer>
 </div>
+<script src="demo.js" defer></script>
 </body>
 </html>

@@ -70,6 +70,26 @@ jobs:
           test -s "$(ls site/leaderboard/duelos/*/index.html | head -n 1)"
           if grep -rqi "<script" site/leaderboard; then echo "La clasificación y sus informes no deben tener JavaScript"; exit 1; fi
 
+  web:
+    name: Portada (duelo en directo, node --test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Pruebas de la lógica del duelo en directo
+        run: node --test "tests/js/*.test.cjs"
+
+      - name: Comprobar el script de la portada
+        run: |
+          test -s site/demo.js
+          test "$(grep -c '<script' site/index.html)" = "1"
+          grep -q '<script src="demo.js" defer></script>' site/index.html
+          if grep -E 'innerHTML|insertAdjacentHTML|eval\(' site/demo.js; then echo "demo.js no debe escribir HTML"; exit 1; fi
+
   package:
     name: Paquete (sdist, wheel y metadatos)
     runs-on: ubuntu-latest
