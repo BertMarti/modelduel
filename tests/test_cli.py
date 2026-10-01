@@ -202,3 +202,72 @@ def test_leaderboard_sin_permiso_de_escritura(tmp_path, capsys):
     bloqueo.write_text("x", encoding="utf-8")  # --out cuelga de un archivo: no se puede crear
     code = main(["leaderboard", str(ROOT / "results"), "--out", str(bloqueo / "lb")])
     assert code == EXIT_ERROR
+
+
+# ---------------------------------------------------------------- --format (v0.6.0)
+
+
+def _duel(examples_dir, out, *extra):
+    args = ["run", str(examples_dir / "tasks" / "slugify"), "--a", "replay:alfa"]
+    return main([*args, "--b", "replay:beta", "--out", str(out), *extra])
+
+
+def test_run_format_md_y_html_escribe_los_dos(examples_dir, tmp_path, capsys):
+    out = tmp_path / "ambos"
+    assert _duel(examples_dir, out, "--format", "html,md") == 0
+    assert (out / "index.html").is_file() and (out / "informe.md").is_file()
+    assert (out / "results.json").is_file()
+    assert "informe.md" in capsys.readouterr().out
+
+
+def test_run_por_defecto_solo_html(examples_dir, tmp_path):
+    out = tmp_path / "defecto"
+    assert _duel(examples_dir, out) == 0
+    assert (out / "index.html").is_file() and not (out / "informe.md").exists()
+
+
+def test_run_format_md_no_escribe_html_pero_si_results(examples_dir, tmp_path):
+    out = tmp_path / "solo-md"
+    assert _duel(examples_dir, out, "--format", "md") == 0
+    assert (out / "informe.md").is_file() and (out / "results.json").is_file()
+    assert not (out / "index.html").exists()
+
+
+def test_report_format_md(examples_dir, tmp_path, capsys):
+    base = tmp_path / "base"
+    assert _duel(examples_dir, base) == 0
+    out = tmp_path / "md"
+    assert main(["report", str(base / "results.json"), "--format", "md", "--out", str(out)]) == 0
+    assert (out / "informe.md").read_text(encoding="utf-8").startswith("# Informe modelduel")
+    assert not (out / "index.html").exists()
+    assert "informe.md" in capsys.readouterr().out
+
+
+def test_report_format_html_md(examples_dir, tmp_path):
+    base = tmp_path / "base"
+    assert _duel(examples_dir, base) == 0
+    out = tmp_path / "dos"
+    assert (
+        main(["report", str(base / "results.json"), "--format", "md,html", "--out", str(out)]) == 0
+    )
+    assert (out / "index.html").is_file() and (out / "informe.md").is_file()
+
+
+@pytest.mark.parametrize("bad", ["pdf", "html,pdf", "", "md,,html", " "])
+def test_format_desconocido_es_error_de_uso(examples_dir, tmp_path, capsys, bad):
+    out = tmp_path / "malo"
+    assert _duel(examples_dir, out, "--format", bad) == EXIT_USAGE
+    err = capsys.readouterr().err
+    assert "--format" in err and "html" in err and "md" in err
+    assert not out.exists()  # antes de gastar llamadas y de crear la carpeta
+    assert (
+        main(["report", str(tmp_path / "no-existe.json"), "--format", bad, "--out", str(out)])
+        == EXIT_USAGE
+    )
+    assert "--format" in capsys.readouterr().err
+
+
+def test_format_repetido_se_escribe_una_vez(examples_dir, tmp_path):
+    out = tmp_path / "rep"
+    assert _duel(examples_dir, out, "--format", "md,md") == 0
+    assert (out / "informe.md").is_file()

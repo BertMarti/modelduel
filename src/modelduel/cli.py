@@ -16,7 +16,7 @@ from modelduel.leaderboard import build_leaderboard
 from modelduel.pricing import PricingError, load_prices
 from modelduel.providers import ProviderError, get_provider
 from modelduel.providers.base import DEFAULT_RETRIES
-from modelduel.report import write_report
+from modelduel.report import write_markdown, write_report
 from modelduel.report.html import fmt_cost, fmt_int, fmt_seconds, plural
 from modelduel.results import (
     ALL_SIDES,
@@ -38,6 +38,9 @@ EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
 EXIT_INTERRUPTED = 130
+
+
+FORMATS = ("html", "md")
 
 
 class OutputError(Exception):
@@ -91,6 +94,9 @@ class SpanishArgumentParser(argparse.ArgumentParser):
         self.exit(EXIT_USAGE, f"{self.prog}: error: {translate_argparse(message)}\n")
 
 
+_FORMAT_HELP = "formatos del informe: html, md o html,md (html); results.json se guarda siempre"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = SpanishArgumentParser(
         prog="modelduel",
@@ -138,6 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="continúa el duelo de --out saltando los intentos ya terminados",
     )
+    run.add_argument("--format", default="html", metavar="F", help=_FORMAT_HELP)
     run.add_argument("--prices", type=Path, metavar="F.json", help="tabla de precios adicional")
     run.add_argument(
         "--replays", type=Path, metavar="DIR", help="carpeta de respuestas grabadas para replay"
@@ -162,8 +169,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="en vez de ejecutar el duelo, copia las tareas y respuestas de ejemplo a DIR",
     )
 
-    report = sub.add_parser("report", help="regenera el informe HTML desde results.json")
+    report = sub.add_parser(
+        "report", help="regenera el informe (HTML y/o Markdown) de results.json"
+    )
     report.add_argument("results", type=Path, help="ruta a results.json")
+    report.add_argument(
+        "--format",
+        default="html",
+        metavar="F",
+        help="formatos del informe: html, md o html,md (html)",
+    )
     report.add_argument("--out", type=Path, required=True, metavar="DIR", help="carpeta de salida")
 
     board = sub.add_parser(
@@ -204,6 +219,18 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_INTERRUPTED
 
 
+def parse_formats(text: str) -> tuple[str, ...]:
+    """``--format html,md`` -> ``("html", "md")`` sin repetidos, o error de uso."""
+    names = [part.strip() for part in text.split(",")]
+    for name in names:
+        if name not in FORMATS:
+            raise TaskError(
+                f"--format: «{name}» no es un formato válido "
+                f"(elige entre {' y '.join(FORMATS)}; sepáralos con comas)."
+            )
+    return tuple(dict.fromkeys(names))
+
+
 def collect_specs(args: argparse.Namespace) -> list[str]:
     """Contendientes en orden: ``--a``, ``--b`` y después cada ``--model``."""
     if args.b and not args.a:
@@ -237,6 +264,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         raise TaskError("--timeout debe ser un número de segundos mayor que 0.")
     if args.retries < 0:
         raise TaskError("--retries debe ser 0 o más.")
+    formats = parse_formats(args.format)
     specs = collect_specs(args)
     tasks = discover_tasks(args.tasks)
     prices = load_prices(args.prices)
@@ -322,12 +350,13 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
     except KeyboardInterrupt:
         return _interrupted(latest.get("results"), args.out)
-    html_path = _write_outputs(results, args.out, with_json=True)
+    report_paths = _write_outputs(results, args.out, formats, with_json=True)
     print()
     print(scoreboard(results))
     print()
     print(f"  Resultados  {results_path}")
-    print(f"  Informe     {html_path}")
+    for path in report_paths:
+        print(f"  Informe     {path}")
     return 0
 
 
@@ -400,6 +429,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
         resume=False,
         prices=None,
         replays=examples / "replays",
+        format="html",
         out=args.out,
     )
     code = cmd_run(run_args)
@@ -411,15 +441,17 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
 
 def cmd_report(args: argparse.Namespace) -> int:
+    formats = parse_formats(args.format)
     results = load_results(args.results)
     _prepare_out(args.out)
     try:
-        html_path = _write_outputs(results, args.out, with_json=False)
+        paths = _write_outputs(results, args.out, formats, with_json=False)
     except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise ResultsError(
             f"{args.results} no parece un results.json de modelduel ({type(exc).__name__}: {exc})."
         ) from exc
-    print(f"Informe regenerado: {html_path}")
+    for path in paths:
+        print(f"Informe regenerado: {path}")
     return 0
 
 
@@ -443,11 +475,14 @@ def _prepare_out(out: Path) -> None:
         raise OutputError(f"no se pudo escribir en {out}: {exc.strerror or exc}.") from exc
 
 
-def _write_outputs(results: dict, out: Path, with_json: bool) -> Path:
+def _write_outputs(
+    results: dict, out: Path, formats: tuple[str, ...], with_json: bool
+) -> list[Path]:
     try:
         if with_json:
             save_results(results, out / "results.json")
-        return write_report(results, out)
+        writers = {"html": write_report, "md": write_markdown}
+        return [writers[name](results, out) for name in formats]
     except OSError as exc:
         raise OutputError(f"no se pudo escribir en {out}: {exc.strerror or exc}.") from exc
 

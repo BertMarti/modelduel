@@ -55,6 +55,20 @@ jobs:
           modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/duelo-dos
           grep -q "Informe de duelo" runs/duelo-dos/index.html
 
+      - name: Informe Markdown (report y run con --format)
+        shell: bash
+        run: |
+          modelduel report site/demo/results.json --format md --out runs/md
+          modelduel run examples/tasks --model replay:alfa --model replay:beta --format html,md --out runs/duelo-md
+          for f in runs/md/informe.md runs/duelo-md/informe.md; do
+            test -s "$f"
+            grep -q "^# Informe " "$f"
+            grep -q "Una sola ejecución es una señal débil" "$f"
+            if grep -q "[^\]<" "$f"; then echo "$f no debe llevar HTML"; exit 1; fi
+          done
+          test -s runs/duelo-md/index.html
+          test ! -e runs/md/index.html
+
       - name: Comprobar el informe
         shell: bash
         run: |
