@@ -26,7 +26,7 @@ SITE_URL = "https://bertmarti.github.io/modelduel/"
 # correos), ``#`` (referencias a issues) y ``$`` (fórmulas).
 _SPECIAL = re.compile(r"[\\`*_~\[\]()<>|&!#@$]")
 # Caracteres de control y de dirección Unicode (los de "Trojan Source"); el espacio ya se aplanó.
-_INVISIBLE = re.compile(r"[\x00-\x1f\x7f-\x9f\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+_INVISIBLE = re.compile(r"[\x00-\x1f\x7f-\x9f\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c\u2060]")
 
 
 BACKSLASH = chr(92)
@@ -54,6 +54,9 @@ def md_text(value: object, limit: int = 200) -> str:
     # GitHub enlaza menciones, correos y referencias DESPUÉS de leer el Markdown, así que la
     # barra no basta: un espacio de ancho cero tras «@» y «#» les quita el sentido.
     text = text.replace("@", "@" + ZWSP).replace("#", "#" + ZWSP)
+    # Y GH-1 (referencia) y los SHA de commit (7 a 40 hexadecimales), que GitHub también enlaza.
+    text = re.sub(r"(?i)\b(GH-)(?=\d)", lambda m: m[1] + ZWSP, text)
+    text = re.sub(r"\b([0-9a-fA-F]{3})(?=[0-9a-fA-F]{4,37}\b)", lambda m: m[1] + ZWSP, text)
     # Al empezar una línea, «- », «+ », «= » o «1. » serían lista o subrayado de título.
     return re.sub(r"^(?:([-+=])|(\d+)\.(?=\s))", _escape_start, text)
 
@@ -78,15 +81,14 @@ def _verdict(results: dict, summary: dict, runs: int) -> str:
         return "empate en tareas resueltas y tests (sin coste comparable)" + summed
     other = rank_sides(summary)[1][1]
     win, lose = summary[winner], summary[other]
+    tasks_w, tasks_l = int(win["tasks_solved"]), int(lose["tasks_solved"])
+    tests_w, tests_l = int(win["tests_passed"]), int(lose["tests_passed"])
     who = f"gana {_label(results, winner)}"
     if criterion == "tasks":
-        return (
-            f"{who} por tareas resueltas "
-            f"({win['tasks_solved']} frente a {lose['tasks_solved']} de {other.upper()})"
-        )
+        return f"{who} por tareas resueltas ({tasks_w} frente a {tasks_l} de {other.upper()})"
     if criterion == "tests":
         return (
-            f"{who} por tests superados ({win['tests_passed']} frente a {lose['tests_passed']} de "
+            f"{who} por tests superados ({tests_w} frente a {tests_l} de "
             f"{other.upper()}, con las mismas tareas resueltas){summed}"
         )
     return (
@@ -115,7 +117,7 @@ def _scoreboard(results: dict, summary: dict) -> list[str]:
     return _table(header, rows, right={0, 2, 3, 4, 5, 6})
 
 
-def _taskmd_text(attempts: list[dict]) -> str:
+def _task_cell(attempts: list[dict]) -> str:
     passed = sum(int(a["passed"]) for a in attempts)
     total = sum(int(a["total"]) for a in attempts)
     statuses = {a["status"] for a in attempts} - {"ok"}
@@ -127,7 +129,7 @@ def _task_table(results: dict, sides: list[str]) -> list[str]:
     rows = []
     for task in results["tasks"]:
         title = md_text(task.get("title") or task.get("id"))
-        rows.append([title] + [_taskmd_text(task["results"][side]) for side in sides])
+        rows.append([title] + [_task_cell(task["results"][side]) for side in sides])
     return _table(["Tarea"] + [s.upper() for s in sides], rows)
 
 
