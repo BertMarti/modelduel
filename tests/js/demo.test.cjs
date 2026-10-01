@@ -110,20 +110,59 @@ test("el veredicto ordena por tests, luego latencia, y marca el glifo con texto"
   const d = { contenders, tasks: [task(attempt({ latency_s: 2.8 }), attempt({ passed: 6, latency_s: 7.6 }), attempt({ latency_s: 0.9 }))] };
   const v = core.verdict(core.prepare(d));
   assert.deepEqual(v.rows.map((r) => r.side), ["c", "a", "b"]);
-  assert.equal(v.rows[0].mark, "▲ gana");
+  assert.equal(v.rows[0].mark, "▲ primero");
   assert.equal(v.rows[1].mark, "✓ resuelve");
   assert.equal(v.rows[2].mark, "✗ falla 2 tests");
-  assert.match(v.text, /^Gana C \(replay:gamma\): 8\/8 tests en 0,9 s/);
+  assert.match(v.text, /^En esta tarea \(«Slugify», 1 de 1\), gana C \(replay:gamma\): 8\/8 tests en 0,9 s/);
 });
 
 test("si nadie resuelve la tarea, lo dice", () => {
   const bad = attempt({ passed: 3 });
   const v = core.verdict(core.prepare({ contenders, tasks: [task(bad, attempt({ passed: 1 }), bad)] }));
-  assert.match(v.text, /^Ninguno resuelve la tarea/);
+  assert.match(v.text, /^En esta tarea \(«Slugify», 1 de 1\) ninguno resuelve la tarea/);
   assert.equal(v.rows[0].mark, "✗ falla 5 tests");
 });
 
 test("el texto no fiable nunca se interpreta como HTML: no hay innerHTML en el script", () => {
   const src = require("node:fs").readFileSync(require.resolve("../../site/demo.js"), "utf8");
   assert.doesNotMatch(src, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(/);
+});
+
+test("el veredicto dice que es solo de una tarea y cuántas tiene el duelo", () => {
+  const d = { contenders, tasks: [task(attempt(), attempt(), attempt()), { id: "b" }, { id: "c" }] };
+  const v = core.verdict(core.prepare(d));
+  assert.match(v.text, /\(«Slugify», 1 de 3\)/);
+  assert.equal(core.CAVEAT, "El informe completo agrega todas las tareas y puede dar otro orden.");
+});
+
+test("un código largo se recorta avisando y sin partir pares sustitutos", () => {
+  const long = "a".repeat(core.MAX_CODE - 1) + "😀" + "b".repeat(50);
+  const p = core.prepare({ contenders, tasks: [task(attempt({ code: long }), attempt(), attempt())] });
+  const code = p.sides[0].code;
+  assert.ok(code.endsWith("\n… (recortado)"));
+  const kept = code.slice(0, -"\n… (recortado)".length);
+  assert.doesNotMatch(kept, /[\uD800-\uDBFF]$/);
+  assert.ok(kept.length <= core.MAX_CODE);
+  assert.equal(p.sides[1].code, "x = 1\n", "lo corto no se toca");
+});
+
+test("más de 200 tests: se muestran los datos reales y el tope solo acota la lista", () => {
+  const big = attempt({ total: 5000, passed: 4990, output: "" });
+  const p = core.prepare({ contenders, tasks: [task(big, attempt(), attempt())] });
+  const s = p.sides[0];
+  assert.equal(s.total, 5000);
+  assert.equal(s.passed, 4990);
+  assert.equal(s.marks.length, core.MAX_TESTS);
+  const v = core.verdict(p);
+  assert.equal(v.rows.find((r) => r.side === "a").mark, "✗ falla 10 tests");
+});
+
+test("spec, título y enunciado largos se acotan con aviso", () => {
+  const t = task(attempt(), attempt(), attempt());
+  t.title = "T".repeat(500);
+  t.statement = "e".repeat(5000);
+  const p = core.prepare({ contenders: { ...contenders, a: { spec: "s".repeat(500) } }, tasks: [t] });
+  assert.ok(p.title.length <= 121 && p.title.endsWith("…"));
+  assert.ok(p.sides[0].spec.length <= 81 && p.sides[0].spec.endsWith("…"));
+  assert.ok(p.statement.endsWith("… (recortado)"));
 });
