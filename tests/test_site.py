@@ -3,6 +3,7 @@
 import json
 import re
 import shutil
+import struct
 import subprocess
 from html.parser import HTMLParser
 
@@ -233,3 +234,21 @@ def test_contraste_aa_de_toda_la_paleta_de_la_portada():
         assert _contrast(printed[fg], "#ffffff") >= 4.5, fg
     # Los acentos d, e y f no se repiten como colores sueltos fuera de las variables.
     assert "#ffb833" not in css.split(":root {")[1].split("}")[1]
+
+
+def test_imagen_social_og_y_twitter_card():
+    _, c = _parse()
+    url = "https://bertmarti.github.io/modelduel/og.png"
+    assert _meta(c, "property", "og:image")[0] == url
+    assert _meta(c, "property", "og:image:width")[0] == "1200"
+    assert _meta(c, "property", "og:image:height")[0] == "630"
+    assert _meta(c, "property", "og:image:alt")[0]
+    assert _meta(c, "name", "twitter:card")[0] == "summary_large_image"
+
+
+def test_og_png_existe_con_1200_por_630_y_pesa_poco():
+    png = (ROOT / "site" / "og.png").read_bytes()
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    width, height = struct.unpack(">II", png[16:24])  # cabecera IHDR
+    assert (width, height) == (1200, 630)
+    assert len(png) < 200_000
