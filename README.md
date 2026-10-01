@@ -138,6 +138,7 @@ Las tres tareas de ejemplo son originales y de dificultad creciente: `slugify`, 
 | `replay:<nombre>` | Respuestas grabadas en `examples/replays/<nombre>/<tarea>.md`, con tokens y latencia en un front-matter. Sin red. | — |
 | `gemini:<modelo>` | API REST `generateContent` de Google Generative Language. | `GEMINI_API_KEY` (obligatoria), `GEMINI_BASE_URL` (opcional) |
 | `openai:<modelo>` | Cualquier API compatible con Chat Completions de OpenAI: OpenAI, OpenRouter, Ollama… | `OPENAI_API_KEY`, `OPENAI_BASE_URL` (por defecto `https://api.openai.com/v1`) |
+| `omniroute:<modelo>` | OmniRoute, router local compatible con OpenAI (`omniroute serve`). | `OMNIROUTE_BASE_URL` (por defecto `http://localhost:20128/v1`), `OMNIROUTE_API_KEY` (opcional) |
 
 - **OpenRouter:** `OPENAI_BASE_URL=https://openrouter.ai/api/v1` y tu clave de OpenRouter en `OPENAI_API_KEY`.
 - **Ollama:** `OPENAI_BASE_URL=http://localhost:11434/v1`. En servidores locales la clave no es obligatoria.
@@ -196,7 +197,7 @@ src/modelduel/
 ├── demo.py             # localiza los ejemplos incluidos (modelduel demo)
 ├── results.py          # results.json y resumen del marcador
 ├── pricing.py          # tarifas y fórmula de coste
-├── providers/          # replay, gemini, openai_compat
+├── providers/          # replay, gemini, openai_compat (openai y omniroute)
 └── report/             # informe HTML: duelo de dos y liga de 3 a 6 (string.Template + SVG)
 docs/USO.md             # guía de uso para personas usuarias
 CHANGELOG.md            # registro de cambios (Keep a Changelog)

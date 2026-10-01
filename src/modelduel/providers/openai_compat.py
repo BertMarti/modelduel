@@ -1,6 +1,7 @@
 """Proveedor ``openai:<modelo>``: cualquier API compatible con Chat Completions de OpenAI.
 
 Sirve para OpenAI, OpenRouter, Ollama y similares cambiando ``OPENAI_BASE_URL``.
+``omniroute:<modelo>`` es el mismo proveedor con otro prefijo, otras variables y otra URL.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from collections.abc import Callable
 
 from modelduel.providers.base import (
     DEFAULT_RETRIES,
+    ConnectionFailed,
     ProviderError,
     Response,
     RetryPolicy,
@@ -23,6 +25,14 @@ _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 
 
 class OpenAIProvider:
+    # Preset: OmniRouteProvider solo cambia estos valores.
+    PREFIX = "openai"
+    BASE_URL_ENV = "OPENAI_BASE_URL"
+    KEY_ENV = "OPENAI_API_KEY"
+    DEFAULT_BASE_URL = DEFAULT_BASE_URL
+    KEY_REQUIRED = True  # salvo que la URL sea local (Ollama)
+    DOWN_HINT = ""
+
     def __init__(
         self,
         model: str,
@@ -30,17 +40,17 @@ class OpenAIProvider:
         on_retry: Callable[[str], None] | None = None,
     ) -> None:
         if not model:
-            raise ProviderError("openai necesita un modelo: openai:<modelo>.")
+            raise ProviderError(f"{self.PREFIX} necesita un modelo: {self.PREFIX}:<modelo>.")
         self.model = model
         self._on_retry = on_retry
         self.retry = RetryPolicy(retries=retries, notify=self._notify)
-        self.spec = f"openai:{model}"
-        self.base_url = (os.environ.get("OPENAI_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
-        self.api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        self.spec = f"{self.PREFIX}:{model}"
+        self.base_url = (os.environ.get(self.BASE_URL_ENV) or self.DEFAULT_BASE_URL).rstrip("/")
+        self.api_key = os.environ.get(self.KEY_ENV, "").strip()
         host = urllib.parse.urlparse(self.base_url).hostname or ""
-        if not self.api_key and host not in _LOCAL_HOSTS:
+        if self.KEY_REQUIRED and not self.api_key and host not in _LOCAL_HOSTS:
             raise ProviderError(
-                "Falta la variable de entorno OPENAI_API_KEY "
+                f"Falta la variable de entorno {self.KEY_ENV} "
                 f"(necesaria para {self.base_url}; los servidores locales como Ollama no la piden)."
             )
 
@@ -53,14 +63,32 @@ class OpenAIProvider:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {"model": self.model, "messages": [{"role": "user", "content": prompt}]}
-        data, latency = post_json(
-            f"{self.base_url}/chat/completions",
-            payload,
-            headers,
-            secrets=(self.api_key,),
-            retry=self.retry,
-        )
+        try:
+            data, latency = post_json(
+                f"{self.base_url}/chat/completions",
+                payload,
+                headers,
+                secrets=(self.api_key,),
+                retry=self.retry,
+            )
+        except ConnectionFailed as exc:
+            if not self.DOWN_HINT:
+                raise
+            raise ConnectionFailed(f"{exc} {self.DOWN_HINT}") from None
         return parse_openai_response(data, latency)
+
+
+class OmniRouteProvider(OpenAIProvider):
+    """``omniroute:<modelo>``: OmniRoute, un router local compatible con OpenAI."""
+
+    PREFIX = "omniroute"
+    BASE_URL_ENV = "OMNIROUTE_BASE_URL"
+    KEY_ENV = "OMNIROUTE_API_KEY"
+    DEFAULT_BASE_URL = "http://localhost:20128/v1"
+    KEY_REQUIRED = False
+    DOWN_HINT = (
+        "¿Está en marcha? Arranca OmniRoute con `omniroute serve` (o fija OMNIROUTE_BASE_URL)."
+    )
 
 
 def parse_openai_response(data: object, latency: float) -> Response:

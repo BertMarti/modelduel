@@ -170,13 +170,14 @@ Las tareas de ejemplo son `slugify` (fácil), `merge_intervals` (media) y `parse
 
 ## Un duelo real con modelos de verdad
 
-Un contendiente se escribe como `proveedor:modelo`. Hay tres proveedores:
+Un contendiente se escribe como `proveedor:modelo`. Hay cuatro proveedores:
 
 | Proveedor | Para qué sirve | Variables de entorno |
 |---|---|---|
 | `replay:<nombre>` | Respuestas grabadas, sin red ni coste (la demo). | Ninguna |
 | `gemini:<modelo>` | La API de Google Gemini. | `GEMINI_API_KEY` (obligatoria), `GEMINI_BASE_URL` (opcional) |
 | `openai:<modelo>` | Cualquier API compatible con «Chat Completions» de OpenAI: OpenAI, OpenRouter, Ollama… | `OPENAI_API_KEY`, `OPENAI_BASE_URL` (por defecto `https://api.openai.com/v1`) |
+| `omniroute:<modelo>` | [OmniRoute](#omniroute), un router local con API compatible con OpenAI. | `OMNIROUTE_BASE_URL` (por defecto `http://localhost:20128/v1`), `OMNIROUTE_API_KEY` (opcional) |
 
 Antes de empezar, ten en cuenta:
 
@@ -185,6 +186,19 @@ Antes de empezar, ten en cuenta:
 - El nombre del `<modelo>` es el que use el proveedor (consulta su documentación). En esta guía se escribe `<modelo>` para que pongas el tuyo.
 - Las variables de entorno solo valen para la terminal donde las defines y desaparecen al cerrarla. Cambia `PEGA_AQUI_TU_CLAVE` por tu clave real.
 - Los dos contendientes `openai:` de una misma orden comparten `OPENAI_BASE_URL` y `OPENAI_API_KEY`. Si quieres comparar dos modelos de OpenRouter, usa `openai:` para los dos; si quieres comparar Gemini con uno de OpenRouter, usa `gemini:` y `openai:`.
+
+### OmniRoute
+
+OmniRoute es un router local que expone muchos modelos con una API compatible con OpenAI. `omniroute:` es el proveedor `openai:` con otras variables y otra dirección por defecto, así que puedes mezclarlo con `openai:` y `gemini:` en la misma orden sin que se pisen las claves.
+
+```bash
+omniroute serve                       # en otra terminal; escucha en http://localhost:20128/v1
+modelduel run examples/tasks --a omniroute:<modelo-1> --b omniroute:<modelo-2> --out runs/omniroute
+```
+
+- Otra dirección: `OMNIROUTE_BASE_URL`. Si tu OmniRoute pide clave: `OMNIROUTE_API_KEY` (opcional; no se exige).
+- Si el servidor no responde, modelduel dice «Arranca OmniRoute con `omniroute serve`» y no reintenta.
+- El nombre del `<modelo>` es el que exponga tu OmniRoute.
 
 ### Gemini
 
@@ -679,7 +693,7 @@ Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelo
 
 - Sin `--resume`, un `results.json` ilegible o de un formato más nuevo se sobrescribe sin aviso; solo se protege un duelo incompleto legible.
 - Un `Retry-After` de entre 30 y 120 s se respeta entero en cada reintento: con `--retries 3`, un proveedor saturado puede costar varios minutos por intento. Baja `--retries` si prefieres rendirte antes.
-- Los proveedores `gemini` y `openai` solo se han probado con respuestas simuladas, no contra las APIs reales.
+- Los proveedores `gemini`, `openai` y `omniroute` solo se han probado con respuestas simuladas, no contra las APIs reales.
 
 ---
 
@@ -695,7 +709,7 @@ Falta pytest en el entorno de Python que ejecuta modelduel. Instálalo en ese mi
 No has definido la clave en **esta** terminal. Las variables de entorno se pierden al cerrarla; vuelve a definirla como se explica en [Un duelo real](#un-duelo-real-con-modelos-de-verdad). Con `openai:` la clave solo es opcional si `OPENAI_BASE_URL` apunta a `localhost` (Ollama).
 
 **Sale «Proveedor … desconocido» o «Especificación … no válida».**
-Los contendientes se escriben `proveedor:modelo`, con uno de estos proveedores: `replay`, `gemini`, `openai`.
+Los contendientes se escriben `proveedor:modelo`, con uno de estos proveedores: `replay`, `gemini`, `openai`, `omniroute`.
 
 **Sale «No encuentro las respuestas grabadas de …» con `replay`.**
 La carpeta `replays/<nombre>` no está donde modelduel la busca (junto a la carpeta de tareas, o en `examples/replays`). Indícala con `--replays DIR`. Y cada tarea necesita su archivo `<id_de_la_tarea>.md` dentro.
