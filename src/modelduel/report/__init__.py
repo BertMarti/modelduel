@@ -28,9 +28,10 @@ def write_report(results: dict, out_dir: Path) -> Path:
 
 
 def write_markdown(results: dict, out_dir: Path) -> Path:
+    text = render_markdown(results)  # antes de abrir: si falla, el informe previo sigue intacto
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / "informe.md"
     with path.open("w", encoding="utf-8", newline="") as handle:  # LF también en Windows
-        handle.write(render_markdown(results))
+        handle.write(text)
     return path
