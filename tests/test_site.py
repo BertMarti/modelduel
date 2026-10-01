@@ -12,6 +12,7 @@ import pytest
 from tests.conftest import ROOT
 
 SITE = ROOT / "site" / "index.html"
+PYPI = "https://pypi.org/project/modelduel/"
 
 
 class _Collector(HTMLParser):
@@ -56,9 +57,10 @@ def test_enlaces_internos_y_externos():
         if href.startswith("#"):
             assert href[1:] in c.ids, f"ancla rota: {href}"
         else:
-            assert href in ("demo/", "leaderboard/") or href.startswith(
+            assert href in ("demo/", "leaderboard/", PYPI) or href.startswith(
                 "https://github.com/BertMarti/modelduel"
             )
+    assert PYPI in hrefs
     assert "demo/" in hrefs
     assert "leaderboard/" in hrefs
 

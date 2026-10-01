@@ -6,6 +6,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Añadido
+
+- Insignia de PyPI en el README y enlace a <https://pypi.org/project/modelduel/> en la web (apartado de instalación y pie); `tests/test_site.py` admite pypi.org de forma explícita ([#18](https://github.com/BertMarti/modelduel/issues/18)).
+
+### Cambiado
+
+- Retirados de README, `docs/USO.md` y la web los avisos «se publica al crear la release»: el paquete ya está en PyPI (desde v0.6.0) y la instalación recomendada es `pip install "modelduel[pytest]"` ([#19](https://github.com/BertMarti/modelduel/issues/19)).
+
 ## [0.6.0] - 2026-10-01
 
 ### Añadido
