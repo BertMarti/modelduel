@@ -6,6 +6,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.7.0] - 2026-10-01
+
 ### Añadido
 
 - **Señal de vida** en las llamadas largas: mientras un proveedor real (no `replay:`) tarda más de unos 10 s, la CLI escribe por `stderr` cada 10 s `  ··  esperando a gemini:modelo (tarea slugify)… 30 s`. Un hilo con `threading.Event` (`modelduel.heartbeat.Heartbeat`) que se para siempre, también ante un error o Ctrl+C ([#48](https://github.com/BertMarti/modelduel/issues/48)).
@@ -113,7 +115,8 @@ Primera versión (MVP).
 - Revisión QA: árbol de procesos muerto al terminar, salida acotada, UTF-8 y BOM, tareas sin tests o con errores de sintaxis, errores de red y respuestas vacías de los proveedores, accesibilidad AA y cobertura mínima del 90 % (PR [#2](https://github.com/BertMarti/modelduel/pull/2)).
 - Guía de uso (`docs/USO.md`) y `CONTRIBUTING.md` (PR [#3](https://github.com/BertMarti/modelduel/pull/3)).
 
-[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.6.0...HEAD
+[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/BertMarti/modelduel/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/BertMarti/modelduel/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/BertMarti/modelduel/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/BertMarti/modelduel/compare/v0.3.0...v0.4.0
