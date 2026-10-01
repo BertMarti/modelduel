@@ -5,6 +5,7 @@ import sys
 import pytest
 
 from modelduel.cli import EXIT_ERROR, EXIT_USAGE, main
+from tests.conftest import ROOT
 
 
 def test_run_de_extremo_a_extremo_con_replay(examples_dir, tmp_path, capsys):
@@ -178,3 +179,26 @@ def test_precios_y_results_con_bom(examples_dir, tmp_path):
     results = out / "results.json"
     results.write_text("﻿" + results.read_text(encoding="utf-8"), encoding="utf-8")
     assert main(["report", str(results), "--out", str(tmp_path / "r")]) == 0
+
+
+def test_leaderboard_genera_la_pagina(tmp_path, capsys):
+    out = tmp_path / "lb"
+    assert main(["leaderboard", str(ROOT / "results"), "--out", str(out)]) == 0
+    assert (out / "index.html").is_file()
+    assert any((out / "duelos").glob("*/index.html"))
+    assert "index.html" in capsys.readouterr().out
+
+
+def test_leaderboard_sin_resultados_es_error_de_uso(tmp_path, capsys):
+    (tmp_path / "vacia").mkdir()
+    assert (
+        main(["leaderboard", str(tmp_path / "vacia"), "--out", str(tmp_path / "o")]) == EXIT_USAGE
+    )
+    assert "No hay resultados" in capsys.readouterr().err
+
+
+def test_leaderboard_sin_permiso_de_escritura(tmp_path, capsys):
+    bloqueo = tmp_path / "archivo"
+    bloqueo.write_text("x", encoding="utf-8")  # --out cuelga de un archivo: no se puede crear
+    code = main(["leaderboard", str(ROOT / "results"), "--out", str(bloqueo / "lb")])
+    assert code == EXIT_ERROR
