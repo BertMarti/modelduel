@@ -307,3 +307,40 @@ def test_report_md_con_numero_desbordado_es_error_de_uso_no_traza(examples_dir, 
     )
     err = capsys.readouterr().err
     assert "no parece un results.json" in err and "Traceback" not in err
+
+
+def test_la_senal_de_vida_va_por_stderr_y_no_con_replay(
+    examples_dir, tmp_path, capsys, monkeypatch
+):
+    import modelduel.cli as cli
+    from modelduel.providers import Response
+
+    class Slow:
+        spec = "gemini:lento"
+
+        def complete(self, prompt, *, task_id=None):
+            return Response(text="sin código", input_tokens=1, output_tokens=1, latency_s=0.1)
+
+    class FakeHeartbeat:
+        def __init__(self, label, emit):
+            self.label, self.emit = label, emit
+
+        def __enter__(self):
+            self.emit(f"  ··  esperando a {self.label}… 10 s")
+
+        def __exit__(self, *exc):
+            return False
+
+    real = cli.get_provider
+    monkeypatch.setattr(
+        cli,
+        "get_provider",
+        lambda spec, *a, **k: Slow() if spec.startswith("gemini") else real(spec, *a, **k),
+    )
+    monkeypatch.setattr(cli, "Heartbeat", FakeHeartbeat)
+    argv = ["run", str(examples_dir / "tasks" / "slugify"), "--a", "gemini:lento"]
+    code = main([*argv, "--b", "replay:alfa", "--out", str(tmp_path / "o")])
+    captured = capsys.readouterr()
+    assert code == 0
+    assert captured.err.count("esperando a gemini:lento (tarea slugify)… 10 s") == 1
+    assert "esperando" not in captured.out and "replay" not in captured.err

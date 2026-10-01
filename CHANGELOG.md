@@ -8,10 +8,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Añadido
 
+- **Señal de vida** en las llamadas largas: mientras un proveedor real (no `replay:`) tarda más de unos 10 s, la CLI escribe por `stderr` cada 10 s `  ··  esperando a gemini:modelo (tarea slugify)… 30 s`. Un hilo con `threading.Event` (`modelduel.heartbeat.Heartbeat`) que se para siempre, también ante un error o Ctrl+C ([#48](https://github.com/BertMarti/modelduel/issues/48)).
 - Insignia de PyPI en el README y enlace a <https://pypi.org/project/modelduel/> en la web (apartado de instalación y pie); `tests/test_site.py` admite pypi.org de forma explícita ([#18](https://github.com/BertMarti/modelduel/issues/18)).
 
 ### Cambiado
 
+- El límite por defecto de las peticiones HTTP baja de 180 s a **90 s** (`MODELDUEL_HTTP_TIMEOUT` lo cambia). La guía de uso explica, junto a los reintentos, que si parece colgado es que espera respuesta y que Ctrl+C guarda lo hecho y `--resume` lo retoma ([#48](https://github.com/BertMarti/modelduel/issues/48)).
 - Retirados de README, `docs/USO.md` y la web los avisos «se publica al crear la release»: el paquete ya está en PyPI (desde v0.6.0) y la instalación recomendada es `pip install "modelduel[pytest]"` ([#19](https://github.com/BertMarti/modelduel/issues/19)).
 
 ## [0.6.0] - 2026-10-01
