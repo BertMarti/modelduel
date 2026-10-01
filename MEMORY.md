@@ -1,5 +1,5 @@
 # MEMORY.md · modelduel
-Última actualización: 2026-10-01 por builder (v0.4.0 · #23, #24 y #25; arreglos de la revisión en #27)
+Última actualización: 2026-10-01 por builder (v0.5.0 · #30-#33: estética profesional y duelo en directo)
 
 ## Estado actual
 v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** en curso, un PR por issue, todos contra `main` y encadenados (cada rama parte de la anterior; se fusionan en orden):
@@ -18,6 +18,11 @@ v0.1.0 fusionada en `main` (MVP, revisión QA y guía de uso). Hito **v0.2.0** e
   - #23 proveedor `omniroute:<modelo>` (rama `agent/builder/23-omniroute`, PR #26): HECHO, en PR.
   - #24 clasificación pública: agregado, página y `modelduel leaderboard` (rama `agent/builder/24-clasificacion-publica`, parte de la de #23, PR #27): HECHO, en PR. Se fusiona después de #26.
   - #25 publicar la clasificación en CI, web y documentación (rama `agent/builder/25-publicar-clasificacion`, parte de la de #24): HECHO, en PR. Se fusiona después de #27.
+- Hito **v0.5.0 «Duelo en directo»** (spec en `docs/specs/v0.5.md`; v0.4.0 ya está etiquetada; un PR por issue contra `main`, encadenados, se fusionan en este orden):
+  - #30 informes accesibles (rama `agent/builder/30-informes-accesibles`, PR #34): HECHO, en PR.
+  - #31 portada: jerarquía, navegación y tabla accesible (rama `agent/builder/31-portada-jerarquia`, PR #35): HECHO, en PR. Después de #34.
+  - #32 duelo en directo (rama `agent/builder/32-duelo-en-directo`, PR #36): HECHO, en PR. Después de #35.
+  - #33 documentación y versión 0.5.0 (rama `agent/builder/33-docs-version-0.5.0`): HECHO, en PR. Después de #36. No se crea release ni etiqueta (PyPI pendiente).
 
 Base heredada de v0.1.0:
 - CLI `modelduel` (`run`, `report`, `list-tasks`) en `src/modelduel/`, solo biblioteca estándar. Ayuda y errores en español; códigos de salida 0/1/2/130.
@@ -39,6 +44,7 @@ Base heredada de v0.1.0:
 - Documentación: `docs/USO.md`, `CONTRIBUTING.md`, `CHANGELOG.md` (en español, formato Keep a Changelog).
 - Omniroute (#23): `OmniRouteProvider` es una subclase de `OpenAIProvider` que solo cambia 6 atributos de clase (`PREFIX`, `BASE_URL_ENV`, `KEY_ENV`, `DEFAULT_BASE_URL`, `KEY_REQUIRED`, `DOWN_HINT`). `OMNIROUTE_BASE_URL` (por defecto `http://localhost:20128/v1`), `OMNIROUTE_API_KEY` opcional. `post_json` lanza `ConnectionFailed` (subclase de `ProviderError`) cuando nadie escucha (rechazada, DNS, red inalcanzable; los cortes de una conexión abierta y los tiempos agotados no) y el proveedor añade «Arranca OmniRoute con `omniroute serve`».
 - Clasificación (#24): `src/modelduel/leaderboard.py` + `report/leaderboard.html`. Cada `results/*.json` es un duelo (id = nombre del archivo); `aggregate` suma por `proveedor:modelo` y `rank_models` ordena **por proporciones** (tareas, tests, coste por intento: con `--runs N` el coste ya suma N intentos por tarea) con `rank_sides`; el coste solo se suma con precio en todos los duelos y una moneda. `build_leaderboard` escribe `index.html` y `duelos/<id>/index.html` regenerado desde el JSON. Duelo `in_progress`, carpeta vacía o datos con formato inesperado = `ResultsError` (exit 2). Los informes `duelos/<id>/` se regeneran desde JSON de terceros: todo texto del JSON va escapado (también la moneda del veredicto) y `failed`/`errors` pasan por `int()`; hay un test de regresión con JSON malicioso que revisa todos los archivos generados. Las tablas hacen scroll horizontal dentro de una región con foco en móvil. `site/leaderboard/` se genera en el CI y el deploy (en `.gitignore`).
+- Duelo en directo (#32): `site/demo.js` (único `<script>` de la web, `defer`) trae `demo/results.json` con `fetch` solo al pulsar y reproduce la **primera tarea** del duelo en ~25 s. El reloj `t` es la única fuente de verdad y `render()` depende solo de `t`: pausar es parar el reloj y «Siguiente» (reduced-motion) salta a `t` = fin de fase. La lógica pura se exporta (`module.exports`) y se prueba con `node --test "tests/js/*.test.cjs"` (job `web` del CI y un test de Python que pasa el `results.json` real por `prepare`/`verdict` si hay Node).
 
 ## Decisiones (por qué)
 - 2026-09-29: Proveedor `replay` con respuestas grabadas para que la demo y los tests funcionen sin claves ni coste.
@@ -97,11 +103,20 @@ Base heredada de v0.1.0:
    - Para publicar en PyPI: registrar el *trusted publisher* (PyPI > Your projects > Publishing > "Add a new pending publisher": proyecto `modelduel`, propietario `BertMarti`, repositorio `modelduel`, workflow `release.yml`, environment `pypi`), crear el environment `pypi` en GitHub (Settings > Environments) y crear la Release `v0.2.0`.
 2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
 3. Tras fusionar y publicar: quitar de README, `docs/USO.md` y la web el aviso «se publica al crear la release», comprobar `pip install "modelduel[pytest]"` y `modelduel demo` desde un entorno limpio, y actualizar enlaces (README/web) con el badge de PyPI si se desea.
+4. Alberto: fusionar los PR de v0.5.0 en orden (#34, #35, #36 y #37) con «Create a merge commit»; después etiquetar `v0.5.0` si quiere (no se ha creado release ni etiqueta) y revisar el duelo en directo desplegado en <https://bertmarti.github.io/modelduel/#demo>.
 
 - 2026-09-30 (builder): #15 `results.rank_sides` y el veredicto comparten una única clave de ordenación (`_rank_key`: tareas resueltas, tests, coste); `decide(summary)` devuelve `(ganador, criterio)` mirando en qué posición de la clave difieren los dos primeros, y `costs_comparable` decide si el coste cuenta. El informe (`_verdict`) dice el criterio: «gana A por tareas resueltas (2 frente a 1)», «por tests superados (…, con las mismas tareas resueltas)», «por coste (…)» o «empate en tareas resueltas, tests y coste» (los costes se comparan redondeados a 6 decimales; con `--runs` > 1 ambos empates añaden «suma de N ejecuciones»; sin coste comparable: «empate en tareas resueltas y tests (sin coste comparable)»). Bajo los números grandes del marcador hay una etiqueta «tests superados» para que no se confundan con el criterio decisivo (una tarea resuelta pesa más que los tests sueltos).
 - 2026-09-30 (builder): #17 el aviso de reintento usa `report.html.fmt_seconds` (el mismo que la CLI y el informe): `1,2 s`, y `1 min 15,0 s` a partir de 60 s. `providers/base.py` importa ahora de `report.html` (no hay ciclo: el informe no importa proveedores). El mensaje «el servidor pide esperar N s» sigue con `:g` (es un error, no el aviso).
 - 2026-10-01 (builder): v0.4.0 compara por proporciones y no por totales para que un modelo con más duelos no gane por volumen; el coste nunca se convierte entre monedas. Los tres resultados sembrados de `results/` son `replay` con precios ficticios y se versionan (no se regeneran en el CI, así sus fechas no cambian).
 - 2026-09-30 (builder): `graphify-out/` (grafo local) está en `.gitignore`.
+
+- 2026-10-01 (builder): v0.5.0 duelo en directo: la línea de progreso de pytest (`....FF..`) da el estado de cada test solo si cuadra con `total` y `passed`; si no, se usa `passed`/`total` (✓ primero, ✗ después). Todo texto grabado va con `textContent`; los datos se acotan (6 contendientes `a`-`f`, 200 tests, 4000 caracteres de código, 1500 de enunciado) y la letra del contendiente se valida porque acaba en una clase CSS.
+- 2026-10-01 (builder): el botón principal del duelo cambia de texto (Ver/Pausar/Reanudar/Siguiente/Ver otra vez) en vez de reemplazarse, para no perder el foco; durante la carga usa `aria-busy` (no `disabled`, que pierde el foco).
+- 2026-10-01 (builder): sin dependencias nuevas (Node solo para las pruebas JS del CI, no es dependencia del paquete). El CSS de la portada define sus propias clases `.demo-*`; no reutiliza `.metric`/`.board`, que son de los informes.
+
+### Auditoría UX de OpenCode (`auditoria-ux-modelduel.md`): verificada contra el código
+Aplicados (todos comprobados y ciertos): barras del hero (`site/index.html` 115-119: 97/94/94 fijos, sin letra, `aria-hidden`) → **retiradas**, los datos reales viven en el duelo en directo; CTA sin jerarquía y 8 enlaces en el nav → una primaria, navegación de 5; subrayado `--line` en `style.css:24`, sin `a:focus-visible` → `--muted` y foco; informes sin enlace a la web → «modelduel · web» en el pie; tabla de proveedores sin `tabindex`/`role`/`aria-label` → añadidos más foco; «perdedor» solo con `opacity:.8` y `.mark`/`th`/`.hint` de 9-11 px → «▼ peor»/«▲ mejor» con glifo y texto, mínimo 12 px.
+Descartados o matizados: (1) «reutilizar `.duel-bars`, `.metric`, `.board` en `site/index.html`»: **falso**, la portada tiene su CSS en línea y esas clases son de los informes (se crearon `.demo-*`); (2) los informes de la clasificación (`leaderboard.html`) **ya tenían** enlace a la web en su cabecera (`topnav`) y foco, el hueco era solo de `template.html`/`league.html`; (3) «escala real del marcador» para las barras del hero: se descartó, retirarlas era más honesto que mantener datos duplicados; (4) incrustar JSON en un `<script type="application/json">`: descartado a favor de `fetch` diferido (mantiene la portada ligera; con `file://` el `fetch` no funciona, hace falta servirla por HTTP o Pages).
 
 ## Problemas conocidos
 - Sin `--resume`, un `results.json` ilegible o de un formato más nuevo se sobrescribe sin aviso (comportamiento de v0.1.0); solo se protege un duelo `in_progress` legible.
@@ -112,6 +127,7 @@ Base heredada de v0.1.0:
 - El disco que pueda llenar una solución que imprime sin parar está acotado solo por el límite de tiempo (va al temporal de la ejecución, que se borra).
 - `<details>` cerrados no se despliegan al imprimir en navegadores sin `::details-content` (p. ej. Firefox antiguo); sin JavaScript no hay alternativa fiable.
 - Los proveedores `gemini`, `openai` y `omniroute` solo se prueban con respuestas simuladas (sin red); no se han probado contra las APIs reales ni contra un OmniRoute en marcha (pendiente de Alberto).
+- El duelo en directo necesita servirse por HTTP (en `file://` el `fetch` de `demo/results.json` falla y la página muestra un aviso con el enlace al informe estático). No hay prueba automática en navegador real: se verificó a mano (pausa, reanudar, detener, `visibilitychange` y modo manual) y con capturas de Chrome; las pruebas automáticas cubren la lógica pura y el HTML.
 - La clasificación no distingue qué tareas se usaron en cada duelo: mezclar duelos con tareas distintas hace que las proporciones no sean del todo comparables.
 
 ## Registro de sesiones
@@ -128,3 +144,4 @@ Base heredada de v0.1.0:
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/15-veredicto-unificado): #15 veredicto del duelo de dos con la misma ordenación que la clasificación y texto que indica el criterio decisivo; tests con los casos que antes discrepaban; CHANGELOG, USO y README al día.
 - 2026-09-30 builder · Claude Code Sonnet (agent/builder/17-aviso-reintento-es): #17 aviso de reintento en formato es-ES con el formateador común; test del mensaje.
 - 2026-10-01 builder · Claude Code Sonnet (agent/builder/23-omniroute, 24-clasificacion-publica, 25-publicar-clasificacion): v0.4.0 «Pro»: spec `docs/specs/v0.4.md`, issues #23-#25, proveedor `omniroute:`, clasificación pública (`leaderboard`, `results/` sembrado con tres replay, página sin JS revisada con Chrome en escritorio y 390 px), CI/deploy/web/documentación.
+- 2026-10-01 builder · Claude Code Sonnet (agent/builder/30-33): v0.5.0: spec `docs/specs/v0.5.md`, issues #30-#33 (hito v0.5.0), informes accesibles, portada con jerarquía, duelo en directo (`site/demo.js`, `node --test`, job `web`) y documentación; auditoría de OpenCode verificada punto por punto (ver «Decisiones»).

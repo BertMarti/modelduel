@@ -6,7 +6,7 @@
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-b5e853.svg)](https://github.com/BertMarti/modelduel/blob/main/LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-ff7eb6.svg)
 
-**Web:** <https://bertmarti.github.io/modelduel/> · **Informe de demostración:** <https://bertmarti.github.io/modelduel/demo/> · **Clasificación pública:** <https://bertmarti.github.io/modelduel/leaderboard/>
+**Web:** <https://bertmarti.github.io/modelduel/> · **[Ver un duelo en directo](https://bertmarti.github.io/modelduel/#demo)** (reproducción pregrabada, sin claves) · **Informe de demostración:** <https://bertmarti.github.io/modelduel/demo/> · **Clasificación pública:** <https://bertmarti.github.io/modelduel/leaderboard/>
 
 **Documentación:** [Guía de uso](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md) (instalación, duelos reales, crear tus tareas, liga, reintentos, reanudación y leer el informe) · [Registro de cambios](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md) · [Cómo contribuir](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md)
 
@@ -26,7 +26,12 @@
 
 Los rankings de modelos miden tareas que no son las tuyas. La forma honesta de elegir es hacer tu propia comparativa: el mismo enunciado, los mismos tests y los números a la vista. modelduel convierte ese ejercicio en una orden.
 
-## Novedades de v0.2.0
+## Novedades de v0.5.0
+
+- **Duelo en directo** en la web: un duelo pregrabado que se reproduce en el navegador (código escribiéndose, tests cayendo, marcador), con pausa y sin servidor ni claves.
+- Informes y portada más legibles: enlaces con foco visible, «▲ mejor» / «▼ peor» con glifo y texto, y una navegación más corta.
+
+### Antes (v0.2.0)
 
 - **Liga de 2 a 6 contendientes** con `--model` repetible: clasificación, comparativa, matriz por tarea y paleta de seis colores con contraste AA (siempre con su letra `A`-`F`).
 - **Reintentos** ante HTTP 429/5xx y cortes de conexión, con espera exponencial y `Retry-After` (`--retries`).
