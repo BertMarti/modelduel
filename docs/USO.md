@@ -16,12 +16,13 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
 5. [Crear tu propia tarea paso a paso](#crear-tu-propia-tarea-paso-a-paso)
 6. [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos)
 7. [Leer el informe](#leer-el-informe)
-8. [Clasificación pública](#clasificación-pública)
-9. [Opciones: `--runs`, `--timeout`, `--retries`, `--resume` y `--prices`](#opciones---runs---timeout---retries---resume-y---prices)
-10. [Códigos de salida](#códigos-de-salida)
-11. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
-12. [Límites conocidos](#límites-conocidos)
-13. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
+8. [Compartir el informe en Markdown](#compartir-el-informe-en-markdown)
+9. [Clasificación pública](#clasificación-pública)
+10. [Opciones: `--runs`, `--timeout`, `--retries`, `--resume`, `--format` y `--prices`](#opciones---runs---timeout---retries---resume---format-y---prices)
+11. [Códigos de salida](#códigos-de-salida)
+12. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
+13. [Límites conocidos](#límites-conocidos)
+14. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
 
 ---
 
@@ -166,6 +167,9 @@ modelduel list-tasks examples/tasks
 
 # Regenera el informe HTML a partir de un results.json (por ejemplo, tras actualizar modelduel)
 modelduel report runs/demo/results.json --out runs/demo
+
+# Lo mismo en Markdown, para pegarlo en un PR o un issue (escribe informe.md)
+modelduel report runs/demo/results.json --format md --out runs/demo
 ```
 
 Las tareas de ejemplo son `slugify` (fácil), `merge_intervals` (media) y `parse_duration` (difícil).
@@ -559,6 +563,26 @@ Un «error del proveedor» no detiene el duelo: se anota y se sigue con el resto
 
 ---
 
+## Compartir el informe en Markdown
+
+El HTML es para mirarlo tú; para **pegar un resultado en un PR o un issue de GitHub** hay un informe en Markdown:
+
+```bash
+# A partir de un results.json que ya tienes
+modelduel report runs/demo/results.json --format md --out runs/demo
+
+# O al terminar el duelo: HTML y Markdown a la vez
+modelduel run examples/tasks --model replay:alfa --model replay:beta --format html,md --out runs/demo
+```
+
+`--format` admite `html` (por defecto), `md` o `html,md`. Con `md` solo se escribe `informe.md` (en `run`, `results.json` se guarda siempre). Un formato desconocido es un error de uso (código 2) y se comprueba antes de llamar a las APIs.
+
+`informe.md` lleva, en este orden: el título (o «Informe de liga» con tres o más contendientes), el aviso de duelo incompleto si lo es, el **marcador** (una fila por contendiente, de mejor a peor: tareas, tests, tiempo, tokens y coste), el **veredicto** con el criterio que decide (tareas resueltas, tests superados o coste, el mismo orden que la clasificación), una **tabla por tarea** con los tests de cada contendiente y su estado si no fue `ok`, y los **avisos**: «una sola ejecución es una señal débil» y la nota de precios ficticios o de monedas no comparables. No copia el código ni la salida de los modelos: para eso está el HTML.
+
+**Seguridad.** Todo texto que sale de `results.json` (nombres de modelo, títulos de tarea, estados, monedas, fechas) es dato no fiable, así que el Markdown lo aplana a una línea y escapa lo que sería sintaxis: barras verticales de tabla, backticks, `<` y `>`, corchetes y paréntesis, imágenes, entidades, direcciones `http://` y `www.`, y el inicio de lista o título. GitHub, además, enlaza `@usuario`, `#12` y los correos **después** de leer el Markdown, así que se inserta un espacio de ancho cero tras `@` y `#` (invisible al leer; si copias el texto, ahí está). Por eso un `results.json` ajeno no puede colar enlaces, HTML, menciones ni filas en tu comentario.
+
+---
+
 ## Clasificación pública
 
 El repositorio publica en <https://bertmarti.github.io/modelduel/leaderboard/> una clasificación de modelos construida con los `results.json` de la carpeta [`results/`](https://github.com/BertMarti/modelduel/tree/main/results). El CI la regenera en cada cambio. Hoy contiene tres resultados de demostración con respuestas grabadas (`replay`) y precios ficticios.
@@ -585,7 +609,7 @@ Crea `runs/clasificacion/index.html` (la clasificación y el histórico) y un in
 
 ---
 
-## Opciones: `--runs`, `--timeout`, `--retries`, `--resume` y `--prices`
+## Opciones: `--runs`, `--timeout`, `--retries`, `--resume`, `--format` y `--prices`
 
 La orden `run` necesita `--out` y entre dos y seis contendientes (`--a` y `--b`, o `--model` varias veces); acepta además estas opciones:
 
@@ -596,6 +620,7 @@ La orden `run` necesita `--out` y entre dos y seis contendientes (`--a` y `--b`,
 | `--timeout S` | Límite en segundos para los tests de cada respuesta (20 por defecto). |
 | `--resume` | Continúa el duelo de `--out` saltando los intentos ya terminados. |
 | `--retries N` | Reintentos ante HTTP 429/5xx y cortes de conexión (3 por defecto; `0` los desactiva). |
+| `--format F` | Formatos del informe: `html` (por defecto), `md` o `html,md` (ver [Compartir el informe en Markdown](#compartir-el-informe-en-markdown)). |
 | `--prices f.json` | Tabla de precios adicional. |
 | `--replays DIR` | Carpeta de respuestas grabadas para `replay`. |
 
@@ -692,7 +717,7 @@ Los precios de `replay:alfa` y `replay:beta` son ficticios y vienen integrados s
 |---|---|
 | `0` | El duelo se completó, **aunque los modelos fallen tests**. |
 | `1` | No se pudo escribir en la carpeta de salida. |
-| `2` | Error de uso o de configuración: argumentos, tareas, proveedores, claves que faltan, precios o un `results.json` ilegible. |
+| `2` | Error de uso o de configuración: argumentos (también un `--format` desconocido), tareas, proveedores, claves que faltan, precios o un `results.json` ilegible. |
 | `130` | Interrumpido con Ctrl+C. |
 
 La carpeta de salida se comprueba **antes** de llamar a las APIs, para no perder un duelo de pago por un error tonto.
