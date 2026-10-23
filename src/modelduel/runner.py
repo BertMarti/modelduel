@@ -1,20 +1,28 @@
 """Construye el prompt y ejecuta los tests de una tarea sobre el código de un modelo.
 
 El código generado se ejecuta SIEMPRE en un directorio temporal, en un subproceso con límite
-de tiempo y sin las variables de entorno que parecen secretos. Al terminar (o al agotar el
+de tiempo, sin las variables de entorno que parecen secretos y con ``HOME`` apuntando al
+temporal. En POSIX el subproceso arranca además con límites del sistema (``setrlimit``): memoria,
+CPU, tamaño de archivo, descriptores y sin volcados de memoria. Al terminar (o al agotar el
 tiempo) se mata el árbol de procesos completo: un *Job Object* en Windows y un grupo de procesos
 en POSIX. La salida va a un archivo y solo se leen su principio y su final, así que una solución
 que imprime sin parar no puede agotar la memoria.
+
+No es un aislamiento real: la solución tiene red y puede leer y escribir rutas absolutas del
+disco. Para código no confiable, usa un contenedor o una máquina virtual.
 """
 
 from __future__ import annotations
 
 import contextlib
 import importlib.util
+import json
+import math
 import os
 import re
 import shutil
 import signal
+import site
 import subprocess
 import sys
 import tempfile
@@ -38,7 +46,70 @@ Instrucciones de formato:
 - No incluyas tests ni código que se ejecute al importar el módulo.
 - Respeta exactamente el nombre y la firma de la función pedida."""
 
-_SECRET_HINTS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
+# Una variable cuyo nombre contenga alguna de estas piezas no llega a la solución.
+_SECRET_HINTS = (
+    "KEY",
+    "TOKEN",
+    "SECRET",
+    "PASS",  # PASSWORD, PASSWD, PASSPHRASE
+    "CREDENTIAL",
+    "AUTH",  # SSH_AUTH_SOCK (agente SSH), *_AUTH
+    "PRIVATE",
+    "COOKIE",
+    "SESSION",  # AWS_SESSION_TOKEN, DBUS_SESSION_BUS_ADDRESS
+    "SIGNATURE",
+    "DSN",  # SENTRY_DSN y cadenas de conexión con usuario y contraseña
+)
+# Variables sin «pista» en el nombre que dan acceso a algo: conexión a bases de datos,
+# al demonio de Docker, a Kubernetes o al agente GPG.
+_SENSITIVE_VARS = frozenset(
+    {"DATABASE_URL", "REDIS_URL", "MONGODB_URI", "DOCKER_HOST", "KUBECONFIG", "GPG_AGENT_INFO"}
+)
+# Variables de directorios personales que se redirigen al temporal de la ejecución.
+_HOME_VARS = (
+    "HOME",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "XDG_CONFIG_HOME",
+    "XDG_CACHE_HOME",
+    "XDG_DATA_HOME",
+    "XDG_STATE_HOME",
+    "XDG_RUNTIME_DIR",
+)
+
+# Límites POSIX (``setrlimit``) del subproceso. Windows no tiene ``resource``: allí solo se
+# aplican el límite de tiempo y el Job Object que mata el árbol.
+MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024  # 1 GiB de espacio de direcciones
+FILE_SIZE_LIMIT_BYTES = 64 * 1024 * 1024  # ningún archivo (ni la salida) pasa de 64 MiB
+OPEN_FILES_LIMIT = 256
+# Margen de CPU sobre el límite de tiempo: el reloj de pared sigue siendo el que manda.
+CPU_MARGIN_S = 5
+
+# Arranque del subproceso: aplica los límites y ejecuta pytest en el mismo proceso. Así no hace
+# falta ``preexec_fn`` (inseguro con hilos, y modelduel tiene el de la señal de vida).
+_BOOTSTRAP = """\
+import json, sys
+try:
+    import resource
+except ImportError:
+    resource = None
+if resource is not None:
+    for _name, _value in json.loads(sys.argv[1]).items():
+        _res = getattr(resource, _name, None)
+        if _res is None:
+            continue
+        try:
+            _soft, _hard = resource.getrlimit(_res)
+            if _hard != resource.RLIM_INFINITY:
+                _value = min(_value, _hard)
+            resource.setrlimit(_res, (_value, _value))
+        except (ValueError, OSError):
+            pass  # p. ej. RLIMIT_AS en macOS: se sigue con el resto de límites
+del sys.argv[1]
+import pytest
+raise SystemExit(pytest.main(sys.argv[1:]))
+"""
 
 
 class RunnerError(Exception):
@@ -81,19 +152,41 @@ def ensure_pytest_available() -> None:
         )
 
 
-def safe_env() -> dict[str, str]:
-    """Entorno para el subproceso sin claves ni configuración de pytest ajena."""
-    env = {
-        name: value
-        for name, value in os.environ.items()
-        if not any(hint in name.upper() for hint in _SECRET_HINTS)
-    }
+def is_sensitive_var(name: str) -> bool:
+    """``True`` si la variable parece un secreto o da acceso a otro servicio."""
+    upper = name.upper()
+    return upper in _SENSITIVE_VARS or any(hint in upper for hint in _SECRET_HINTS)
+
+
+def safe_env(home: Path | None = None) -> dict[str, str]:
+    """Entorno para el subproceso sin claves ni configuración de pytest ajena.
+
+    Con ``home``, los directorios personales (``HOME``, ``USERPROFILE``, ``XDG_*``…) apuntan
+    ahí: ``~/.netrc``, ``~/.aws`` o ``~/.ssh`` no se encuentran por accidente. ``PYTHONUSERBASE``
+    conserva el valor real para que un pytest instalado con ``pip install --user`` siga cargando.
+    """
+    env = {name: value for name, value in os.environ.items() if not is_sensitive_var(name)}
     for name in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTHONPATH", "PYTHONSTARTUP"):
         env.pop(name, None)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+    if home is not None:
+        env.setdefault("PYTHONUSERBASE", site.getuserbase())
+        for name in _HOME_VARS:
+            env[name] = str(home)
     return env
+
+
+def resource_limits(timeout: float) -> dict[str, int]:
+    """Límites ``setrlimit`` (por nombre de ``resource``) para una ejecución de ``timeout`` s."""
+    return {
+        "RLIMIT_AS": MEMORY_LIMIT_BYTES,
+        "RLIMIT_CPU": math.ceil(timeout) + CPU_MARGIN_S,
+        "RLIMIT_FSIZE": FILE_SIZE_LIMIT_BYTES,
+        "RLIMIT_NOFILE": OPEN_FILES_LIMIT,
+        "RLIMIT_CORE": 0,
+    }
 
 
 def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) -> TestRun:
@@ -123,8 +216,9 @@ def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) ->
         output_path = root / "output.log"
         cmd = [
             sys.executable,
-            "-m",
-            "pytest",
+            "-c",
+            _BOOTSTRAP,
+            json.dumps(resource_limits(timeout)),
             "-q",
             "--tb=short",
             "-p",
@@ -132,7 +226,7 @@ def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) ->
             f"--junitxml={junit}",
             TEST_FILE,
         ]
-        env = safe_env()
+        env = safe_env(home=tmpdir)
         # Los temporales de la solución y de pytest se quedan dentro de la ejecución y se borran.
         for name in ("TMP", "TEMP", "TMPDIR"):
             env[name] = str(tmpdir)
@@ -164,7 +258,7 @@ def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) ->
             total=expected,
             duration_s=duration,
             output=output,
-            message=f"pytest terminó con código {returncode} sin generar resultados.",
+            message=_no_results_message(returncode),
         )
     if counts["collection_error"] or (returncode in (2, 3, 4) and counts["total"] == 0):
         return TestRun(
@@ -186,6 +280,28 @@ def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) ->
         duration_s=duration,
         output=output,
     )
+
+
+_LIMIT_SIGNALS = {
+    "SIGXCPU": "superó el límite de CPU",
+    "SIGXFSZ": f"escribió un archivo de más de {FILE_SIZE_LIMIT_BYTES // (1024 * 1024)} MiB",
+    "SIGKILL": "fue terminado a la fuerza (SIGKILL)",
+    "SIGSEGV": "falló con una violación de segmento (¿sin memoria?)",
+}
+
+
+def _no_results_message(returncode: int) -> str:
+    """Explica un final sin XML; si fue una señal de un límite, lo dice."""
+    if returncode < 0:
+        try:
+            name = signal.Signals(-returncode).name
+        except ValueError:
+            name = f"señal {-returncode}"
+        reason = _LIMIT_SIGNALS.get(name)
+        if reason:
+            return f"El proceso de los tests {reason} y terminó sin generar resultados."
+        return f"El proceso de los tests terminó por la señal {name} sin generar resultados."
+    return f"pytest terminó con código {returncode} sin generar resultados."
 
 
 def parse_junit(path: Path) -> dict | None:
