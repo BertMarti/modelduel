@@ -5,10 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Permisos mínimos: el build solo lee; el despliegue pide pages e id-token en su job.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -19,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -37,8 +38,6 @@ jobs:
       - name: Generar la clasificación pública
         run: modelduel leaderboard results --out site/leaderboard
 
-      - uses: actions/configure-pages@v5
-
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
@@ -46,6 +45,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
