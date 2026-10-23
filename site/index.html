@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>modelduel · dos modelos, una tarea, los mismos tests</title>
 <meta name="description" content="CLI que enfrenta a dos modelos de IA con la misma tarea de programación, ejecuta los tests y genera un informe HTML con aciertos, tiempo, tokens y coste.">
@@ -131,6 +132,15 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
   .steps { grid-template-columns: 1fr; }
   nav .links { gap: 14px; }
   .lede { font-size: 18px; }
+}
+@media (max-width: 560px) {
+  /* En el móvil la marca va encima y los enlaces en su propia fila, con zona táctil cómoda. */
+  nav { flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px 0; }
+  nav .links { gap: 4px 18px; }
+  nav .links a { display: inline-block; padding: 8px 0; }
+  nav .links a.gh { padding: 6px 12px; }
+  .cta .btn { flex: 1 1 100%; text-align: center; }
+  .cta .alt { padding: 8px 4px; }
 }
 @media print {
   :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; --c: #0e7490; --d: #a15c00; --e: #6d3fd6; --f: #c2410c; }
