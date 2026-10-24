@@ -102,6 +102,9 @@ def test_red_simulada(proyecto):
         calls.append((url, headers))
         return 200 if "googleapis" in url else 401
 
+    def gemini_bad_key(url, headers, timeout):
+        return 400
+
     env = {"GEMINI_API_KEY": SENTINEL, "OPENAI_API_KEY": SENTINEL + "x"}
     text, code = render(collect_checks(network=True, env=env, request=fake))
     assert code == 1
@@ -112,6 +115,8 @@ def test_red_simulada(proyecto):
     assert all(SENTINEL not in url for url, _ in calls)
     assert calls[0][1] == {"x-goog-api-key": SENTINEL}
     assert calls[1][1] == {"Authorization": f"Bearer {SENTINEL}x"}
+    text, _ = render(collect_checks(network=True, env=env, request=gemini_bad_key))
+    assert "clave no válida" in text
 
 
 def test_red_sin_conexion_da_una_pista(proyecto):

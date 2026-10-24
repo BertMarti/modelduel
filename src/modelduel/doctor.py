@@ -212,6 +212,7 @@ def _endpoint(kind: str, env: Mapping[str, str]) -> tuple[str, dict[str, str], s
 
 
 _STATUS_HINTS = {
+    400: "petición rechazada (Gemini responde así a una clave no válida)",
     401: "la clave no es válida",
     403: "la clave no tiene permiso",
     404: "¿es correcta la URL base?",
