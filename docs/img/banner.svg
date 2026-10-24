@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-label="modelo contra modelo: dos modelos, una tarea, los mismos tests">
+  <title>modelo vs modelo · modelduel</title>
+  <rect width="1200" height="360" fill="#0f0f11"/>
+  <path d="M60 62H1140M60 298H1140" stroke="#2a2a2f" stroke-width="2"/>
+  <text x="535" y="170" text-anchor="end" fill="#b5e853" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="86" font-weight="700">modelo</text>
+  <text x="600" y="164" text-anchor="middle" fill="#8d8d96" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="64">vs</text>
+  <text x="665" y="170" fill="#ff7eb6" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="86" font-weight="700">modelo</text>
+  <text x="600" y="222" text-anchor="middle" fill="#8d8d96" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="22">modelduel · dos modelos, una tarea, los mismos tests</text>
+  <rect x="62" y="258" width="506" height="6" fill="#b5e853"/>
+  <rect x="632" y="258" width="506" height="6" fill="#ff7eb6"/>
+</svg>

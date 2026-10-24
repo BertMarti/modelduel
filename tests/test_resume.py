@@ -470,7 +470,7 @@ def test_resume_con_un_results_json_corrupto_explica_y_no_gasta_llamadas(
 
 
 def test_un_error_del_proveedor_con_sustituto_suelto_no_tumba_el_guardado(make_task, tmp_path):
-    """Un detalle de error con ``\ud800`` (válido en JSON) rompía ``save_results`` a mitad."""
+    r"""Un detalle de error con ``\ud800`` (válido en JSON) rompía ``save_results`` a mitad."""
     task = make_task(ADD_TESTS)
     boom = ProviderError("fallo \ud800 raro")
     path = tmp_path / "results.json"

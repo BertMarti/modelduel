@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>modelduel · dos modelos, una tarea, los mismos tests</title>
 <meta name="description" content="CLI que enfrenta a dos modelos de IA con la misma tarea de programación, ejecuta los tests y genera un informe HTML con aciertos, tiempo, tokens y coste.">
@@ -132,6 +133,15 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
   nav .links { gap: 14px; }
   .lede { font-size: 18px; }
 }
+@media (max-width: 560px) {
+  /* En el móvil la marca va encima y los enlaces en su propia fila, con zona táctil cómoda. */
+  nav { flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px 0; }
+  nav .links { gap: 4px 18px; }
+  nav .links a { display: inline-block; padding: 8px 0; }
+  nav .links a.gh { padding: 6px 12px; }
+  .cta .btn { flex: 1 1 100%; text-align: center; }
+  .cta .alt { padding: 8px 4px; }
+}
 @media print {
   :root { --bg: #fff; --panel: #f6f6f6; --text: #111; --muted: #555; --line: #d4d4d8; --a: #4d7c0f; --b: #be185d; --c: #0e7490; --d: #a15c00; --e: #6d3fd6; --f: #c2410c; }
   html, body { background: #fff; color: #111; }
@@ -212,9 +222,10 @@ modelduel report runs/duelo/results.json --out runs/duelo</code></pre>
 </section>
 
 <section aria-labelledby="novedades">
-  <h2 id="novedades">Novedades de v0.7.0</h2>
+  <h2 id="novedades">Novedades de v0.8.0</h2>
   <ul>
-    <li><strong>Señal de vida</strong>: si una llamada a un modelo tarda más de unos 10 s, modelduel avisa cada 10 s por <code>stderr</code> de que sigue esperando. El límite de red por defecto baja a 90 s (<code>MODELDUEL_HTTP_TIMEOUT</code> lo cambia).</li>
+    <li><strong>Ejecución más protegida</strong>: en Linux y macOS el código de los modelos corre con límites de CPU, tamaño de archivo (256 MiB) y descriptores, más memoria (4 GiB) en Linux, con <code>HOME</code> en el temporal y sin el agente SSH ni más variables con credenciales. Los informes llevan una política de seguridad que prohíbe JavaScript.</li>
+    <li>Desde v0.7.0: <strong>señal de vida</strong>: si una llamada a un modelo tarda más de unos 10 s, modelduel avisa cada 10 s por <code>stderr</code> de que sigue esperando. El límite de red por defecto baja a 90 s (<code>MODELDUEL_HTTP_TIMEOUT</code> lo cambia).</li>
     <li>Desde v0.6.0: <strong>informe en Markdown</strong>: <code>modelduel report results.json --format md --out DIR</code> genera <code>informe.md</code>, listo para pegar en un PR o un issue, con el texto de <code>results.json</code> escapado.</li>
     <li>Desde v0.5.0: el <strong>duelo en directo</strong> de esta página y los informes más legibles. Desde v0.4.0: proveedor <code>omniroute:</code> y <a href="leaderboard/">clasificación pública</a>. Desde v0.2.0: liga de 2 a 6, reintentos y <code>--resume</code>.</li>
   </ul>

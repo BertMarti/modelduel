@@ -8,6 +8,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 from modelduel import __version__
 from modelduel.demo import DEMO_MODELS, examples_dir
@@ -91,7 +92,7 @@ class SpanishArgumentParser(argparse.ArgumentParser):
         self._optionals.title = "opciones"
         self.add_argument("-h", "--help", action="help", help="muestra esta ayuda y sale")
 
-    def error(self, message: str):  # type: ignore[override]
+    def error(self, message: str) -> NoReturn:
         self.print_usage(sys.stderr)
         self.exit(EXIT_USAGE, f"{self.prog}: error: {translate_argparse(message)}\n")
 
@@ -294,9 +295,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     reuse: dict = {}
     warnings: list[str] = []
     if previous is not None:
-        specs = {side: provider.spec for side, provider in providers.items()}
+        spec_by_side = {side: provider.spec for side, provider in providers.items()}
         try:
-            reuse, warnings = plan_resume(previous, tasks, specs, args.runs, args.timeout)
+            reuse, warnings = plan_resume(previous, tasks, spec_by_side, args.runs, args.timeout)
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise ResumeError(
                 f"{results_path} está dañado o incompleto ({type(exc).__name__}: {exc}). "

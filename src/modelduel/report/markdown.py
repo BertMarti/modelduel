@@ -7,6 +7,7 @@ copia el código ni la salida de los modelos (para eso está el HTML).
 from __future__ import annotations
 
 import re
+from collections.abc import Set
 
 from modelduel import __version__
 from modelduel.report.html import (
@@ -61,7 +62,7 @@ def md_text(value: object, limit: int = 200) -> str:
     return re.sub(r"^(?:([-+=])|(\d+)\.(?=\s))", _escape_start, text)
 
 
-def _table(header: list[str], rows: list[list[str]], right: set[int] = frozenset()) -> list[str]:
+def _table(header: list[str], rows: list[list[str]], right: Set[int] = frozenset()) -> list[str]:
     align = ["---:" if i in right else "---" for i in range(len(header))]
     lines = [f"| {' | '.join(header)} |", f"| {' | '.join(align)} |"]
     lines += [f"| {' | '.join(row)} |" for row in rows]

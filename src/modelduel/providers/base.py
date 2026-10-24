@@ -275,6 +275,6 @@ def redact(message: str, secrets: tuple[str, ...]) -> str:
 
 def as_int(value: object) -> int | None:
     try:
-        return int(value)  # type: ignore[arg-type]
+        return int(value)  # type: ignore[call-overload]
     except (TypeError, ValueError):
         return None

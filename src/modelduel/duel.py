@@ -54,15 +54,15 @@ def run_duel(
         "contenders": {
             side: {
                 "spec": providers[side].spec,
-                "price": contender_prices[side].to_dict() if contender_prices[side] else None,
+                "price": price.to_dict() if (price := contender_prices[side]) else None,
             }
             for side in sides
         },
         "tasks": [],
     }
-    entries = {}
+    entries: dict[str, dict] = {}
     for task in tasks:
-        entry = {
+        entry: dict = {
             "id": task.id,
             "title": task.title,
             "difficulty": task.difficulty,
@@ -126,8 +126,9 @@ def run_attempt(
     heartbeat: HeartbeatFactory | None = None,
 ) -> dict:
     live = heartbeat is not None and not provider.spec.startswith("replay:")
+    label = f"{provider.spec} (tarea {task.id})"
     try:
-        with heartbeat(f"{provider.spec} (tarea {task.id})") if live else nullcontext():
+        with heartbeat(label) if heartbeat is not None and live else nullcontext():
             response = provider.complete(prompt, task_id=task.id)
     except Exception as exc:  # noqa: BLE001 - un intento fallido no debe tumbar todo el duelo
         message = clean_text(str(exc) if isinstance(exc, ProviderError) else _unexpected(exc))

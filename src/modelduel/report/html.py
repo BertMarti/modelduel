@@ -293,7 +293,7 @@ def _side_task_totals(attempts: list[dict], currency: str | None) -> dict[str, s
             if any(x is not None for x in outputs)
             else None,
         ),
-        "cost": fmt_cost(sum(costs), currency)
+        "cost": fmt_cost(sum(c for c in costs if c is not None), currency)
         if costs and all(c is not None for c in costs)
         else "sin datos",
     }
