@@ -14,8 +14,8 @@ Cuenta qué pasa, cómo reproducirlo y qué versión usas. Intentaremos responde
 
 modelduel **ejecuta en tu máquina el código que generan los modelos**. Lo hace en un directorio
 temporal, con límite de tiempo, sin las variables de entorno que parecen secretos, con `HOME`
-apuntando al temporal y, en Linux y macOS, con límites de memoria, CPU, tamaño de archivo y
-descriptores; al terminar mata todo el árbol de procesos. **No es un aislamiento real**: el código
+apuntando al temporal y, en Linux y macOS, con límites de CPU, tamaño de archivo (256 MiB) y
+descriptores, más un límite de memoria (4 GiB de espacio de direcciones) que solo aplica Linux; al terminar mata todo el árbol de procesos. **No es un aislamiento real**: el código
 tiene red y puede leer y escribir rutas absolutas del disco. Para código de modelos en los que no
 confíes, ejecuta modelduel dentro de un contenedor o una máquina virtual.
 

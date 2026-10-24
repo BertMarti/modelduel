@@ -4,7 +4,7 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
 
 ## Hecho hoy (24/10/2026, v0.8.0)
 - **Seguridad en el runner:**
-  - Implementación de límites `setrlimit` en POSIX: 1 GiB de memoria, CPU (con margen), archivos de máx. 64 MiB, 256 descriptores de archivos y desactivación de volcados de memoria (core).
+  - Implementación de límites `setrlimit` en POSIX: 4 GiB de espacio de direcciones (solo Linux), CPU (con margen y SIGXCPU), archivos de máx. 256 MiB, 256 descriptores de archivos y desactivación de volcados de memoria (core).
   - Redirección de `HOME` y variables `XDG_*` a un directorio temporal de ejecución para evitar fugas de configuración personal.
   - Filtrado estricto de variables de entorno sensibles (claves, tokens, cookies, DSN, etc.) antes de ejecutar el código del modelo.
   - Mensajes de error específicos cuando el proceso es terminado por señales del sistema (SIGXCPU, SIGXFSZ, etc.).

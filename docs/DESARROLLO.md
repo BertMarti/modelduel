@@ -95,7 +95,7 @@ Sin tokens o sin precio, el informe muestra «sin datos». Las tarifas incluidas
 
 ## Seguridad de ejecución
 
-El runner usa un temporal propio (también como `HOME`), un subproceso limitado y un entorno depurado de secretos (`is_sensitive_var` en `runner.py`). Los límites (`resource_limits`) se aplican en el propio subproceso, sin `preexec_fn`, que no es seguro con el hilo de la señal de vida. En Linux y macOS aplica límites de memoria, CPU, tamaño de archivo, descriptores y volcados; en Windows usa Job Object y en POSIX un grupo de procesos para matar el árbol al terminar. Esto reduce riesgos, pero no constituye un sandbox: el código generado conserva red y acceso al disco con rutas absolutas.
+El runner usa un temporal propio (también como `HOME`), un subproceso limitado y un entorno depurado de secretos (`is_sensitive_var` en `runner.py`). Los límites (`resource_limits`) se aplican en el propio subproceso, sin `preexec_fn`, que no es seguro con el hilo de la señal de vida. En Linux y macOS aplica límites de CPU (el duro un segundo por encima del blando, para que llegue SIGXCPU y no SIGKILL), tamaño de archivo (256 MiB; CPython ignora SIGXFSZ y `write()` lanza `OSError [Errno 27]`, que el runner traduce a un mensaje), descriptores y volcados; el de memoria (4 GiB de espacio de direcciones, no de memoria residente) solo lo aplica Linux; en Windows usa Job Object y en POSIX un grupo de procesos para matar el árbol al terminar. Esto reduce riesgos, pero no constituye un sandbox: el código generado conserva red y acceso al disco con rutas absolutas.
 
 ## Clasificación
 

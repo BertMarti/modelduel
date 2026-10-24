@@ -90,7 +90,7 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 ## Seguridad
 
 > [!WARNING]
-> **El código generado por los modelos se ejecuta en tu máquina.** modelduel crea un directorio temporal propio y lo borra al terminar, ejecuta los tests en un subproceso con límite de tiempo, elimina las variables de entorno que parecen secretos (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASS`, `AUTH`, `CREDENTIAL`, `PRIVATE`, `COOKIE`, `SESSION` y similares), retira `SSH_AUTH_SOCK` y apunta `HOME`/`USERPROFILE` al temporal. En Linux y macOS aplica además límites del sistema: 1 GiB de memoria, límite de CPU, archivos de 64 MiB como máximo, 256 descriptores y sin volcados de memoria. Al terminar mata el árbol de procesos (Job Object en Windows y grupo de procesos en POSIX).
+> **El código generado por los modelos se ejecuta en tu máquina.** modelduel crea un directorio temporal propio y lo borra al terminar, ejecuta los tests en un subproceso con límite de tiempo, elimina las variables de entorno que parecen secretos (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASS`, `AUTH`, `CREDENTIAL`, `PRIVATE`, `COOKIE`, `SESSION`, `PROXY`, `WEBHOOK` y similares), retira `SSH_AUTH_SOCK` y apunta `HOME`/`USERPROFILE` al temporal. En Linux y macOS aplica además límites del sistema: límite de CPU, archivos de 256 MiB como máximo, 256 descriptores y sin volcados de memoria; en Linux, también 4 GiB de memoria (espacio de direcciones). Al terminar mata el árbol de procesos (Job Object en Windows y grupo de procesos en POSIX).
 >
 > Esto **no es un aislamiento real**: el código conserva acceso a la red y al disco mediante rutas absolutas. Úsalo con tareas de confianza e, idealmente, dentro de un contenedor o una máquina virtual.
 
