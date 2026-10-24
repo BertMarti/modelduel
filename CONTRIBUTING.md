@@ -14,7 +14,7 @@ source .venv/bin/activate        # Windows (PowerShell): .venv\Scripts\Activate.
 pip install -e ".[dev]"
 ```
 
-El extra `dev` instala pytest, pytest-cov y ruff. En ejecución el programa solo usa la biblioteca estándar: **no añadas dependencias** sin justificarlo en «Decisiones» de `MEMORY.md`.
+El extra `dev` instala pytest, pytest-cov, ruff y mypy. En ejecución el programa solo usa la biblioteca estándar: **no añadas dependencias** sin justificarlo en «Decisiones» de `MEMORY.md`.
 
 ## Comandos
 
@@ -23,6 +23,7 @@ Antes de abrir un pull request tienen que pasar los mismos pasos que el CI (Ubun
 ```bash
 ruff check .                     # lint
 ruff format --check .            # formato (usa «ruff format .» para aplicarlo)
+mypy                             # tipos (solo src/, configuración en pyproject.toml)
 pytest --cov                     # tests con cobertura; el mínimo es el 90 %
 modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out runs/demo   # demo
 ```

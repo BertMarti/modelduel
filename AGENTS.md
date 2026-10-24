@@ -6,12 +6,14 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 ## Tecnología (propia de este proyecto)
 - **Python 3.12**, paquete instalable con `pyproject.toml` (backend `hatchling`).
 - Solo biblioteca estándar en tiempo de ejecución (HTTP con `urllib`, CLI con `argparse`). Informe HTML con plantilla propia (`string.Template`) y **gráficas SVG en línea**, sin JavaScript.
-- **pytest** para tests; **ruff** para lint y formato.
+- **pytest** para tests; **ruff** para lint y formato; **mypy** (ligero, solo `src/`) para tipos.
 - Despliegue: **GitHub Pages** con la web del proyecto y un **informe de demostración** generado en el CI con respuestas grabadas (proveedor `replay`), sin claves.
 
 ## Comandos
 - Entorno: `python -m venv .venv` y `pip install -e ".[dev]"`
 - Lint: `ruff check . && ruff format --check .`
+- Tipos: `mypy` (configuración en `pyproject.toml`)
+- Seguridad (como el CI): `gitleaks git . --redact` y `pip-audit --skip-editable`
 - Tests: `pytest`
 - Clasificación: `modelduel leaderboard results --out site/leaderboard`
 - JS: `node --test "tests/js/*.test.cjs"` (solo `site/demo.js`; Node no es dependencia del paquete)
@@ -29,10 +31,15 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 - `src/modelduel/heartbeat.py` señal de vida: `Heartbeat(etiqueta, emit, interval=10)` es un gestor de contexto con un hilo y un `threading.Event` que escribe «esperando a <spec> (tarea X)… N s» por stderr mientras `run_attempt` espera a un proveedor real (nunca `replay:`); se para siempre al salir (error y Ctrl+C). Reloj e intervalo inyectables en los tests (`tests/test_heartbeat.py`). `DEFAULT_HTTP_TIMEOUT` es 90 s.
 - `src/modelduel/resume.py` reanudación de duelos cortados (`--resume`).
 - `examples/tasks/` tareas de ejemplo originales (enunciado + tests) y `examples/replays/` respuestas grabadas.
+- `docs/DESARROLLO.md` documentación técnica (estructura, flujo, opciones); el README es para personas usuarias y debe tener solo enlaces absolutos (va a PyPI). `docs/img/` banner y capturas del README.
+- `PLAN.md` hoja de ruta; `.claude/agents/` (revisor-seguridad, probador-web) y `.claude/skills/` (anadir-tarea, publicar-version).
 - `site/` web estática del proyecto: `index.html` (portada con la sección `#demo`) y `demo.js` (el duelo en directo). `tests/js/` tiene las pruebas de su lógica (`node --test`).
 
 ## Seguridad
-El código generado por un modelo se ejecuta en local: siempre en un directorio temporal, en un subproceso con límite de tiempo, y avisándolo en el README. Las claves se leen de variables de entorno (`GEMINI_API_KEY`, `OPENAI_API_KEY`), nunca de archivos del repositorio.
+El código generado por un modelo se ejecuta en local: siempre en un directorio temporal, en un subproceso con límite de tiempo, y avisándolo en el README. Las claves se leen de variables de entorno (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `OMNIROUTE_API_KEY`), nunca de archivos del repositorio, y nunca se escriben en `results.json`, informes ni errores (`redact` en `providers/base.py`).
+- `runner.py` (desde v0.8.0): `safe_env(home=…)` quita las variables sensibles (`is_sensitive_var`: pistas como KEY, TOKEN, PASS, AUTH, SESSION… y la lista `_SENSITIVE_VARS`) y apunta `HOME`/`USERPROFILE`/`XDG_*` al temporal; en POSIX `resource_limits()` (1 GiB, CPU, 64 MiB por archivo, 256 descriptores, sin core) se aplica en el hijo con el arranque `_BOOTSTRAP` (nunca `preexec_fn`). Pruebas en `tests/test_sandbox.py`.
+- Los informes y la clasificación llevan una CSP sin scripts y la portada una con `script-src 'self'` (`tests/test_csp.py`). Si añades un recurso a la web, amplía la CSP a propósito.
+- `SECURITY.md` explica cómo avisar de una vulnerabilidad; el CI pasa gitleaks y pip-audit (job «Seguridad») y Dependabot abre PRs semanales agrupados.
 
 ## Diseño: «duelo editorial oscuro»
 Minimalista, oscuro y tipográfico, como un informe de laboratorio.
