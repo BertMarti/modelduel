@@ -6,7 +6,9 @@ Esta página reúne la información técnica del proyecto. Para instalarlo y usa
 
 ```text
 src/modelduel/
-├── cli.py              # run, report, leaderboard, list-tasks, demo
+├── cli.py              # run, init, doctor, demo, report, leaderboard, list-tasks
+├── config.py           # modelduel.toml e init (catálogo de proveedores)
+├── doctor.py           # comprobaciones de modelduel doctor
 ├── tasks.py            # carga de tareas y recuento de tests
 ├── extract.py          # extracción del bloque de código
 ├── runner.py           # prompt y ejecución de pytest en temporal
@@ -95,7 +97,7 @@ Sin tokens o sin precio, el informe muestra «sin datos». Las tarifas incluidas
 
 ## Seguridad de ejecución
 
-El runner usa un temporal propio (también como `HOME`), un subproceso limitado y un entorno depurado de secretos (`is_sensitive_var` en `runner.py`). Los límites (`resource_limits`) se aplican en el propio subproceso, sin `preexec_fn`, que no es seguro con el hilo de la señal de vida. En Linux y macOS aplica límites de CPU (el duro un segundo por encima del blando, para que llegue SIGXCPU y no SIGKILL), tamaño de archivo (256 MiB; CPython ignora SIGXFSZ y `write()` lanza `OSError [Errno 27]`, que el runner traduce a un mensaje), descriptores y volcados; el de memoria (4 GiB de espacio de direcciones, no de memoria residente) solo lo aplica Linux; en Windows usa Job Object y en POSIX un grupo de procesos para matar el árbol al terminar. Esto reduce riesgos, pero no constituye un sandbox: el código generado conserva red y acceso al disco con rutas absolutas.
+El runner usa un temporal propio (también como `HOME`), un subproceso limitado y un entorno depurado de secretos (`is_sensitive_var` en `runner.py`). Los límites (`resource_limits`) se aplican en el propio subproceso, sin `preexec_fn`, que no es seguro con el hilo de la señal de vida. En Linux y macOS aplica límites de CPU (el duro un segundo por encima del blando, para que llegue SIGXCPU y no SIGKILL), tamaño de archivo (256 MiB; CPython ignora SIGXFSZ y `write()` lanza `OSError [Errno 27]`, que el runner traduce a un mensaje), descriptores y volcados; el de memoria (4 GiB de espacio de direcciones, no de memoria residente) solo lo aplica Linux; en Windows usa Job Object y en POSIX un grupo de procesos para matar el árbol al terminar. En Linux, además, pytest corre bajo un supervisor intermedio (`_SUPERVISOR`) que se declara *subreaper* con `prctl(PR_SET_CHILD_SUBREAPER)`: los procesos que se desligan con `setsid()`/doble fork siguen colgando de él y, al terminar, los mata todos recorriendo `/proc` (pruebas en `tests/test_sandbox.py`, incluido un control que demuestra que sin supervisor el nieto escaparía). Si la solución mata al supervisor, el padre busca la marca `MODELDUEL_RUN` en `/proc/*/environ`. Esto reduce riesgos, pero no constituye un sandbox: el código generado conserva red y acceso al disco con rutas absolutas.
 
 ## Clasificación
 

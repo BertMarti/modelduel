@@ -18,10 +18,13 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 - Clasificación: `modelduel leaderboard results --out site/leaderboard`
 - JS: `node --test "tests/js/*.test.cjs"` (solo `site/demo.js`; Node no es dependencia del paquete)
 - Informe Markdown: `modelduel report results.json --format md --out DIR` (o `run ... --format html,md`) escribe `informe.md`.
+- Primer uso: `modelduel init` (carpeta con `modelduel.toml`), `modelduel doctor [--red]` y `modelduel run` sin argumentos dentro de esa carpeta.
 - Demo: `modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo`
 
 ## Estructura
 - `src/modelduel/cli.py` punto de entrada.
+- `src/modelduel/config.py` `modelduel.toml` (`load_config`, `find_config`; claves `tareas`, `modelos`, `ejecuciones`, `tiempo_limite`, `salida`, `formato`; la orden manda) y `modelduel init` (`init_project`, catálogo `PROVIDER_CATALOG` con variables, URL de claves y de modelos; marcadores `CAMBIA-ESTO`).
+- `src/modelduel/doctor.py` `modelduel doctor`: comprobaciones puras (`collect_checks(env=…, request=…)`) y `render`. Nunca imprime claves; solo usa la red con `--red` (`GET …/models`).
 - `src/modelduel/providers/` proveedores: `replay` (grabado), `gemini` (API de Google), `openai` (cualquier API compatible con OpenAI: OpenRouter, Ollama…), `omniroute` (preset de `openai` para el router local OmniRoute).
 - `src/modelduel/runner.py` extrae el código de la respuesta y ejecuta los tests en un directorio temporal con límite de tiempo.
 - `src/modelduel/report/` informe HTML: duelo de dos (`html.py`, `template.html`) y liga de 3 a 6 (`league.py`, `league.html`); el CSS común está en `style.css`.
@@ -37,8 +40,8 @@ CLI que enfrenta a dos modelos de IA (o a una liga de hasta seis) con la misma t
 
 ## Seguridad
 El código generado por un modelo se ejecuta en local: siempre en un directorio temporal, en un subproceso con límite de tiempo, y avisándolo en el README. Las claves se leen de variables de entorno (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `OMNIROUTE_API_KEY`), nunca de archivos del repositorio, y nunca se escriben en `results.json`, informes ni errores (`redact` en `providers/base.py`).
-- `runner.py` (desde v0.8.0): `safe_env(home=…)` quita las variables sensibles (`is_sensitive_var`: pistas como KEY, TOKEN, PASS, AUTH, SESSION… y la lista `_SENSITIVE_VARS`) y apunta `HOME`/`USERPROFILE`/`XDG_*` al temporal; en POSIX `resource_limits()` (4 GiB de espacio de direcciones, solo efectivo en Linux; CPU con el duro un segundo por encima del blando para que llegue SIGXCPU; 256 MiB por archivo, cuyo `OSError [Errno 27]` se explica en el mensaje; 256 descriptores; sin core) se aplica en el hijo con el arranque `_BOOTSTRAP` (nunca `preexec_fn`). Pruebas en `tests/test_sandbox.py`.
-- Los informes y la clasificación llevan una CSP sin scripts y la portada una con `script-src 'self'` (`tests/test_csp.py`). Si añades un recurso a la web, amplía la CSP a propósito.
+- `runner.py` (desde v0.8.0): `safe_env(home=…)` quita las variables sensibles (`is_sensitive_var`: pistas como KEY, TOKEN, PASS, AUTH, SESSION… y la lista `_SENSITIVE_VARS`) y apunta `HOME`/`USERPROFILE`/`XDG_*` al temporal; en POSIX `resource_limits()` (4 GiB de espacio de direcciones, solo efectivo en Linux; CPU con el duro un segundo por encima del blando para que llegue SIGXCPU; 256 MiB por archivo, cuyo `OSError [Errno 27]` se explica en el mensaje; 256 descriptores; sin core) se aplica en el hijo con el arranque `_BOOTSTRAP` (nunca `preexec_fn`). En Linux, además, `_execute` corre bajo el supervisor `_SUPERVISOR` (`prctl(PR_SET_CHILD_SUBREAPER)`): al acabar mata a todos sus descendientes recorriendo `/proc`, también los que hicieron `setsid`/doble fork; si lo matan, el padre limpia por la marca `MODELDUEL_RUN` del entorno (`_kill_marked`) y una muerte por señal nunca cuenta como resuelta. `isolation_summary()` describe lo que aplica cada sistema (lo enseña `doctor`). Pruebas en `tests/test_sandbox.py`.
+- Los informes y la clasificación llevan una CSP sin scripts y la portada una con `script-src 'self'` (`tests/test_csp.py`). Ninguna usa `'unsafe-inline'`: los `<style>` van por hash SHA-256 (`report/csp.py`; en la portada el hash está escrito a mano y el test dice cómo recalcularlo). Nada de atributos `style=`. Todas las webs de BertMarti comparten el origen `bertmarti.github.io`: nada de scripts de terceros ni datos sensibles en `localStorage`. Si añades un recurso a la web, amplía la CSP a propósito.
 - `SECURITY.md` explica cómo avisar de una vulnerabilidad; el CI pasa gitleaks y pip-audit (job «Seguridad») y Dependabot abre PRs semanales agrupados.
 
 ## Diseño: «duelo editorial oscuro»
