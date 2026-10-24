@@ -82,6 +82,9 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 [tool.mypy]
 # Comprobación ligera de tipos del paquete (no de los tests): sin modo estricto, pero en el CI.
 python_version = "3.12"
+# El código distingue POSIX y Windows con os.name: se comprueba siempre como POSIX para que
+# el resultado sea el mismo en los runners de Ubuntu y de Windows.
+platform = "linux"
 files = ["src"]
 warn_unused_ignores = true
 warn_redundant_casts = true
