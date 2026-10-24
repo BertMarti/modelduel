@@ -61,9 +61,25 @@ _SECRET_HINTS = (
     "DSN",  # SENTRY_DSN y cadenas de conexión con usuario y contraseña
 )
 # Variables sin «pista» en el nombre que dan acceso a algo: conexión a bases de datos,
-# al demonio de Docker, a Kubernetes o al agente GPG.
+# al demonio de Docker, a Kubernetes o al agente GPG, o rutas a archivos de configuración con
+# credenciales (cambiar HOME no las neutraliza porque son absolutas).
 _SENSITIVE_VARS = frozenset(
-    {"DATABASE_URL", "REDIS_URL", "MONGODB_URI", "DOCKER_HOST", "KUBECONFIG", "GPG_AGENT_INFO"}
+    {
+        "DATABASE_URL",
+        "REDIS_URL",
+        "MONGODB_URI",
+        "DOCKER_HOST",
+        "DOCKER_CONFIG",
+        "KUBECONFIG",
+        "GPG_AGENT_INFO",
+        "AWS_CONFIG_FILE",
+        "NETRC",
+        "NPM_CONFIG_USERCONFIG",
+        "PIP_CONFIG_FILE",
+        "GIT_CONFIG_GLOBAL",
+        "CLOUDSDK_CONFIG",
+        "AZURE_CONFIG_DIR",
+    }
 )
 # Variables de directorios personales que se redirigen al temporal de la ejecución.
 _HOME_VARS = (

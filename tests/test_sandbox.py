@@ -40,6 +40,12 @@ posix_only = pytest.mark.skipif(os.name == "nt", reason="setrlimit solo existe e
         "GH_PRIVATE_THING",
         "HTTP_COOKIE",
         "OMNIROUTE_API_KEY",
+        "AWS_SHARED_CREDENTIALS_FILE",
+        "AWS_CONFIG_FILE",
+        "NETRC",
+        "DOCKER_CONFIG",
+        "NPM_CONFIG_USERCONFIG",
+        "GOOGLE_APPLICATION_CREDENTIALS",
     ],
 )
 def test_variables_sensibles(name):
