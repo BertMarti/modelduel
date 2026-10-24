@@ -162,6 +162,9 @@ table.ranking th.lft { text-align: left; padding-left: 0; }
 table.ranking td.who { text-align: left; white-space: normal; min-width: 150px; font: 14px/1.4 var(--mono); }
 table.ranking td.who .spec { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
 table.ranking th.rk { text-align: left; padding-left: 0; font: 600 16px/1 var(--mono); letter-spacing: 0; text-transform: none; color: var(--text); width: 42px; }
+/* La posición es estrecha: sin esto heredaba los 170 px de la primera columna de las matrices. */
+table.ranking thead tr th:first-child, table.ranking tbody th.rk,
+table.models thead tr th:first-child, table.models tbody th.rk { min-width: 0; width: 42px; }
 table.ranking td svg { display: block; width: 100%; min-width: 60px; height: 6px; margin-top: 6px; }
 table.ranking tr.first td, table.ranking tr.first th.rk { border-bottom-color: var(--muted); }
 .mark { font: 600 12px/1 var(--mono); letter-spacing: .02em; vertical-align: 2px; margin-left: 6px; white-space: nowrap; }
@@ -197,6 +200,8 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--line);
   .metric .mid { grid-column: 1 / -1; order: -1; }
   .duo { grid-template-columns: 1fr; }
   .detail-body { padding-left: 0; }
+  /* El pie de una tabla desplazable se queda en la pantalla en vez de medir lo que la tabla. */
+  .table-wrap caption { position: sticky; left: 0; max-width: calc(100vw - 32px); }
   /* Con 6 nombres largos la barra se quedaba en 0 px: nombre, valor y barra van en filas. */
   .lg-row { grid-template-columns: 34px minmax(0, 1fr); }
   .lg-val { grid-column: 2; text-align: left; order: 2; }
