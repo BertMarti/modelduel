@@ -142,6 +142,108 @@ raise SystemExit(pytest.main(sys.argv[1:]))
 """
 
 
+# Supervisor intermedio (solo Linux). Una solución que llame a ``setsid()`` o haga un doble fork
+# sale del grupo de procesos y sobreviviría al ``killpg``. El supervisor se declara «subreaper»
+# (``prctl(PR_SET_CHILD_SUBREAPER)``, sin privilegios): los procesos que se queden huérfanos por
+# debajo de él pasan a ser hijos suyos en vez de irse a init, así que siguen siendo descendientes
+# suyos aunque cambien de sesión o de grupo. Al terminar (o al agotar el tiempo, o con SIGTERM)
+# mata a TODOS sus descendientes recorriendo /proc y los recoge. Por la tubería ``argv[1]``
+# devuelve el código de salida de pytest («timeout» si se agotó el tiempo). pytest corre en un
+# hijo con ``close_fds``: la solución no hereda la tubería.
+_SUPERVISOR = """\
+import ctypes, os, signal, subprocess, sys, time
+status_fd, timeout, cmd = int(sys.argv[1]), float(sys.argv[2]), sys.argv[3:]
+try:
+    ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)  # PR_SET_CHILD_SUBREAPER
+except (OSError, AttributeError):
+    pass  # sin subreaper solo se ven los descendientes que no se hayan desligado
+me = os.getpid()
+
+
+def descendants():
+    children = {}
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        try:
+            with open("/proc/" + name + "/stat", "rb") as fh:
+                data = fh.read()
+            ppid = int(data[data.rindex(b")") + 2 :].split()[1])
+        except (OSError, ValueError, IndexError):
+            continue
+        children.setdefault(ppid, []).append(int(name))
+    found, todo = [], [me]
+    while todo:
+        for pid in children.get(todo.pop(), ()):
+            found.append(pid)
+            todo.append(pid)
+    return found
+
+
+def reap_all():
+    deadline = time.monotonic() + 10
+    while True:
+        pids = descendants()
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+        while True:
+            try:
+                if os.waitpid(-1, os.WNOHANG)[0] == 0:
+                    break
+            except ChildProcessError:
+                break
+        if not pids or time.monotonic() > deadline:
+            return
+        time.sleep(0.005)
+
+
+class Stop(Exception):
+    pass
+
+
+def stop(signum, frame):
+    raise Stop
+
+
+status = "stopped"
+try:
+    signal.signal(signal.SIGTERM, stop)
+    child = subprocess.Popen(cmd)
+    try:
+        status = str(child.wait(timeout=timeout))
+    except subprocess.TimeoutExpired:
+        status = "timeout"
+except Stop:
+    pass
+finally:
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    reap_all()
+    os.write(status_fd, status.encode())
+"""
+# Margen del padre sobre el límite de tiempo antes de no fiarse del supervisor y matar el grupo.
+SUPERVISOR_GRACE_S = 10.0
+# Marca en el entorno de cada ejecución: si el supervisor muere (p. ej. la solución lo mata),
+# el padre busca en /proc los procesos que aún la lleven y los mata.
+RUN_MARKER_VAR = "MODELDUEL_RUN"
+
+
+def supervisor_supported() -> bool:
+    """``True`` en Linux con /proc y ``prctl(PR_SET_CHILD_SUBREAPER)`` disponibles."""
+    if not sys.platform.startswith("linux") or not os.path.isdir("/proc/self"):
+        return False
+    try:
+        import ctypes
+
+        value = ctypes.c_int(0)
+        # PR_GET_CHILD_SUBREAPER (37): solo consulta, no cambia nada en este proceso.
+        return ctypes.CDLL(None, use_errno=True).prctl(37, ctypes.byref(value), 0, 0, 0) == 0
+    except (OSError, AttributeError):
+        return False
+
+
 class RunnerError(Exception):
     """Error de configuración del runner (no del código del modelo)."""
 
@@ -180,6 +282,25 @@ def ensure_pytest_available() -> None:
             "modelduel necesita pytest para ejecutar los tests de las tareas. "
             "Instálalo en este entorno con: pip install pytest"
         )
+
+
+def isolation_summary() -> list[str]:
+    """Medidas de protección que el runner aplica en este sistema (para ``modelduel doctor``)."""
+    items = ["directorio temporal propio y entorno sin secretos", "límite de tiempo por respuesta"]
+    if os.name == "nt":
+        items.append("Job Object que mata el árbol de procesos (sin límite de memoria)")
+        return items
+    items.append("límites del sistema (setrlimit): CPU, memoria, archivos y descriptores")
+    if supervisor_supported():
+        items.append(
+            "supervisor «subreaper» que mata también los procesos que se desligan (setsid)"
+        )
+    else:
+        items.append(
+            "grupo de procesos propio que se mata al terminar (no recoge los que hacen setsid)"
+        )
+    items.append("sin aislamiento de red ni de disco: para código no fiable, usa un contenedor")
+    return items
 
 
 def is_sensitive_var(name: str) -> bool:
@@ -293,6 +414,10 @@ def _classify(
     timeout: float,
 ) -> TestRun:
     """Convierte el código de salida y el XML de pytest en un ``TestRun``."""
+    if returncode is not None and returncode < 0:
+        # Muerte por señal (un límite, o la solución matando a su supervisor): el XML que haya
+        # no es de fiar y el intento no puede contar como resuelto.
+        counts = None
     if returncode is None:
         return TestRun(
             status="timeout",
@@ -400,9 +525,12 @@ def _execute(
     """Ejecuta ``cmd`` y devuelve ``(código de salida, duración)``; ``None`` si agota el tiempo.
 
     stdout y stderr van juntos a ``output_path``: un archivo no obliga a esperar a que los
-    procesos nietos suelten una tubería. Al volver no queda vivo ningún proceso del árbol
-    (salvo los que se desliguen a propósito de él; ver «Problemas conocidos» en MEMORY.md).
+    procesos nietos suelten una tubería. Al volver no queda vivo ningún proceso del árbol. En
+    Linux, ``cmd`` corre bajo el supervisor ``_SUPERVISOR``, que recoge también a los que se
+    desligan con ``setsid``/doble fork; en el resto de POSIX esos podrían sobrevivir.
     """
+    if supervisor_supported():
+        return _execute_supervised(cmd, workdir, env, output_path, timeout)
     extra: dict = {}
     if os.name != "nt":
         extra["start_new_session"] = True  # grupo de procesos propio para matarlo entero
@@ -429,15 +557,111 @@ def _execute(
     return returncode, round(time.perf_counter() - start, 3)
 
 
+def _execute_supervised(
+    cmd: list[str], workdir: Path, env: dict[str, str], output_path: Path, timeout: float
+) -> tuple[int | None, float]:
+    """Como ``_execute``, pero a través del supervisor «subreaper» (solo Linux)."""
+    marker = os.urandom(16).hex()
+    env = {**env, RUN_MARKER_VAR: marker}
+    read_fd, write_fd = os.pipe()
+    start = time.perf_counter()
+    timed_out = False
+    try:
+        with open(output_path, "wb") as out:
+            proc = subprocess.Popen(
+                [sys.executable, "-c", _SUPERVISOR, str(write_fd), repr(timeout), *cmd],
+                cwd=workdir,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=out,
+                stderr=subprocess.STDOUT,
+                pass_fds=(write_fd,),
+                start_new_session=True,
+            )
+            os.close(write_fd)
+            write_fd = -1
+            tree = _ProcessTree(proc, supervised=True)
+            try:
+                proc.wait(timeout=timeout + SUPERVISOR_GRACE_S)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+            finally:
+                tree.kill()
+                proc.wait()
+                # Red de seguridad si alguien mató al supervisor antes de que limpiara.
+                _kill_marked(marker)
+        status = _read_status(read_fd)
+    finally:
+        os.close(read_fd)
+        if write_fd >= 0:
+            os.close(write_fd)
+    duration = round(time.perf_counter() - start, 3)
+    if timed_out or status == "timeout":
+        return None, duration
+    try:
+        return int(status), duration
+    except ValueError:
+        # El supervisor no informó (lo mataron): su propio final es lo único que se sabe.
+        return proc.returncode, duration
+
+
+def _read_status(fd: int) -> str:
+    chunks = []
+    while True:
+        chunk = os.read(fd, 64)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    return b"".join(chunks).decode("ascii", errors="replace").strip()
+
+
+def _kill_marked(marker: str) -> int:
+    """Mata los procesos propios que conserven ``RUN_MARKER_VAR=marker`` en su entorno."""
+    needle = f"{RUN_MARKER_VAR}={marker}".encode()
+    me = os.getpid()
+    killed = 0
+    for _ in range(5):
+        found = []
+        try:
+            names = os.listdir("/proc")
+        except OSError:
+            return killed
+        for name in names:
+            if not name.isdigit() or int(name) == me:
+                continue
+            try:
+                with open(f"/proc/{name}/environ", "rb") as fh:
+                    environ = fh.read()
+            except OSError:
+                continue  # de otro usuario, o ya terminó
+            if needle in environ.split(b"\0"):
+                found.append(int(name))
+        if not found:
+            return killed
+        for pid in found:
+            with contextlib.suppress(OSError):
+                os.kill(pid, signal.SIGKILL)
+                killed += 1
+        time.sleep(0.05)
+    return killed
+
+
 class _ProcessTree:
     """Mata un proceso y todos sus descendientes solo con la biblioteca estándar."""
 
-    def __init__(self, proc: subprocess.Popen) -> None:
+    def __init__(self, proc: subprocess.Popen, supervised: bool = False) -> None:
         self.proc = proc
+        self.supervised = supervised
         self.job = _win_job_for(proc) if os.name == "nt" else None
 
     def kill(self) -> None:
         if os.name != "nt":
+            if self.supervised and self.proc.poll() is None:
+                # SIGTERM al supervisor: mata y recoge a todos sus descendientes antes de salir.
+                with contextlib.suppress(ProcessLookupError):
+                    self.proc.send_signal(signal.SIGTERM)
+                with contextlib.suppress(subprocess.TimeoutExpired):
+                    self.proc.wait(timeout=SUPERVISOR_GRACE_S)
             with contextlib.suppress(ProcessLookupError, PermissionError):
                 os.killpg(self.proc.pid, signal.SIGKILL)
             return
