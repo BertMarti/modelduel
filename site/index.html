@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'sha256-36vcr0p5u+mIs/2zhtW6rAkRQKlE1+xZxrKRN/PNVf8='; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>modelduel · dos modelos, una tarea, los mismos tests</title>
 <meta name="description" content="CLI que enfrenta a dos modelos de IA con la misma tarea de programación, ejecuta los tests y genera un informe HTML con aciertos, tiempo, tokens y coste.">
@@ -147,6 +147,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
   html, body { background: #fff; color: #111; }
   nav .links, .cta, .skip, .demo-controls { display: none; }
   }
+.mt-16 { margin-top: 16px; }
 </style>
 </head>
 <body>
@@ -262,7 +263,7 @@ def test_basico():
     </tbody>
   </table>
   </div>
-  <p style="margin-top:16px">Las claves se leen solo de variables de entorno y nunca aparecen en el informe. Con Ollama en local basta con <code>OPENAI_BASE_URL=http://localhost:11434/v1</code>.</p>
+  <p class="mt-16">Las claves se leen solo de variables de entorno y nunca aparecen en el informe. Con Ollama en local basta con <code>OPENAI_BASE_URL=http://localhost:11434/v1</code>.</p>
 </section>
 
 <section aria-labelledby="coste">

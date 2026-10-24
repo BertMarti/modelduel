@@ -7,6 +7,7 @@ from importlib import resources
 from string import Template
 
 from modelduel import __version__
+from modelduel.report.csp import apply_style_hashes
 from modelduel.report.html import (
     STATUS_LABELS,
     _short_label,
@@ -264,7 +265,7 @@ def render_league(results: dict, summary: dict) -> str:
     )
     package = resources.files("modelduel.report")
     template = Template(package.joinpath("league.html").read_text("utf-8"))
-    return template.substitute(
+    page = template.substitute(
         css=package.joinpath("style.css").read_text("utf-8"),
         version=e(results.get("version", __version__)),
         page_title=e(" vs ".join(labels) + " · liga · modelduel"),
@@ -291,3 +292,4 @@ def render_league(results: dict, summary: dict) -> str:
         details=build_details(results),
         price_note=e(price_note),
     )
+    return apply_style_hashes(page)

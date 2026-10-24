@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 from modelduel import __version__
 from modelduel.report import write_report
+from modelduel.report.csp import apply_style_hashes
 from modelduel.report.html import (
     e,
     fmt_cost,
@@ -202,7 +203,7 @@ def render_leaderboard(duels: list[Duel]) -> str:
     fictitious = any(m["fictitious"] for m in models.values())
     package = resources.files("modelduel.report")
     template = Template(package.joinpath("leaderboard.html").read_text("utf-8"))
-    return template.substitute(
+    page = template.substitute(
         css=package.joinpath("style.css").read_text("utf-8"),
         version=e(__version__),
         lede=e(
@@ -218,6 +219,7 @@ def render_leaderboard(duels: list[Duel]) -> str:
             else "El coste suma los duelos de cada modelo; «sin datos» si falta un precio."
         ),
     )
+    return apply_style_hashes(page)
 
 
 def build_leaderboard(folder: Path, out: Path) -> Path:
