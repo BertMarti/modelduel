@@ -203,29 +203,27 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
 
 <section aria-labelledby="instalar">
   <h2 id="instalar">Instalación y uso</h2>
-  <p>Necesitas Python 3.12 o superior. modelduel no tiene dependencias; pytest hace falta para ejecutar los tests de las tareas.</p>
-  <pre><code>pip install "modelduel[pytest]"    # o: pip install modelduel pytest
+  <p>Necesitas Python 3.12 o superior. modelduel no tiene dependencias; pytest hace falta para ejecutar los tests de las tareas. Pruébalo con una sola orden, sin claves (en Windows: <code>py -m venv modelduel-env; modelduel-env\Scripts\pip install "modelduel[pytest]"; modelduel-env\Scripts\modelduel demo</code>):</p>
+  <pre><code>python3 -m venv modelduel-env &amp;&amp; modelduel-env/bin/pip install "modelduel[pytest]" &amp;&amp; modelduel-env/bin/modelduel demo
 
-# Demo sin claves ni coste: una liga de tres contendientes con respuestas grabadas
-modelduel demo
-modelduel demo --copy MIS-EJEMPLOS  # copia las tareas de ejemplo como plantilla
+# Después, con el entorno activado (source modelduel-env/bin/activate):
+modelduel init mi-duelo --proveedor gemini --proveedor openai   # carpeta con tareas y modelduel.toml
+cd mi-duelo
+modelduel doctor          # ¿falta algo? (las claves nunca se muestran; --red prueba la conexión)
+modelduel run             # lanza el duelo y deja el informe en resultados/index.html
+modelduel run --resume    # continúa un duelo cortado
 
-# Dos modelos reales (o repite --model para una liga de 2 a 6)
-modelduel run MIS-EJEMPLOS/tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo
-
-# Continuar un duelo cortado
-modelduel run MIS-EJEMPLOS/tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo --resume
-
-# Otras órdenes
-modelduel list-tasks MIS-EJEMPLOS/tasks
-modelduel report runs/duelo/results.json --out runs/duelo</code></pre>
+# Todo en la orden, sin archivo de configuración (o repite --model para una liga de 2 a 6)
+modelduel run tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo</code></pre>
+  <p>Las claves van en variables de entorno (<code>export GEMINI_API_KEY="…"</code>), nunca en un archivo. <code>modelduel init</code> te dice cuáles necesitas y dónde conseguirlas.</p>
   <p>El paquete está en <a href="https://pypi.org/project/modelduel/">PyPI</a>. Para la última versión sin publicar: <code>pip install git+https://github.com/BertMarti/modelduel pytest</code>.</p>
 </section>
 
 <section aria-labelledby="novedades">
   <h2 id="novedades">Novedades de v0.8.0</h2>
   <ul>
-    <li><strong>Ejecución más protegida</strong>: en Linux y macOS el código de los modelos corre con límites de CPU, tamaño de archivo (256 MiB) y descriptores, más memoria (4 GiB) en Linux, con <code>HOME</code> en el temporal y sin el agente SSH ni más variables con credenciales. Los informes llevan una política de seguridad que prohíbe JavaScript.</li>
+    <li><strong>Configurar es más fácil</strong>: <code>modelduel init</code> prepara una carpeta con tareas de ejemplo y un <code>modelduel.toml</code>; <code>modelduel doctor</code> comprueba la instalación, las claves y la conexión; <code>modelduel run</code> sin argumentos usa la configuración.</li>
+    <li><strong>Ejecución más protegida</strong>: en Linux, los procesos que intentan escapar con <code>setsid</code> también se matan al terminar; en Linux y macOS el código de los modelos corre con límites de CPU, tamaño de archivo (256 MiB) y descriptores, más memoria (4 GiB) en Linux, con <code>HOME</code> en el temporal y sin el agente SSH ni más variables con credenciales. Los informes llevan una política de seguridad que prohíbe JavaScript.</li>
     <li>Desde v0.7.0: <strong>señal de vida</strong>: si una llamada a un modelo tarda más de unos 10 s, modelduel avisa cada 10 s por <code>stderr</code> de que sigue esperando. El límite de red por defecto baja a 90 s (<code>MODELDUEL_HTTP_TIMEOUT</code> lo cambia).</li>
     <li>Desde v0.6.0: <strong>informe en Markdown</strong>: <code>modelduel report results.json --format md --out DIR</code> genera <code>informe.md</code>, listo para pegar en un PR o un issue, con el texto de <code>results.json</code> escapado.</li>
     <li>Desde v0.5.0: el <strong>duelo en directo</strong> de esta página y los informes más legibles. Desde v0.4.0: proveedor <code>omniroute:</code> y <a href="leaderboard/">clasificación pública</a>. Desde v0.2.0: liga de 2 a 6, reintentos y <code>--resume</code>.</li>

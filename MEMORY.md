@@ -120,6 +120,8 @@ Base heredada de v0.1.0:
 - 2026-09-30 (docs): «Cómo se ha hecho» (README y web): v0.1.0 con lead, builder y qa en Claude Opus y docs en Sonnet; toda la v0.2.0 en Sonnet; OpenCode previsto pero sin poder ejecutarse en modo autónomo; Alberto supervisa y fusiona.
 
 ## Siguiente paso
+0. **Alberto (fase 2, 24/10/2026):** tras fusionar la PR de `fase2-2026-10-24`, publicar v0.8.0 (irreversible: sube a PyPI) desde un clon con `main` al día:
+   `gh release create v0.8.0 --repo BertMarti/modelduel --target main --title "v0.8.0 · runner endurecido, init y doctor" --notes "$(awk '/^## \[0.8.0\]/{f=1;next} /^## \[0.7.0\]/{f=0} f' CHANGELOG.md)"`
 1. Alberto: fusionar los PR de v0.2.0 en orden (#10, #11, #12, #13, #14 de QA y por último el #16 de documentación) con «Create a merge commit».
    - Para publicar en PyPI: registrar el *trusted publisher* (PyPI > Your projects > Publishing > "Add a new pending publisher": proyecto `modelduel`, propietario `BertMarti`, repositorio `modelduel`, workflow `release.yml`, environment `pypi`), crear el environment `pypi` en GitHub (Settings > Environments) y crear la Release `v0.2.0`.
 2. Alberto: probar una vez `gemini:` y `openai:` contra las APIs reales con claves propias (solo se han probado con respuestas simuladas).
