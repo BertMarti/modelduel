@@ -6,6 +6,27 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.8.0] - 2026-10-24
+
+### Seguridad
+
+- **Ejecución del código de los modelos endurecida** (`runner.py`): en POSIX el subproceso arranca con `setrlimit` (1 GiB de memoria, CPU = límite de tiempo + 5 s, archivos de 64 MiB como máximo, 256 descriptores y sin volcados de memoria) mediante un arranque `python -c` que después llama a `pytest.main`, sin `preexec_fn` (no es seguro con el hilo de la señal de vida). `HOME`, `USERPROFILE`, `APPDATA` y `XDG_*` apuntan al temporal de la ejecución, y el filtro de entorno quita también `PASS*`, `AUTH` (`SSH_AUTH_SOCK`), `PRIVATE`, `COOKIE`, `SESSION`, `SIGNATURE`, `DSN`, `DATABASE_URL`, `DOCKER_HOST`, `KUBECONFIG`… Un final por señal (`SIGXCPU`, `SIGXFSZ`, `SIGKILL`) se explica en el mensaje.
+- **Content-Security-Policy** en los informes, la clasificación (`default-src 'none'`, sin scripts) y la portada (`script-src 'self'`): defensa en profundidad frente a XSS con salidas de modelos.
+- CI: job «Seguridad» con gitleaks (binario con suma SHA-256 comprobada, todo el historial) y pip-audit; Dependabot semanal y agrupado; `SECURITY.md`; el despliegue de Pages da `pages` e `id-token` solo al job que despliega.
+
+### Añadido
+
+- `mypy` en el extra `dev` y en el CI (configuración ligera en `pyproject.toml`); el CI prueba también Python 3.13.
+- README para personas usuarias con cabecera propia (`docs/img/banner.svg`) y capturas; lo técnico pasa a `docs/DESARROLLO.md`.
+- `PLAN.md`, subagentes en `.claude/agents/` y skills en `.claude/skills/` para trabajar en el repo con Claude Code.
+
+### Corregido
+
+- `tests/test_resume.py` no se recogía en Python 3.13 (docstring con `\ud800` sin prefijo `r`).
+- Portada en el móvil: la marca y los enlaces de la navegación se apretaban en 390 px; ahora van en dos filas con zona táctil cómoda y los botones ocupan el ancho.
+- Informes y clasificación en el móvil: la columna «Pos.» medía 170 px y el pie de la tabla se salía de la pantalla.
+- Nueve avisos de tipos de mypy sin cambio de comportamiento.
+
 ## [0.7.0] - 2026-10-01
 
 ### Añadido
@@ -115,7 +136,8 @@ Primera versión (MVP).
 - Revisión QA: árbol de procesos muerto al terminar, salida acotada, UTF-8 y BOM, tareas sin tests o con errores de sintaxis, errores de red y respuestas vacías de los proveedores, accesibilidad AA y cobertura mínima del 90 % (PR [#2](https://github.com/BertMarti/modelduel/pull/2)).
 - Guía de uso (`docs/USO.md`) y `CONTRIBUTING.md` (PR [#3](https://github.com/BertMarti/modelduel/pull/3)).
 
-[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.7.0...HEAD
+[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/BertMarti/modelduel/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/BertMarti/modelduel/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/BertMarti/modelduel/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/BertMarti/modelduel/compare/v0.4.0...v0.5.0
