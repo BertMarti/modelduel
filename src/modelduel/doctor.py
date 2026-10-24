@@ -126,7 +126,8 @@ def env_checks(env: Mapping[str, str]) -> list[Check]:
             checks.append(Check(OK, f"{name}: definida (no se muestra)", group))
     for name in URL_VARS:
         if _defined(env, name):
-            checks.append(Check(OK, f"{name}: {safe_url(env[name].strip())}", group))
+            shown = redact(safe_url(env[name].strip()), tuple(env.get(k, "") for k in KEY_VARS))
+            checks.append(Check(OK, f"{name}: {shown}", group))
         else:
             checks.append(Check(INFO, f"{name}: no definida (se usa la de por defecto)", group))
     if _defined(env, "MODELDUEL_HTTP_TIMEOUT"):

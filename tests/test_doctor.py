@@ -45,6 +45,8 @@ def test_url_base_sin_credenciales(tmp_path, monkeypatch):
     text = _text(collect_checks(env=env, request=_no_network))
     assert "https://proxy.ejemplo.test/v1" in text
     assert SENTINEL not in text and "usuario" not in text
+    env = {"OMNIROUTE_BASE_URL": f"http://localhost:20128/v1?token={SENTINEL}"}
+    assert SENTINEL not in _text(collect_checks(env=env, request=_no_network))
 
 
 def test_timeout_http_invalido_es_un_fallo(tmp_path, monkeypatch):

@@ -175,17 +175,23 @@ def placeholder_error(spec: str, config_path: Path | None) -> str | None:
 
 
 def safe_url(url: str) -> str:
-    """URL sin usuario ni contraseña, para mostrarla."""
+    """URL para mostrar: sin usuario ni contraseña y sin la consulta ni el fragmento.
+
+    Una clave puede ir en ``user:pass@`` o en ``?token=…``; de la consulta solo se dice que hay.
+    """
     try:
         parts = urlsplit(url)
-        if not parts.username and not parts.password:
-            return url
         host = parts.hostname or ""
         if parts.port:
             host = f"{host}:{parts.port}"
     except ValueError:
         return "(URL no válida)"
-    return parts._replace(netloc=host).geturl()
+    if not parts.scheme or not host:
+        return "(URL no válida)"
+    shown = f"{parts.scheme}://{host}{parts.path}"
+    if parts.query or parts.fragment:
+        shown += "?…"
+    return shown
 
 
 def init_specs(selected: list[str]) -> list[str]:

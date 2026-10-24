@@ -639,11 +639,38 @@ def _kill_marked(marker: str) -> int:
         if not found:
             return killed
         for pid in found:
-            with contextlib.suppress(OSError):
-                os.kill(pid, signal.SIGKILL)
-                killed += 1
+            killed += _kill_if_marked(pid, needle)
         time.sleep(0.05)
     return killed
+
+
+def _kill_if_marked(pid: int, needle: bytes) -> int:
+    """Mata ``pid`` solo si sigue llevando la marca, sin carrera con la reutilización del PID.
+
+    Con ``pidfd_open`` (Linux 5.3+) el descriptor fija el proceso: si muere y su PID pasa a otro
+    entre la comprobación y la señal, ``pidfd_send_signal`` falla en vez de matar al nuevo.
+    """
+    pidfd = -1
+    with contextlib.suppress(OSError, AttributeError):
+        pidfd = os.pidfd_open(pid)
+    try:
+        try:
+            with open(f"/proc/{pid}/environ", "rb") as fh:
+                if needle not in fh.read().split(b"\0"):
+                    return 0
+        except OSError:
+            return 0
+        try:
+            if pidfd >= 0:
+                signal.pidfd_send_signal(pidfd, signal.SIGKILL)
+            else:
+                os.kill(pid, signal.SIGKILL)
+        except OSError:
+            return 0
+        return 1
+    finally:
+        if pidfd >= 0:
+            os.close(pidfd)
 
 
 class _ProcessTree:

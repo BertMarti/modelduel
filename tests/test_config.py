@@ -63,6 +63,9 @@ def test_marcador_cambia_esto():
 def test_safe_url_quita_usuario_y_contrasena():
     assert safe_url("https://usu:secreta@ejemplo.test:8443/v1") == "https://ejemplo.test:8443/v1"
     assert safe_url("http://localhost:11434/v1") == "http://localhost:11434/v1"
+    # Revisión cruzada: una clave en la consulta tampoco se muestra.
+    assert safe_url("https://host.test/v1?token=SECRETO#x") == "https://host.test/v1?…"
+    assert safe_url("no es una url") == "(URL no válida)"
 
 
 # ---------------------------------------------------------------- run + configuración

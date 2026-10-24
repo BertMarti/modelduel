@@ -351,6 +351,28 @@ def test_la_solucion_no_hereda_la_tuberia_del_supervisor(make_task):
     assert result.solved, result.output
 
 
+@linux_supervisor
+def test_kill_if_marked_no_mata_procesos_sin_la_marca():
+    # Revisión cruzada: solo se mata un proceso que siga llevando la marca exacta.
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        assert runner._kill_if_marked(proc.pid, b"MODELDUEL_RUN=otra") == 0
+        assert proc.poll() is None
+    finally:
+        proc.kill()
+        proc.wait()
+    marked = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        env={**os.environ, "MODELDUEL_RUN": "abc"},
+    )
+    try:
+        assert runner._kill_if_marked(marked.pid, b"MODELDUEL_RUN=abc") == 1
+        assert marked.wait(timeout=5) == -signal.SIGKILL
+    finally:
+        if marked.poll() is None:
+            marked.kill()
+
+
 def test_resumen_de_aislamiento_menciona_los_limites():
     summary = " ".join(runner.isolation_summary())
     assert "contenedor" in summary or os.name == "nt"
