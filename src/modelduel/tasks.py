@@ -90,7 +90,10 @@ def discover_tasks(path: Path) -> list[Task]:
         raise TaskError(f"{path} no es una carpeta de tareas.")
     tasks = [load_task(child) for child in sorted(path.iterdir()) if is_task_dir(child)]
     if not tasks:
-        raise TaskError(f"No hay tareas en {path}.")
+        raise TaskError(
+            f"No hay tareas en {path}. Una tarea es una carpeta con task.md y test_task.py; "
+            "crea ejemplos con `modelduel init`."
+        )
     return sorted(tasks, key=lambda t: (t.order, t.id))
 
 

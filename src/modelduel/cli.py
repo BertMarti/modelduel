@@ -11,7 +11,18 @@ from pathlib import Path
 from typing import NoReturn
 
 from modelduel import __version__
+from modelduel.config import (
+    PROVIDER_CATALOG,
+    Config,
+    ConfigError,
+    env_lines,
+    find_config,
+    init_project,
+    load_config,
+    placeholder_error,
+)
 from modelduel.demo import DEMO_MODELS, examples_dir
+from modelduel.doctor import collect_checks, render
 from modelduel.duel import run_duel
 from modelduel.heartbeat import Heartbeat
 from modelduel.leaderboard import build_leaderboard
@@ -104,7 +115,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = SpanishArgumentParser(
         prog="modelduel",
         description="Dos modelos, una tarea, los mismos tests.",
-        epilog="Aviso: el código generado por los modelos se ejecuta en tu máquina.",
+        epilog="Empieza con: modelduel demo (sin claves) · modelduel init · modelduel doctor. "
+        "Aviso: el código generado por los modelos se ejecuta en tu máquina.",
     )
     parser.add_argument(
         "--version",
@@ -112,26 +124,32 @@ def build_parser() -> argparse.ArgumentParser:
         version=f"modelduel {__version__}",
         help="muestra la versión y sale",
     )
-    sub = parser.add_subparsers(dest="command", required=True, metavar="orden")
+    sub = parser.add_subparsers(dest="command", metavar="orden")
 
     run = sub.add_parser("run", help="enfrenta de 2 a 6 modelos y genera el informe")
-    run.add_argument("tasks", type=Path, help="carpeta de tareas o carpeta de una tarea")
+    run.add_argument("tasks", type=Path, nargs="?", help="carpeta de tareas o carpeta de una tarea")
+    run.add_argument(
+        "--config",
+        type=Path,
+        metavar="F.toml",
+        help="configuración (por defecto, modelduel.toml de esta carpeta si existe)",
+    )
     run.add_argument("--a", metavar="PROVEEDOR:MODELO", help="contendiente A")
     run.add_argument("--b", metavar="PROVEEDOR:MODELO", help="contendiente B")
     run.add_argument(
         "--model",
         "-m",
         action="append",
-        default=[],
+        default=None,
         metavar="PROVEEDOR:MODELO",
         help=f"contendiente de una liga; repítelo ({MIN_CONTENDERS} a {MAX_CONTENDERS} en total, "
         "contando --a y --b)",
     )
-    run.add_argument("--runs", type=int, default=1, metavar="N", help="ejecuciones por tarea (1)")
+    run.add_argument("--runs", type=int, default=None, metavar="N", help="ejecuciones por tarea")
     run.add_argument(
         "--timeout",
         type=float,
-        default=DEFAULT_TIMEOUT,
+        default=None,
         metavar="S",
         help=f"límite en segundos para los tests de cada respuesta ({DEFAULT_TIMEOUT:g})",
     )
@@ -147,12 +165,37 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="continúa el duelo de --out saltando los intentos ya terminados",
     )
-    run.add_argument("--format", default="html", metavar="F", help=_FORMAT_HELP)
+    run.add_argument("--format", default=None, metavar="F", help=_FORMAT_HELP)
     run.add_argument("--prices", type=Path, metavar="F.json", help="tabla de precios adicional")
     run.add_argument(
         "--replays", type=Path, metavar="DIR", help="carpeta de respuestas grabadas para replay"
     )
-    run.add_argument("--out", type=Path, required=True, metavar="DIR", help="carpeta de salida")
+    run.add_argument("--out", type=Path, metavar="DIR", help="carpeta de salida")
+
+    init = sub.add_parser("init", help="prepara una carpeta con tareas, respuestas y configuración")
+    init.add_argument("folder", nargs="?", type=Path, default=Path("mi-duelo"), metavar="CARPETA")
+    init.add_argument(
+        "--proveedor",
+        "--provider",
+        action="append",
+        choices=tuple(PROVIDER_CATALOG),
+        default=[],
+        metavar="NOMBRE",
+        help="proveedor real (se puede repetir: gemini, openai, openrouter, ollama u omniroute)",
+    )
+
+    doctor = sub.add_parser("doctor", help="comprueba la instalación y la configuración")
+    doctor.add_argument(
+        "--red",
+        action="store_true",
+        help="pide a cada proveedor su lista de modelos (no gasta tokens)",
+    )
+    doctor.add_argument(
+        "--config",
+        type=Path,
+        metavar="F.toml",
+        help="configuración que revisar (modelduel.toml de esta carpeta si existe)",
+    )
 
     demo = sub.add_parser(
         "demo",
@@ -201,9 +244,20 @@ def main(argv: list[str] | None = None) -> int:
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
     args = build_parser().parse_args(argv)
+    if args.command is None:
+        print("Primeros pasos:")
+        print("  modelduel demo       duelo de ejemplo sin claves")
+        print("  modelduel init       prepara una carpeta con configuración")
+        print("  modelduel doctor     comprueba tu instalación")
+        print("  modelduel --help")
+        return EXIT_USAGE
     try:
         if args.command == "run":
             return cmd_run(args)
+        if args.command == "init":
+            return cmd_init(args)
+        if args.command == "doctor":
+            return cmd_doctor(args)
         if args.command == "demo":
             return cmd_demo(args)
         if args.command == "report":
@@ -211,8 +265,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "leaderboard":
             return cmd_leaderboard(args)
         return cmd_list_tasks(args)
-    except (TaskError, ProviderError, PricingError, ResultsError, RunnerError, ResumeError) as exc:
+    except (TaskError, ConfigError, PricingError, ResultsError, RunnerError, ResumeError) as exc:
         print(f"modelduel: error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except ProviderError as exc:
+        print(f"modelduel: error: {exc}", file=sys.stderr)
+        print("Ayuda: modelduel doctor", file=sys.stderr)
         return EXIT_USAGE
     except OutputError as exc:
         print(f"modelduel: error: {exc}", file=sys.stderr)
@@ -238,7 +296,7 @@ def collect_specs(args: argparse.Namespace) -> list[str]:
     """Contendientes en orden: ``--a``, ``--b`` y después cada ``--model``."""
     if args.b and not args.a:
         raise TaskError("--b necesita también --a (o usa --model para cada contendiente).")
-    specs = [spec for spec in (args.a, args.b) if spec] + list(args.model)
+    specs = [spec for spec in (args.a, args.b) if spec] + list(args.model or [])
     if len(specs) < MIN_CONTENDERS:
         raise TaskError(
             f"hacen falta al menos {MIN_CONTENDERS} contendientes: usa --a y --b, "
@@ -261,6 +319,8 @@ def _reject_duplicates(providers: dict) -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    config = _config_for_run(args)
+    _apply_config(args, config)
     if args.runs < 1:
         raise TaskError("--runs debe ser 1 o más.")
     if not math.isfinite(args.timeout) or args.timeout <= 0:
@@ -364,6 +424,90 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _config_for_run(args: argparse.Namespace) -> Config | None:
+    """``modelduel.toml`` de ``run`` (``--config`` o el del directorio actual); nunca en demo."""
+    if not getattr(args, "use_config", True):
+        return None
+    path = find_config(getattr(args, "config", None))
+    return load_config(path) if path is not None else None
+
+
+def _apply_config(args: argparse.Namespace, config: Config | None) -> None:
+    """Completa ``args`` con la configuración (la orden manda) y los valores por defecto."""
+    from_cli = bool(args.a or args.b or args.model)
+    if config is not None:
+        if args.tasks is None:
+            args.tasks = config.tasks
+        if not from_cli:
+            args.model = list(config.models)
+        if args.out is None:
+            args.out = config.out
+        for name, value in (("runs", config.runs), ("timeout", config.timeout)):
+            if getattr(args, name) is None:
+                setattr(args, name, value)
+        if args.format is None:
+            args.format = config.format
+    args.runs = 1 if args.runs is None else args.runs
+    args.timeout = DEFAULT_TIMEOUT if args.timeout is None else args.timeout
+    args.format = "html" if args.format is None else args.format
+    args.model = list(args.model or [])
+    if args.tasks is None:
+        raise TaskError(
+            "falta la carpeta de tareas. Usa `modelduel run CARPETA --a proveedor:modelo "
+            "--b proveedor:modelo --out RESULTADOS`, o prepara una carpeta con `modelduel init` "
+            "y ejecuta `modelduel run` dentro de ella. Sin claves: `modelduel demo`."
+        )
+    if args.out is None:
+        raise TaskError(
+            "falta --out CARPETA: dónde guardar results.json y el informe "
+            "(o pon «salida» en modelduel.toml)."
+        )
+    for spec in [s for s in (args.a, args.b) if s] + args.model:
+        problem = placeholder_error(spec, None if from_cli else getattr(config, "path", None))
+        if problem:
+            raise TaskError(problem)
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """``modelduel init``: carpeta con tareas de ejemplo, respuestas grabadas y configuración."""
+    folder: Path = args.folder
+    providers = list(dict.fromkeys(args.proveedor))
+    specs = init_project(folder, providers)
+    print(f"Listo: {folder}/")
+    print(f"  modelduel.toml  configuración ({', '.join(specs)})")
+    print("  tasks/          3 tareas de ejemplo (enunciado + tests): cámbialas por las tuyas")
+    print("  replays/        respuestas grabadas para probar sin claves")
+    if providers:
+        print()
+        print("Variables de entorno que necesitas (nunca las escribas en modelduel.toml):")
+        for name in providers:
+            info = PROVIDER_CATALOG[name]
+            print(f"  {name}" + (f" ({info.note})" if info.note else ""))
+            for line in env_lines(name):
+                var, _, value = line.partition("=")
+                print(f'    Linux/macOS:  export {var}="{value}"')
+                print(f'    PowerShell:   $env:{var} = "{value}"')
+            if info.key_url:
+                print(f"    consigue la clave en {info.key_url}")
+            print(f"    lista de modelos: {info.models_hint}")
+    print()
+    print("Siguientes pasos:")
+    print(f"  cd {folder}")
+    if any("CAMBIA-ESTO" in spec for spec in specs):
+        print("  edita modelduel.toml y cambia CAMBIA-ESTO por el nombre de cada modelo")
+    print("  modelduel doctor     comprueba que no falta nada")
+    print("  modelduel run        lanza el duelo y deja el informe en resultados/index.html")
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """``modelduel doctor``: comprobaciones de instalación, claves y configuración."""
+    checks = collect_checks(args.config, network=args.red)
+    text, code = render(checks, config_found=find_config(args.config) is not None)
+    print(text)
+    return code
+
+
 def _alive(line: str) -> None:
     """Señal de vida de una llamada larga: por stderr, para no mezclarla con el resultado."""
     print(line, file=sys.stderr, flush=True)
@@ -441,6 +585,8 @@ def cmd_demo(args: argparse.Namespace) -> int:
         replays=examples / "replays",
         format="html",
         out=args.out,
+        config=None,
+        use_config=False,
     )
     code = cmd_run(run_args)
     if code == 0:

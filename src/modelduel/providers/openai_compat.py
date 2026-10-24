@@ -51,7 +51,10 @@ class OpenAIProvider:
         if self.KEY_REQUIRED and not self.api_key and host not in _LOCAL_HOSTS:
             raise ProviderError(
                 f"Falta la variable de entorno {self.KEY_ENV} "
-                f"(necesaria para {self.base_url}; los servidores locales como Ollama no la piden)."
+                f"(necesaria para {self.base_url}; "
+                "los servidores locales como Ollama no la piden). "
+                f'Defínela con: export {self.KEY_ENV}="PEGA_AQUI_TU_CLAVE" '
+                f'(PowerShell: $env:{self.KEY_ENV} = "PEGA_AQUI_TU_CLAVE").'
             )
 
     def _notify(self, message: str) -> None:

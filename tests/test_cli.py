@@ -113,9 +113,9 @@ def _usage_error(argv, capsys) -> str:
 
 
 def test_errores_de_argumentos_en_espanol(capsys):
-    err = _usage_error(["run"], capsys)
-    assert err.startswith("uso: modelduel run")
-    assert "faltan argumentos obligatorios: tasks, --out" in err
+    err = _usage_error(["report"], capsys)
+    assert err.startswith("uso: modelduel report")
+    assert "faltan argumentos obligatorios: results, --out" in err
     err = _usage_error(["run", "t", "--a", "x", "--b", "y", "--out", "o", "--runs", "dos"], capsys)
     assert "argumento --runs: valor no válido: 'dos'" in err
     err = _usage_error(["duelo"], capsys)
