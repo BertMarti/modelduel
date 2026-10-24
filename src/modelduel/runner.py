@@ -59,6 +59,9 @@ _SECRET_HINTS = (
     "SESSION",  # AWS_SESSION_TOKEN, DBUS_SESSION_BUS_ADDRESS
     "SIGNATURE",
     "DSN",  # SENTRY_DSN y cadenas de conexión con usuario y contraseña
+    "PROXY",  # HTTP(S)_PROXY puede llevar usuario:contraseña@
+    "WEBHOOK",  # una URL de webhook es en sí una credencial
+    "_PWD",  # MYSQL_PWD (pero no PWD, el directorio actual)
 )
 # Variables sin «pista» en el nombre que dan acceso a algo: conexión a bases de datos,
 # al demonio de Docker, a Kubernetes o al agente GPG, o rutas a archivos de configuración con
@@ -72,6 +75,7 @@ _SENSITIVE_VARS = frozenset(
         "DOCKER_CONFIG",
         "KUBECONFIG",
         "GPG_AGENT_INFO",
+        "GNUPGHOME",
         "AWS_CONFIG_FILE",
         "NETRC",
         "NPM_CONFIG_USERCONFIG",
@@ -96,8 +100,14 @@ _HOME_VARS = (
 
 # Límites POSIX (``setrlimit``) del subproceso. Windows no tiene ``resource``: allí solo se
 # aplican el límite de tiempo y el Job Object que mata el árbol.
-MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024  # 1 GiB de espacio de direcciones
-FILE_SIZE_LIMIT_BYTES = 64 * 1024 * 1024  # ningún archivo (ni la salida) pasa de 64 MiB
+# 4 GiB de espacio de direcciones (no de memoria residente): cada hilo reserva su pila, así que
+# con 1 GiB un ThreadPoolExecutor en una máquina de muchos núcleos ya fallaba. Solo Linux lo
+# respeta; macOS no aplica RLIMIT_AS.
+MEMORY_LIMIT_BYTES = 4 * 1024 * 1024 * 1024
+# Ningún archivo (tampoco la salida de los tests) pasa de 256 MiB. CPython ignora SIGXFSZ: al
+# superarlo, write() lanza «OSError: [Errno 27] File too large» y el mensaje lo explica. La lectura
+# de la salida ya está acotada por ``_read_capped``.
+FILE_SIZE_LIMIT_BYTES = 256 * 1024 * 1024
 OPEN_FILES_LIMIT = 256
 # Margen de CPU sobre el límite de tiempo: el reloj de pared sigue siendo el que manda.
 CPU_MARGIN_S = 5
@@ -115,11 +125,15 @@ if resource is not None:
         _res = getattr(resource, _name, None)
         if _res is None:
             continue
+        # Con blando == duro en la CPU el núcleo manda SIGKILL y nunca SIGXCPU: un segundo de
+        # margen en el duro permite explicar el final. El resto, blando == duro.
+        _new_hard = _value + 1 if _name == "RLIMIT_CPU" else _value
         try:
             _soft, _hard = resource.getrlimit(_res)
             if _hard != resource.RLIM_INFINITY:
                 _value = min(_value, _hard)
-            resource.setrlimit(_res, (_value, _value))
+                _new_hard = min(_new_hard, _hard)
+            resource.setrlimit(_res, (_value, _new_hard))
         except (ValueError, OSError):
             pass  # p. ej. RLIMIT_AS en macOS: se sigue con el resto de límites
 del sys.argv[1]
@@ -252,6 +266,33 @@ def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) ->
     finally:
         _remove_tree(root)
 
+    result = _classify(returncode, counts, output, duration, expected, timeout)
+    if _hit_file_size_limit(output):
+        result.message = file_size_message()
+    return result
+
+
+def file_size_message() -> str:
+    return (
+        f"La solución escribió más de {FILE_SIZE_LIMIT_BYTES // (1024 * 1024)} MiB de salida "
+        "o en un archivo (límite del sistema)."
+    )
+
+
+def _hit_file_size_limit(output: str) -> bool:
+    """``True`` si la salida muestra el ``OSError`` de ``RLIMIT_FSIZE`` (CPython ignora SIGXFSZ)."""
+    return "[Errno 27]" in output or "File too large" in output
+
+
+def _classify(
+    returncode: int | None,
+    counts: dict | None,
+    output: str,
+    duration: float,
+    expected: int,
+    timeout: float,
+) -> TestRun:
+    """Convierte el código de salida y el XML de pytest en un ``TestRun``."""
     if returncode is None:
         return TestRun(
             status="timeout",
