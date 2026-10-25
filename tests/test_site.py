@@ -209,7 +209,7 @@ def test_results_json_generado_en_el_ci_se_puede_reproducir(tmp_path):
     assert result["top"] == "c"
     assert result["marks0"] == "▲ primero"
     assert result["text"].startswith(
-        "En esta tarea («" + data["tasks"][0]["title"] + "», 1 de 3), gana C"
+        f"En esta tarea («{data['tasks'][0]['title']}», 1 de {len(data['tasks'])}), gana C"
     )
 
 

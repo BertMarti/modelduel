@@ -165,7 +165,7 @@ def test_liga_de_tres_de_extremo_a_extremo(examples_dir, replays, tmp_path, caps
     assert results["status"] == "complete"
     printed = capsys.readouterr().out
     lines = [ln for ln in printed.splitlines() if re.match(r"\s+\d+\s+[A-F] replay:", ln)]
-    assert [ln.split()[2] for ln in lines] == ["replay:alfa", "replay:gamma", "replay:beta"]
+    assert [ln.split()[2] for ln in lines] == ["replay:alfa", "replay:beta", "replay:gamma"]
     assert [ln.split()[0] for ln in lines] == ["1", "2", "3"]
     html = (out / "index.html").read_text(encoding="utf-8")
     assert "Informe de liga" in html and "Clasificación" in html
