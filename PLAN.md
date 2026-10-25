@@ -28,15 +28,20 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
 - CSP sin `'unsafe-inline'` en `style-src` (hash de cada `<style>`).
 - README: prueba en una orden con entorno virtual, flujo `init` → `doctor` → `run` y orden `docker run` para código no fiable.
 
+## Hecho en la fase 3 (26/10/2026, v0.9.0)
+- **Aislamiento en contenedores:** `--sandbox docker|podman` (imagen oficial fijada por digest, sin red ni privilegios, solo lectura, techos de memoria, CPU y procesos) y clave `aislamiento` en `modelduel.toml`.
+- **Aislamiento de red en Linux:** red cortada por defecto con espacios de nombres de usuario y red (sin root); aviso si el sistema no lo permite.
+- **Límite de memoria en Windows:** `JOB_OBJECT_LIMIT_PROCESS_MEMORY` (1 GiB por proceso) en el Job Object, probado en el CI de Windows.
+- **Modo «solo generar»:** `--solo-generar` y `--replay CARPETA`.
+- **Más tareas de ejemplo:** `flatten_json`, `csv_totals`, `wrap_text`, `grid_path` y `topo_order` (8 en total).
+- `modelduel doctor` informa del aislamiento disponible y recomienda el mejor.
+
 ## Siguiente
-- **Límite de memoria en Windows:** Implementar `JOB_OBJECT_LIMIT_PROCESS_MEMORY` en el *Job Object* del runner para igualar la seguridad de POSIX.
-- **Aislamiento en contenedores:** Añadir opción `--docker` o `--podman` para ejecutar los tests dentro de un contenedor si la herramienta está disponible, proporcionando un sandbox real.
-- **Aislamiento de red en Linux:** Intentar usar `unshare -n` (namespaces de red) para desactivar el acceso a internet del código generado cuando el sistema lo permita.
-- **Más tareas de ejemplo:** Ampliar `examples/tasks/` con retos de algoritmos más complejos y manipulación de datos (ej. JSON, CSV).
-- **Resultados reales:** Poblar la carpeta `results/` con duelos reales entre modelos actuales para que la clasificación pública sea útil.
+- **Resultados reales:** Poblar la carpeta `results/` con duelos reales entre modelos actuales para que la clasificación pública sea útil (necesita claves y gasto: decisión de Alberto).
+- **Disco:** `RLIMIT_FSIZE` limita cada archivo, no el total, y el contenedor monta la carpeta de la ejecución sin tope; valorar copiar los archivos a un tmpfs del contenedor (`docker create` + `docker cp`) o un volumen con cuota.
 - **Procesos que se desligan en macOS:** no hay subreaper; valorar recorrer los procesos con la marca `MODELDUEL_RUN` (`ps -E`) también allí.
-- **Modo «solo generar»:** guardar las respuestas sin ejecutarlas para ejecutar los tests en otra máquina o en un contenedor con `--network none`.
-- **Disco:** `RLIMIT_FSIZE` limita cada archivo, no el total; valorar un tope de disco (cuota o contenedor).
+- **Contenedor sin el pytest del anfitrión:** opción de imagen propia con pytest (publicada en GHCR) para no depender de montar los paquetes del entorno local.
+- **Actualizar la imagen fijada** cuando salga un parche de Python (Dependabot no ve la constante de `sandbox.py`; cómo hacerlo en `docs/DESARROLLO.md`).
 
 ## Ideas
 - **Tareas multi-lenguaje:** Soporte experimental para tareas en JavaScript/TypeScript usando `node --test`.
