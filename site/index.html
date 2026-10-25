@@ -216,6 +216,7 @@ modelduel run --resume    # continúa un duelo cortado
 # Todo en la orden, sin archivo de configuración (o repite --model para una liga de 2 a 6)
 modelduel run tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo</code></pre>
   <p>Las claves van en variables de entorno (<code>export GEMINI_API_KEY="…"</code>), nunca en un archivo. <code>modelduel init</code> te dice cuáles necesitas y dónde conseguirlas.</p>
+  <p><code>init</code>, <code>doctor</code> y <code>run</code> sin argumentos llegan en la 0.8.0. Si <code>modelduel --version</code> dice 0.7.0, aún no está en PyPI: instálala desde GitHub con <code>pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"</code>.</p>
   <p>El paquete está en <a href="https://pypi.org/project/modelduel/">PyPI</a>. Para la última versión sin publicar: <code>pip install git+https://github.com/BertMarti/modelduel pytest</code>.</p>
 </section>
 

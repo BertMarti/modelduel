@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 
 import pytest
@@ -168,3 +169,15 @@ def test_orden_doctor(tmp_path, monkeypatch, capsys):
     assert main(["doctor"]) == 0
     out = capsys.readouterr().out
     assert "Instalación" in out and "pytest" in out and "Todo listo" in out
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="permisos POSIX sin root")
+def test_tareas_sin_permiso_de_lectura_no_rompen_doctor(proyecto, tmp_path):
+    proyecto('"replay:alfa", "replay:beta"')
+    tasks = tmp_path / "tasks"
+    tasks.chmod(0)
+    try:
+        text, code = render(collect_checks(env={}))
+    finally:
+        tasks.chmod(0o755)
+    assert code == 1 and "permiso denegado" in text

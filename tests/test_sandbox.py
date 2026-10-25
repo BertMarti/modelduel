@@ -362,15 +362,21 @@ def test_kill_if_marked_no_mata_procesos_sin_la_marca():
         proc.kill()
         proc.wait()
     marked = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(30)"],
+        [sys.executable, "-c", "import time; print('listo', flush=True); time.sleep(30)"],
         env={**os.environ, "MODELDUEL_RUN": "abc"},
+        stdout=subprocess.PIPE,
     )
     try:
+        # Hasta el exec, /proc/<pid>/environ aún es el del padre: se espera a que arranque.
+        assert marked.stdout is not None and marked.stdout.readline() == b"listo\n"
         assert runner._kill_if_marked(marked.pid, b"MODELDUEL_RUN=abc") == 1
         assert marked.wait(timeout=5) == -signal.SIGKILL
     finally:
         if marked.poll() is None:
             marked.kill()
+        marked.wait()
+        if marked.stdout is not None:
+            marked.stdout.close()
 
 
 def test_resumen_de_aislamiento_menciona_los_limites():
@@ -378,3 +384,15 @@ def test_resumen_de_aislamiento_menciona_los_limites():
     assert "contenedor" in summary or os.name == "nt"
     if runner.supervisor_supported():
         assert "setsid" in summary
+
+
+@linux_supervisor
+def test_sigterm_al_supervisor_se_explica_como_senal(make_task):
+    # Revisión final: antes salía «pytest terminó con código 0 sin generar resultados».
+    code = (
+        "import os, signal\nos.kill(os.getppid(), signal.SIGTERM)\n"
+        "def add(a, b):\n    return a + b\n"
+    )
+    result = run_tests(code, make_task(ADD_TESTS))
+    assert not result.solved
+    assert "SIGTERM" in result.message, result.message

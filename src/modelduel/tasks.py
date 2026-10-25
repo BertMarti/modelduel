@@ -82,6 +82,17 @@ def load_task(path: Path) -> Task:
 def discover_tasks(path: Path) -> list[Task]:
     """Devuelve la tarea de ``path`` o todas las tareas de sus subcarpetas, ordenadas."""
     path = Path(path)
+    try:
+        return _discover(path)
+    except PermissionError as exc:
+        where = exc.filename or path
+        raise TaskError(
+            f"No se puede leer {where}: permiso denegado. Revisa sus permisos "
+            "(por ejemplo con `ls -l`) o elige otra carpeta de tareas."
+        ) from None
+
+
+def _discover(path: Path) -> list[Task]:
     if not path.exists():
         raise TaskError(f"No existe la ruta {path}.")
     if is_task_dir(path):

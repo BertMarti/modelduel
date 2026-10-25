@@ -58,6 +58,9 @@ Solo evalúa funciones de Python comprobables con tests automáticos. Una sola e
 
 2. **Prueba la demo** sin claves ni coste: `modelduel demo`. Enfrenta respuestas grabadas de `alfa`, `beta` y `gamma` y deja el informe en `modelduel-demo/`.
 
+> [!NOTE]
+> `modelduel init`, `modelduel doctor` y `modelduel run` sin argumentos (pasos 3 a 6) llegan en la versión 0.8.0. Si `modelduel --version` dice 0.7.0, es que aún no está en PyPI: instala la última versión desde GitHub con `pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"`. La demo funciona con las dos.
+
 3. **Prepara tu duelo** con los proveedores que vayas a usar:
 
    ```bash

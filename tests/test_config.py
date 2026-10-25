@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 
 import pytest
@@ -147,3 +148,16 @@ def test_falta_la_clave_explica_como_definirla(proyecto, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert 'export GEMINI_API_KEY="PEGA_AQUI_TU_CLAVE"' in err
     assert "$env:GEMINI_API_KEY" in err and "Ayuda: modelduel doctor" in err
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="permisos POSIX sin root")
+def test_carpeta_de_tareas_sin_permiso_es_un_error_claro(tmp_path, capsys):
+    tasks = tmp_path / "tareas"
+    (tasks / "una").mkdir(parents=True)
+    tasks.chmod(0)
+    try:
+        code = main(["run", str(tasks), "--a", "replay:alfa", "--b", "replay:beta", "--out", "r"])
+    finally:
+        tasks.chmod(0o755)
+    assert code == EXIT_USAGE
+    assert "permiso denegado" in capsys.readouterr().err

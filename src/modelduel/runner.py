@@ -180,15 +180,44 @@ def descendants():
     return found
 
 
+def parent_of(pid):
+    try:
+        with open("/proc/" + str(pid) + "/stat", "rb") as fh:
+            data = fh.read()
+        return int(data[data.rindex(b")") + 2 :].split()[1])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def kill(pid, tree):
+    # pidfd fija el proceso: si muere y su PID se reutiliza antes de la señal, la señal falla
+    # en vez de alcanzar a otro. Se comprueba que sigue colgando del árbol tras abrirlo.
+    fd = -1
+    try:
+        fd = os.pidfd_open(pid)
+    except (OSError, AttributeError):
+        pass
+    try:
+        if parent_of(pid) not in tree:
+            return
+        if fd >= 0:
+            signal.pidfd_send_signal(fd, signal.SIGKILL)
+        else:
+            os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
 def reap_all():
     deadline = time.monotonic() + 10
     while True:
         pids = descendants()
+        tree = set(pids) | {me}
         for pid in pids:
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError:
-                pass
+            kill(pid, tree)
         while True:
             try:
                 if os.waitpid(-1, os.WNOHANG)[0] == 0:
@@ -601,8 +630,12 @@ def _execute_supervised(
     try:
         return int(status), duration
     except ValueError:
-        # El supervisor no informó (lo mataron): su propio final es lo único que se sabe.
-        return proc.returncode, duration
+        pass
+    if status == "stopped":
+        # Al supervisor le llegó SIGTERM (de la propia solución, p. ej.): se informa como tal.
+        return -signal.SIGTERM, duration
+    # El supervisor no informó (lo mataron): su propio final es lo único que se sabe.
+    return proc.returncode, duration
 
 
 def _read_status(fd: int) -> str:

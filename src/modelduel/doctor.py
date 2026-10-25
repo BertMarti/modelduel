@@ -180,6 +180,8 @@ def config_checks(path: Path | None, env: Mapping[str, str]) -> tuple[list[Check
         checks.append(Check(OK, f"{len(tasks)} tareas en {config.tasks}", group))
     except TaskError as exc:
         checks.append(Check(FAIL, str(exc), group))
+    except OSError as exc:
+        checks.append(Check(FAIL, f"no se pudo leer {config.tasks}: {exc.strerror or exc}", group))
     return checks, config
 
 
