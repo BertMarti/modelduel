@@ -13,6 +13,7 @@ from modelduel.providers import Provider, ProviderError
 from modelduel.results import SCHEMA_VERSION, summarize
 from modelduel.resume import Key, task_fingerprint
 from modelduel.runner import DEFAULT_TIMEOUT, TestRun, build_prompt, run_tests
+from modelduel.sandbox import Sandbox
 from modelduel.tasks import Task
 
 Progress = Callable[[str], None]
@@ -31,6 +32,7 @@ def run_duel(
     reuse: dict[Key, dict] | None = None,
     created_at: str | None = None,
     heartbeat: HeartbeatFactory | None = None,
+    sandbox: Sandbox | None = None,
 ) -> dict:
     """Enfrenta a los contendientes. ``on_update`` recibe los resultados tras cada intento.
 
@@ -91,7 +93,14 @@ def run_duel(
                     progress(_progress_line(task, side, run, runs, reuse[key], reused=True))
                     continue
                 attempt = run_attempt(
-                    task, prompt, providers[side], contender_prices[side], timeout, heartbeat
+                    task,
+                    prompt,
+                    providers[side],
+                    contender_prices[side],
+                    timeout,
+                    heartbeat,
+                    run=run,
+                    sandbox=sandbox,
                 )
                 attempt["run"] = run
                 attempts = entry["results"][side]
@@ -124,12 +133,22 @@ def run_attempt(
     price: Price | None,
     timeout: float,
     heartbeat: HeartbeatFactory | None = None,
+    run: int = 1,
+    sandbox: Sandbox | None = None,
 ) -> dict:
-    live = heartbeat is not None and not provider.spec.startswith("replay:")
+    live = (
+        heartbeat is not None
+        and not provider.spec.startswith("replay:")
+        and not getattr(provider, "recorded", False)
+    )
     label = f"{provider.spec} (tarea {task.id})"
     try:
         with heartbeat(label) if heartbeat is not None and live else nullcontext():
-            response = provider.complete(prompt, task_id=task.id)
+            if getattr(provider, "recorded", False):
+                # RecordedProvider (``run --replay``): la respuesta grabada de ESA ejecución.
+                response = provider.complete(prompt, task_id=task.id, run=run)  # type: ignore[call-arg]
+            else:
+                response = provider.complete(prompt, task_id=task.id)
     except Exception as exc:  # noqa: BLE001 - un intento fallido no debe tumbar todo el duelo
         message = clean_text(str(exc) if isinstance(exc, ProviderError) else _unexpected(exc))
         test_run = TestRun(status="provider_error", total=task.expected_tests, message=message)
@@ -145,7 +164,7 @@ def run_attempt(
         return attempt
     text = clean_text(response.text)
     code = extract_code(text)
-    test_run = run_tests(code, task, timeout=timeout)
+    test_run = run_tests(code, task, timeout=timeout, sandbox=sandbox)
     attempt = test_run.to_dict()
     attempt.update(
         latency_s=round(response.latency_s, 3),

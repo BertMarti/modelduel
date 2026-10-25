@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 from modelduel.demo import examples_dir
 from modelduel.results import MAX_CONTENDERS, MIN_CONTENDERS
+from modelduel.sandbox import SANDBOX_CHOICES
 
 CONFIG_NAME = "modelduel.toml"
 PLACEHOLDER = "CAMBIA-ESTO"
@@ -78,7 +79,15 @@ MODELS_HINT_BY_PREFIX = {
 # Proveedores que comparten OPENAI_BASE_URL/OPENAI_API_KEY: solo uno por duelo.
 _SHARED_OPENAI = ("openai", "openrouter", "ollama")
 
-VALID_KEYS = ("tareas", "modelos", "ejecuciones", "tiempo_limite", "salida", "formato")
+VALID_KEYS = (
+    "tareas",
+    "modelos",
+    "ejecuciones",
+    "tiempo_limite",
+    "salida",
+    "formato",
+    "aislamiento",
+)
 
 
 class ConfigError(Exception):
@@ -94,6 +103,7 @@ class Config:
     timeout: float | None = None
     out: Path | None = None
     format: str | None = None
+    sandbox: str | None = None  # «aislamiento»: auto, docker, podman o ninguno
 
 
 def find_config(explicit: Path | None) -> Path | None:
@@ -144,6 +154,14 @@ def load_config(path: Path) -> Config:
         raise ConfigError(f"{path}: «tiempo_limite» debe ser un número de segundos mayor que 0.")
     out = _typed(path, data, "salida", str, "un texto (carpeta de resultados)")
     fmt = _typed(path, data, "formato", str, "un texto: html, md o html,md")
+    sandbox = _typed(path, data, "aislamiento", str, f"uno de: {', '.join(SANDBOX_CHOICES)}")
+    if sandbox is not None:
+        sandbox = sandbox.strip().lower()
+        if sandbox not in SANDBOX_CHOICES:
+            raise ConfigError(
+                f"{path}: «aislamiento» debe ser uno de: {', '.join(SANDBOX_CHOICES)} "
+                f"(tiene «{sandbox}»)."
+            )
     base = path.parent
     return Config(
         path=path,
@@ -153,6 +171,7 @@ def load_config(path: Path) -> Config:
         timeout=float(timeout) if timeout is not None else None,
         out=base / out if out else None,
         format=fmt,
+        sandbox=sandbox,
     )
 
 
@@ -254,6 +273,10 @@ def render_config(specs: list[str], providers: list[str]) -> str:
         "",
         "# Segundos máximos para los tests de cada respuesta (20 por defecto).",
         "# tiempo_limite = 20",
+        "",
+        "# Dónde se ejecuta el código de los modelos: auto (en local; en Linux, sin red si se",
+        "# puede), docker o podman (contenedor sin red ni privilegios: lo más seguro) o ninguno.",
+        '# aislamiento = "docker"',
     ]
     for name in providers:
         info = PROVIDER_CATALOG[name]

@@ -8,8 +8,10 @@ tiempo) se mata el árbol de procesos completo: un *Job Object* en Windows y un 
 en POSIX. La salida va a un archivo y solo se leen su principio y su final, así que una solución
 que imprime sin parar no puede agotar la memoria.
 
-No es un aislamiento real: la solución tiene red y puede leer y escribir rutas absolutas del
-disco. Para código no confiable, usa un contenedor o una máquina virtual.
+En Linux, por defecto, el supervisor corta además la red con un espacio de nombres propio
+(``sandbox.network_isolation_available``). Aun así puede leer y escribir rutas absolutas del disco:
+para código no confiable, usa ``--sandbox docker|podman`` (``sandbox.py``), que ejecuta los tests
+en un contenedor sin red, sin privilegios y de solo lectura.
 """
 
 from __future__ import annotations
@@ -31,6 +33,18 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from modelduel.sandbox import (
+    CONTAINER_FAILURE_CODES,
+    CONTAINER_GRACE_S,
+    CONTAINER_MEMORY,
+    CONTAINER_ROOT,
+    TIMEOUT_EXIT_CODE,
+    Sandbox,
+    container_command,
+    container_name,
+    network_isolation_available,
+    remove_container,
+)
 from modelduel.tasks import TEST_FILE, Task
 
 DEFAULT_TIMEOUT = 20.0
@@ -111,6 +125,9 @@ FILE_SIZE_LIMIT_BYTES = 256 * 1024 * 1024
 OPEN_FILES_LIMIT = 256
 # Margen de CPU sobre el límite de tiempo: el reloj de pared sigue siendo el que manda.
 CPU_MARGIN_S = 5
+# Windows: memoria comprometida máxima de cada proceso del Job Object
+# (JOB_OBJECT_LIMIT_PROCESS_MEMORY). Al superarla, la reserva falla (MemoryError en Python).
+WINDOWS_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024
 
 # Arranque del subproceso: aplica los límites y ejecuta pytest en el mismo proceso. Así no hace
 # falta ``preexec_fn`` (inseguro con hilos, y modelduel tiene el de la señal de vida).
@@ -152,11 +169,24 @@ raise SystemExit(pytest.main(sys.argv[1:]))
 # hijo con ``close_fds``: la solución no hereda la tubería.
 _SUPERVISOR = """\
 import ctypes, os, signal, subprocess, sys, time
-status_fd, timeout, cmd = int(sys.argv[1]), float(sys.argv[2]), sys.argv[3:]
+status_fd, timeout, isolate, cmd = int(sys.argv[1]), float(sys.argv[2]), sys.argv[3], sys.argv[4:]
 try:
     ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)  # PR_SET_CHILD_SUBREAPER
 except (OSError, AttributeError):
     pass  # sin subreaper solo se ven los descendientes que no se hayan desligado
+if isolate == "net":
+    # Espacio de nombres de usuario y de red propios (como `unshare --map-current-user --net`):
+    # sin root, el mismo UID dentro y solo un `lo` apagado. Si falla, no se ejecuta nada.
+    try:
+        uid, gid = os.getuid(), os.getgid()
+        os.unshare(os.CLONE_NEWUSER | os.CLONE_NEWNET)
+        maps = (("setgroups", "deny"), ("uid_map", f"{uid} {uid} 1"), ("gid_map", f"{gid} {gid} 1"))
+        for name, text in maps:
+            with open("/proc/self/" + name, "w") as fh:
+                fh.write(text)
+    except (OSError, AttributeError):
+        os.write(status_fd, b"nonet")
+        raise SystemExit(0)
 me = os.getpid()
 
 
@@ -317,7 +347,10 @@ def isolation_summary() -> list[str]:
     """Medidas de protección que el runner aplica en este sistema (para ``modelduel doctor``)."""
     items = ["directorio temporal propio y entorno sin secretos", "límite de tiempo por respuesta"]
     if os.name == "nt":
-        items.append("Job Object que mata el árbol de procesos (sin límite de memoria)")
+        items.append(
+            "Job Object que mata el árbol de procesos y limita la memoria a "
+            f"{WINDOWS_MEMORY_LIMIT_BYTES // 2**30} GiB por proceso"
+        )
         return items
     items.append("límites del sistema (setrlimit): CPU, memoria, archivos y descriptores")
     if supervisor_supported():
@@ -328,7 +361,9 @@ def isolation_summary() -> list[str]:
         items.append(
             "grupo de procesos propio que se mata al terminar (no recoge los que hacen setsid)"
         )
-    items.append("sin aislamiento de red ni de disco: para código no fiable, usa un contenedor")
+    if network_isolation_available() and supervisor_supported():
+        items.append("red cortada por defecto (espacio de nombres de red de Linux, sin root)")
+    items.append("para código no fiable: --sandbox docker o podman (contenedor sin red ni root)")
     return items
 
 
@@ -369,8 +404,23 @@ def resource_limits(timeout: float) -> dict[str, int]:
     }
 
 
-def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) -> TestRun:
-    """Ejecuta ``test_task.py`` contra ``code`` guardado como ``solution.py``."""
+def default_sandbox() -> Sandbox:
+    """Lo de siempre más la red cortada en Linux cuando el sistema lo permite (``auto``)."""
+    return Sandbox(isolate_network=network_isolation_available())
+
+
+def run_tests(
+    code: str | None,
+    task: Task,
+    timeout: float = DEFAULT_TIMEOUT,
+    sandbox: Sandbox | None = None,
+) -> TestRun:
+    """Ejecuta ``test_task.py`` contra ``code`` guardado como ``solution.py``.
+
+    ``sandbox`` decide dónde: en local (por defecto, con la red cortada si se puede) o en un
+    contenedor de Docker/Podman ya preparado con ``sandbox.prepare_container``.
+    """
+    sandbox = default_sandbox() if sandbox is None else sandbox
     expected = task.expected_tests
     if code is None:
         return TestRun(
@@ -394,29 +444,61 @@ def run_tests(code: str | None, task: Task, timeout: float = DEFAULT_TIMEOUT) ->
         (workdir / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
         junit = root / "junit.xml"
         output_path = root / "output.log"
-        cmd = [
-            sys.executable,
-            "-c",
-            _BOOTSTRAP,
-            json.dumps(resource_limits(timeout)),
-            "-q",
-            "--tb=short",
-            "-p",
-            "no:cacheprovider",
-            f"--junitxml={junit}",
-            TEST_FILE,
-        ]
-        env = safe_env(home=tmpdir)
-        # Los temporales de la solución y de pytest se quedan dentro de la ejecución y se borran.
-        for name in ("TMP", "TEMP", "TMPDIR"):
-            env[name] = str(tmpdir)
-        returncode, duration = _execute(cmd, workdir, env, output_path, timeout)
+        pytest_args = ["-q", "--tb=short", "-p", "no:cacheprovider"]
+        limits = json.dumps(resource_limits(timeout))
+        if sandbox.is_container:
+            python_args = [
+                "-c",
+                _BOOTSTRAP,
+                limits,
+                *pytest_args,
+                f"--junitxml={CONTAINER_ROOT}/junit.xml",
+                TEST_FILE,
+            ]
+            returncode, duration = _execute_container(
+                sandbox, root, python_args, output_path, timeout
+            )
+        else:
+            cmd = [
+                sys.executable,
+                "-c",
+                _BOOTSTRAP,
+                limits,
+                *pytest_args,
+                f"--junitxml={junit}",
+                TEST_FILE,
+            ]
+            env = safe_env(home=tmpdir)
+            # Los temporales de la solución y de pytest se quedan dentro de la ejecución.
+            for name in ("TMP", "TEMP", "TMPDIR"):
+                env[name] = str(tmpdir)
+            returncode, duration = _execute(
+                cmd, workdir, env, output_path, timeout, isolate_network=sandbox.isolate_network
+            )
         output = _truncate(_clean_output(_read_capped(output_path), root))
         counts = parse_junit(junit) if junit.is_file() else None
+    except _SetupFailed as exc:
+        return TestRun(status="error", total=expected, message=str(exc))
     finally:
         _remove_tree(root)
 
+    if sandbox.is_container and returncode in CONTAINER_FAILURE_CODES and counts is None:
+        return TestRun(
+            status="error",
+            total=expected,
+            duration_s=duration,
+            output=output,
+            message=(
+                f"{sandbox.kind} no pudo ejecutar los tests en el contenedor (código {returncode})."
+                " Revisa la salida y `modelduel doctor`."
+            ),
+        )
     result = _classify(returncode, counts, output, duration, expected, timeout)
+    if sandbox.is_container and returncode == -9 and counts is None:  # SIGKILL
+        result.message = (
+            "El contenedor terminó los tests a la fuerza: ¿superó la memoria "
+            f"({CONTAINER_MEMORY.upper()}iB) o el número de procesos?"
+        )
     if _hit_file_size_limit(output):
         result.message = file_size_message()
     return result
@@ -548,8 +630,58 @@ def parse_junit(path: Path) -> dict | None:
 # ---------------------------------------------------------------- subproceso
 
 
+class _SetupFailed(Exception):
+    """No se pudo preparar el aislamiento pedido para esta ejecución (no es culpa del modelo)."""
+
+
+def _execute_container(
+    sandbox: Sandbox, root: Path, python_args: list[str], output_path: Path, timeout: float
+) -> tuple[int | None, float]:
+    """Ejecuta los tests en un contenedor desechable; ``None`` si se agota el tiempo.
+
+    Dentro, ``timeout -s KILL`` corta a los ``timeout`` s (sale con 124). El cliente de
+    Docker/Podman corre con el entorno normal (lo necesita para hablar con su demonio); al
+    contenedor solo llegan las variables de ``sandbox.container_env``. Si el cliente no vuelve a
+    tiempo, ``rm -f`` para el contenedor y todo lo que haya dentro.
+    """
+    name = container_name()
+    cmd = container_command(sandbox, name=name, root=root, python_args=python_args, timeout=timeout)
+    start = time.perf_counter()
+    finished = False
+    with open(output_path, "wb") as out:
+        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT)
+        try:
+            returncode: int | None = proc.wait(timeout=timeout + CONTAINER_GRACE_S)
+            finished = True
+        except subprocess.TimeoutExpired:
+            returncode = None
+        finally:
+            if not finished:
+                remove_container(sandbox, name)
+                proc.kill()
+                proc.wait()
+    duration = round(time.perf_counter() - start, 3)
+    if returncode == TIMEOUT_EXIT_CODE:
+        return None, duration
+    # Señales que el proceso de dentro recibe por un límite (Windows no define todas).
+    limit_signals = {
+        int(sig)
+        for name in ("SIGKILL", "SIGXCPU", "SIGXFSZ", "SIGSEGV")
+        if (sig := getattr(signal, name, None)) is not None
+    }
+    if returncode is not None and returncode > 128 and returncode - 128 in limit_signals:
+        # El proceso de dentro murió por una señal: se informa igual que en local.
+        return -(returncode - 128), duration
+    return returncode, duration
+
+
 def _execute(
-    cmd: list[str], workdir: Path, env: dict[str, str], output_path: Path, timeout: float
+    cmd: list[str],
+    workdir: Path,
+    env: dict[str, str],
+    output_path: Path,
+    timeout: float,
+    isolate_network: bool = False,
 ) -> tuple[int | None, float]:
     """Ejecuta ``cmd`` y devuelve ``(código de salida, duración)``; ``None`` si agota el tiempo.
 
@@ -559,7 +691,12 @@ def _execute(
     desligan con ``setsid``/doble fork; en el resto de POSIX esos podrían sobrevivir.
     """
     if supervisor_supported():
-        return _execute_supervised(cmd, workdir, env, output_path, timeout)
+        return _execute_supervised(cmd, workdir, env, output_path, timeout, isolate_network)
+    if isolate_network:
+        raise _SetupFailed(
+            "Este sistema no permite cortar la red de los tests sin el supervisor de Linux. "
+            "Usa --sandbox docker o --sandbox ninguno."
+        )
     extra: dict = {}
     if os.name != "nt":
         extra["start_new_session"] = True  # grupo de procesos propio para matarlo entero
@@ -587,9 +724,19 @@ def _execute(
 
 
 def _execute_supervised(
-    cmd: list[str], workdir: Path, env: dict[str, str], output_path: Path, timeout: float
+    cmd: list[str],
+    workdir: Path,
+    env: dict[str, str],
+    output_path: Path,
+    timeout: float,
+    isolate_network: bool = False,
 ) -> tuple[int | None, float]:
-    """Como ``_execute``, pero a través del supervisor «subreaper» (solo Linux)."""
+    """Como ``_execute``, pero a través del supervisor «subreaper» (solo Linux).
+
+    Con ``isolate_network`` el supervisor entra antes en un espacio de nombres de red propio; si
+    no puede, no ejecuta nada y se lanza ``_SetupFailed`` (nunca se ejecuta con red por sorpresa).
+    """
+    isolate = "net" if isolate_network else "-"
     marker = os.urandom(16).hex()
     env = {**env, RUN_MARKER_VAR: marker}
     read_fd, write_fd = os.pipe()
@@ -598,7 +745,7 @@ def _execute_supervised(
     try:
         with open(output_path, "wb") as out:
             proc = subprocess.Popen(
-                [sys.executable, "-c", _SUPERVISOR, str(write_fd), repr(timeout), *cmd],
+                [sys.executable, "-c", _SUPERVISOR, str(write_fd), repr(timeout), isolate, *cmd],
                 cwd=workdir,
                 env=env,
                 stdin=subprocess.DEVNULL,
@@ -625,6 +772,11 @@ def _execute_supervised(
         if write_fd >= 0:
             os.close(write_fd)
     duration = round(time.perf_counter() - start, 3)
+    if status == "nonet":
+        raise _SetupFailed(
+            "No se pudo cortar la red de los tests (espacio de nombres de Linux) y no se "
+            "ejecutaron. Usa --sandbox docker o --sandbox ninguno."
+        )
     if timed_out or status == "timeout":
         return None, duration
     try:
@@ -751,7 +903,90 @@ def _kernel32():  # pragma: no cover - solo Windows
     kernel32.TerminateJobObject.restype = wintypes.BOOL
     kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
     kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.SetInformationJobObject.argtypes = (
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+    )
+    kernel32.SetInformationJobObject.restype = wintypes.BOOL
     return kernel32
+
+
+# Estructuras de winnt.h para JOBOBJECT_EXTENDED_LIMIT_INFORMATION. Se definen con tipos de
+# ctypes de tamaño fijo para poder comprobar su tamaño también fuera de Windows (tests).
+JOB_OBJECT_LIMIT_PROCESS_MEMORY = 0x00000100
+JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS = 9
+
+
+def _job_limit_structs():
+    import ctypes
+
+    class IoCounters(ctypes.Structure):
+        _fields_ = [
+            (name, ctypes.c_uint64)
+            for name in (
+                "ReadOperationCount",
+                "WriteOperationCount",
+                "OtherOperationCount",
+                "ReadTransferCount",
+                "WriteTransferCount",
+                "OtherTransferCount",
+            )
+        ]
+
+    class BasicLimitInformation(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_int64),
+            ("PerJobUserTimeLimit", ctypes.c_int64),
+            ("LimitFlags", ctypes.c_uint32),
+            ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t),
+            ("ActiveProcessLimit", ctypes.c_uint32),
+            ("Affinity", ctypes.c_size_t),
+            ("PriorityClass", ctypes.c_uint32),
+            ("SchedulingClass", ctypes.c_uint32),
+        ]
+
+    class ExtendedLimitInformation(ctypes.Structure):
+        _fields_ = [
+            ("BasicLimitInformation", BasicLimitInformation),
+            ("IoInfo", IoCounters),
+            ("ProcessMemoryLimit", ctypes.c_size_t),
+            ("JobMemoryLimit", ctypes.c_size_t),
+            ("PeakProcessMemoryUsed", ctypes.c_size_t),
+            ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]
+
+    return ExtendedLimitInformation
+
+
+def job_memory_limit_info(limit: int = WINDOWS_MEMORY_LIMIT_BYTES):
+    """``JOBOBJECT_EXTENDED_LIMIT_INFORMATION`` con el tope de memoria por proceso.
+
+    ``KILL_ON_JOB_CLOSE`` además: si modelduel muere, Windows cierra el Job y mata el árbol.
+    """
+    info = _job_limit_structs()()
+    info.BasicLimitInformation.LimitFlags = (
+        JOB_OBJECT_LIMIT_PROCESS_MEMORY | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    )
+    info.ProcessMemoryLimit = limit
+    return info
+
+
+def _win_limit_memory(kernel32, job) -> bool:  # pragma: no cover - solo Windows
+    import ctypes
+
+    info = job_memory_limit_info()
+    return bool(
+        kernel32.SetInformationJobObject(
+            job,
+            JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
+            ctypes.byref(info),
+            ctypes.sizeof(info),
+        )
+    )
 
 
 def _win_job_for(proc: subprocess.Popen) -> int | None:  # pragma: no cover - solo Windows
@@ -761,6 +996,8 @@ def _win_job_for(proc: subprocess.Popen) -> int | None:  # pragma: no cover - so
         job = kernel32.CreateJobObjectW(None, None)
         if not job:
             return None
+        # Si el límite no se puede poner, el Job sigue sirviendo para matar el árbol.
+        _win_limit_memory(kernel32, job)
         if not kernel32.AssignProcessToJobObject(job, int(proc._handle)):  # type: ignore[attr-defined]
             kernel32.CloseHandle(job)
             return None
@@ -815,6 +1052,7 @@ def _clean_output(output: str, root: Path) -> str:
         for form in (base, base.resolve()):
             variants |= {str(form), form.as_posix()}
     # Primero las más largas, para que ``<root>/work`` no quede como ``<tmp>/work``.
+    variants |= {f"{CONTAINER_ROOT}/work", CONTAINER_ROOT}
     for variant in sorted(variants, key=len, reverse=True):
         output = output.replace(variant, "<tmp>")
     return re.sub(r"\n{3,}", "\n\n", output).strip()

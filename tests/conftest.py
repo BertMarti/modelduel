@@ -62,3 +62,27 @@ def _sin_esperas_reales_en_reintentos(monkeypatch):
         raise AssertionError(f"un test intentó esperar {seconds} s de verdad en un reintento")
 
     monkeypatch.setattr(base, "_real_sleep", boom)
+
+
+@pytest.fixture(autouse=True)
+def _sin_docker_real(monkeypatch):
+    """Ningún test ve Docker ni Podman reales salvo con ``MODELDUEL_TEST_DOCKER=1`` (CI).
+
+    En una máquina con contenedores en producción, un test no debe descargar imágenes ni
+    arrancar nada por accidente.
+    """
+    import os
+    import shutil
+
+    from modelduel import sandbox
+
+    if os.environ.get("MODELDUEL_TEST_DOCKER") == "1":
+        return
+    real_which = shutil.which
+
+    def which(name, *args, **kwargs):
+        if name in sandbox.CONTAINER_TOOLS:
+            return None
+        return real_which(name, *args, **kwargs)
+
+    monkeypatch.setattr(sandbox.shutil, "which", which)

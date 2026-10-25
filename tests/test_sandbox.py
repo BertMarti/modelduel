@@ -29,6 +29,7 @@ from modelduel.runner import (
     run_tests,
     safe_env,
 )
+from modelduel.sandbox import Sandbox
 from tests.conftest import ADD_TESTS
 
 posix_only = pytest.mark.skipif(os.name == "nt", reason="setrlimit solo existe en POSIX")
@@ -316,7 +317,8 @@ def test_sin_supervisor_el_nieto_con_setsid_escaparia(make_task, tmp_path, monke
     # mide algo. Se limpia al acabar.
     monkeypatch.setattr(runner, "supervisor_supported", lambda: False)
     pidfile = tmp_path / "nieto.pid"
-    result = run_tests(_escape_code(pidfile), make_task(ADD_TESTS))
+    # Sin red cortada: sin supervisor no se puede aislar la red y el runner se negaría.
+    result = run_tests(_escape_code(pidfile), make_task(ADD_TESTS), sandbox=Sandbox())
     pid = int(pidfile.read_text())
     try:
         assert result.solved
