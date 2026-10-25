@@ -5,11 +5,13 @@ Entorno sin credenciales, ``HOME`` en el temporal y límites ``setrlimit`` en PO
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -27,6 +29,7 @@ from modelduel.runner import (
     run_tests,
     safe_env,
 )
+from tests.conftest import ADD_TESTS
 
 posix_only = pytest.mark.skipif(os.name == "nt", reason="setrlimit solo existe en POSIX")
 
@@ -224,3 +227,172 @@ def test_imprimir_70_mib_al_importar_no_es_un_error(make_task):
     code = "print('x' * (70 * 1024 * 1024))\ndef add(a, b):\n    return a + b\n"
     result = run_tests(code, make_task(ADD_TESTS), timeout=60)
     assert result.solved, result.message
+
+
+# ---------------------------------------------------------------- procesos que se desligan (fase 2)
+
+linux_supervisor = pytest.mark.skipif(
+    not runner.supervisor_supported(), reason="el supervisor subreaper solo existe en Linux"
+)
+
+
+def _escape_code(pidfile: Path, *, kill_supervisor: bool = False, hang: bool = False) -> str:
+    """Solución que, al importarse, deja un nieto con ``setsid`` (doble fork) durmiendo 60 s.
+
+    Espera a que el nieto escriba su PID para que el test pueda comprobar si sigue vivo.
+    """
+    lines = [
+        "import os, signal, sys, time",
+        f"PIDFILE = {str(pidfile)!r}",
+        "if os.fork() == 0:",
+        "    os.setsid()",
+        "    if os.fork() == 0:",
+        "        with open(PIDFILE + '.tmp', 'w') as fh:",
+        "            fh.write(str(os.getpid()))",
+        "        os.rename(PIDFILE + '.tmp', PIDFILE)",
+        "        time.sleep(60)",
+        "    os._exit(0)",
+        "for _ in range(500):",
+        "    if os.path.exists(PIDFILE):",
+        "        break",
+        "    time.sleep(0.01)",
+    ]
+    if kill_supervisor:
+        lines.append("os.kill(os.getppid(), signal.SIGKILL)")
+    if hang:
+        lines += ["while True:", "    pass"]
+    lines += ["def add(a, b):", "    return a + b", ""]
+    return "\n".join(lines)
+
+
+def _alive(pid: int) -> bool:
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return False
+    return data[data.rindex(b")") + 2 :].split()[0] != b"Z"
+
+
+def _dies(pid: int, seconds: float = 3.0) -> bool:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if not _alive(pid):
+            return True
+        time.sleep(0.05)
+    return False
+
+
+@linux_supervisor
+def test_un_nieto_con_setsid_muere_al_terminar(make_task, tmp_path):
+    pidfile = tmp_path / "nieto.pid"
+    result = run_tests(_escape_code(pidfile), make_task(ADD_TESTS))
+    assert result.solved, result.message
+    pid = int(pidfile.read_text())
+    assert _dies(pid), "el nieto con setsid sobrevivió al runner"
+
+
+@linux_supervisor
+def test_un_nieto_con_setsid_muere_al_agotar_el_tiempo(make_task, tmp_path):
+    pidfile = tmp_path / "nieto.pid"
+    result = run_tests(_escape_code(pidfile, hang=True), make_task(ADD_TESTS), timeout=3)
+    assert result.status == "timeout"
+    assert _dies(int(pidfile.read_text()))
+
+
+@linux_supervisor
+def test_matar_al_supervisor_no_salva_al_nieto(make_task, tmp_path):
+    # Red de seguridad: si la solución mata a su supervisor, el padre busca la marca del entorno.
+    pidfile = tmp_path / "nieto.pid"
+    result = run_tests(_escape_code(pidfile, kill_supervisor=True), make_task(ADD_TESTS))
+    assert not result.solved  # matar al supervisor nunca da el intento por bueno
+    assert "SIGKILL" in result.message
+    assert _dies(int(pidfile.read_text()))
+
+
+@linux_supervisor
+def test_sin_supervisor_el_nieto_con_setsid_escaparia(make_task, tmp_path, monkeypatch):
+    # Control: demuestra que el ataque es real (el killpg solo no basta) y que el test de arriba
+    # mide algo. Se limpia al acabar.
+    monkeypatch.setattr(runner, "supervisor_supported", lambda: False)
+    pidfile = tmp_path / "nieto.pid"
+    result = run_tests(_escape_code(pidfile), make_task(ADD_TESTS))
+    pid = int(pidfile.read_text())
+    try:
+        assert result.solved
+        assert not _dies(pid, seconds=1.0), "sin supervisor el nieto debería seguir vivo"
+    finally:
+        with contextlib.suppress(OSError):
+            os.kill(pid, signal.SIGKILL)
+
+
+@linux_supervisor
+def test_el_supervisor_devuelve_el_codigo_de_pytest(make_task):
+    from tests.conftest import ADD_TESTS
+
+    result = run_tests("def add(a, b):\n    return a - b\n", make_task(ADD_TESTS))
+    assert result.status == "ok" and result.failed > 0
+
+
+@linux_supervisor
+def test_la_solucion_no_hereda_la_tuberia_del_supervisor(make_task):
+    # La tubería por la que el supervisor informa no llega a pytest ni a la solución.
+    tests = (
+        "import os\n\ndef test_fds():\n"
+        "    links = []\n"
+        "    for name in os.listdir('/proc/self/fd'):\n"
+        "        try:\n"
+        "            links.append(os.readlink('/proc/self/fd/' + name))\n"
+        "        except OSError:\n"
+        "            pass\n"
+        "    assert not [link for link in links if link.startswith('pipe:')], links\n"
+    )
+    result = run_tests("x = 1\n", make_task(tests))
+    assert result.solved, result.output
+
+
+@linux_supervisor
+def test_kill_if_marked_no_mata_procesos_sin_la_marca():
+    # Revisión cruzada: solo se mata un proceso que siga llevando la marca exacta.
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        assert runner._kill_if_marked(proc.pid, b"MODELDUEL_RUN=otra") == 0
+        assert proc.poll() is None
+    finally:
+        proc.kill()
+        proc.wait()
+    marked = subprocess.Popen(
+        [sys.executable, "-c", "import time; print('listo', flush=True); time.sleep(30)"],
+        env={**os.environ, "MODELDUEL_RUN": "abc"},
+        stdout=subprocess.PIPE,
+    )
+    try:
+        # Hasta el exec, /proc/<pid>/environ aún es el del padre: se espera a que arranque.
+        assert marked.stdout is not None and marked.stdout.readline() == b"listo\n"
+        assert runner._kill_if_marked(marked.pid, b"MODELDUEL_RUN=abc") == 1
+        assert marked.wait(timeout=5) == -signal.SIGKILL
+    finally:
+        if marked.poll() is None:
+            marked.kill()
+        marked.wait()
+        if marked.stdout is not None:
+            marked.stdout.close()
+
+
+def test_resumen_de_aislamiento_menciona_los_limites():
+    summary = " ".join(runner.isolation_summary())
+    assert "contenedor" in summary or os.name == "nt"
+    if runner.supervisor_supported():
+        assert "setsid" in summary
+
+
+@linux_supervisor
+def test_sigterm_al_supervisor_se_explica_como_senal(make_task):
+    # Revisión final: antes salía «pytest terminó con código 0 sin generar resultados».
+    code = (
+        "import os, signal\nos.kill(os.getppid(), signal.SIGTERM)\n"
+        "def add(a, b):\n    return a + b\n"
+    )
+    result = run_tests(code, make_task(ADD_TESTS))
+    assert not result.solved
+    assert "SIGTERM" in result.message, result.message

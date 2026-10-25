@@ -10,12 +10,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Seguridad
 
+- **Los procesos que se desligan ya no sobreviven** (Linux): los tests corren bajo un supervisor intermedio que se declara «subreaper» con `prctl(PR_SET_CHILD_SUBREAPER)` (sin privilegios), así que un nieto que haga `setsid()` o un doble fork sigue colgando de él; al terminar, al agotar el tiempo o con Ctrl+C mata a todos sus descendientes recorriendo `/proc`. Si la solución mata a su supervisor, el padre busca y mata los procesos que conservan la marca `MODELDUEL_RUN` en su entorno, y el intento no cuenta como resuelto. En macOS sigue el grupo de procesos y en Windows el Job Object.
+- **CSP sin `'unsafe-inline'` en `style-src`**: los `<style>` de informes, clasificación y portada se autorizan por su hash SHA-256 (todas las webs de Pages de BertMarti comparten el origen `bertmarti.github.io`).
 - **Ejecución del código de los modelos endurecida** (`runner.py`): en POSIX el subproceso arranca con `setrlimit` (4 GiB de espacio de direcciones, que solo aplica Linux; CPU = límite de tiempo + 5 s, con el duro un segundo por encima para que llegue SIGXCPU; archivos de 256 MiB como máximo, con un mensaje claro si se superan; 256 descriptores y sin volcados de memoria) mediante un arranque `python -c` que después llama a `pytest.main`, sin `preexec_fn` (no es seguro con el hilo de la señal de vida). `HOME`, `USERPROFILE`, `APPDATA` y `XDG_*` apuntan al temporal de la ejecución, y el filtro de entorno quita también `PASS*`, `AUTH` (`SSH_AUTH_SOCK`), `PRIVATE`, `COOKIE`, `SESSION`, `SIGNATURE`, `DSN`, `PROXY`, `WEBHOOK`, `_PWD`, `DATABASE_URL`, `DOCKER_HOST`, `KUBECONFIG`, `GNUPGHOME` y rutas a configuraciones con credenciales (`AWS_CONFIG_FILE`, `NETRC`, `DOCKER_CONFIG`…) Un final por señal (`SIGXCPU`, `SIGXFSZ`, `SIGKILL`) se explica en el mensaje.
 - **Content-Security-Policy** en los informes, la clasificación (`default-src 'none'`, sin scripts) y la portada (`script-src 'self'`): defensa en profundidad frente a XSS con salidas de modelos.
 - CI: job «Seguridad» con gitleaks (binario con suma SHA-256 comprobada, todo el historial) y pip-audit; Dependabot semanal y agrupado; `SECURITY.md`; el despliegue de Pages da `pages` e `id-token` solo al job que despliega.
 
 ### Añadido
 
+- **`modelduel init`**: prepara una carpeta con tareas de ejemplo, respuestas grabadas y un `modelduel.toml` comentado; con `--proveedor gemini|openai|openrouter|ollama|omniroute` explica qué variables definir (Linux/macOS y PowerShell), dónde conseguir la clave y dónde mirar los modelos.
+- **`modelduel.toml`**: `modelduel run` sin argumentos usa la configuración de la carpeta actual (o `--config`); lo que se pase en la orden manda. Errores guiados para TOML roto, claves desconocidas, tipos y marcadores `CAMBIA-ESTO` sin editar.
+- **`modelduel doctor`**: comprueba Python, pytest, ejemplos, la protección del runner, las variables de entorno (sin mostrar nunca las claves), la configuración y, con `--red`, la lista de modelos de cada proveedor (no gasta tokens). Sale con 1 si algo falla.
+- `modelduel` sin orden muestra los primeros pasos; si falta una clave, el error dice cómo definirla y remite a `modelduel doctor`.
 - `mypy` en el extra `dev` y en el CI (configuración ligera en `pyproject.toml`); el CI prueba también Python 3.13.
 - README para personas usuarias con cabecera propia (`docs/img/banner.svg`) y capturas; lo técnico pasa a `docs/DESARROLLO.md`.
 - `PLAN.md`, subagentes en `.claude/agents/` y skills en `.claude/skills/` para trabajar en el repo con Claude Code.

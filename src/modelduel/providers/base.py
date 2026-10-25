@@ -11,7 +11,7 @@ import re
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -91,13 +91,17 @@ class Provider(Protocol):
 def require_env(name: str, hint: str) -> str:
     value = os.environ.get(name, "").strip()
     if not value:
-        raise ProviderError(f"Falta la variable de entorno {name}. {hint}")
+        raise ProviderError(
+            f"Falta la variable de entorno {name}. {hint} "
+            f'Defínela con: export {name}="PEGA_AQUI_TU_CLAVE" '
+            f'(PowerShell: $env:{name} = "PEGA_AQUI_TU_CLAVE").'
+        )
     return value
 
 
-def http_timeout() -> float:
+def http_timeout(env: Mapping[str, str] | None = None) -> float:
     """Límite de las peticiones HTTP (``MODELDUEL_HTTP_TIMEOUT``), validado al usarlo."""
-    raw = os.environ.get("MODELDUEL_HTTP_TIMEOUT", "").strip()
+    raw = (os.environ if env is None else env).get("MODELDUEL_HTTP_TIMEOUT", "").strip()
     if not raw:
         return DEFAULT_HTTP_TIMEOUT
     try:

@@ -8,6 +8,7 @@ from importlib import resources
 from string import Template
 
 from modelduel import __version__
+from modelduel.report.csp import apply_style_hashes
 from modelduel.results import costs_comparable, decide, sides_of
 
 STATUS_LABELS = {
@@ -465,7 +466,7 @@ def render_versus(results: dict, summary: dict) -> str:
     template = Template(
         resources.files("modelduel.report").joinpath("template.html").read_text("utf-8")
     )
-    return template.substitute(
+    page = template.substitute(
         css=resources.files("modelduel.report").joinpath("style.css").read_text("utf-8"),
         version=e(results.get("version", __version__)),
         page_title=e(f"{_short_label(spec_a)} vs {_short_label(spec_b)} · modelduel"),
@@ -497,3 +498,4 @@ def render_versus(results: dict, summary: dict) -> str:
         details=build_details(results),
         price_note=e(price_note),
     )
+    return apply_style_hashes(page)

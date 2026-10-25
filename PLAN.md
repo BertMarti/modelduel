@@ -22,13 +22,20 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
   - README renovado con banner, capturas de pantalla y secciones claras para usuarios.
   - Nueva guía técnica `docs/DESARROLLO.md`.
 
+## Hecho en la fase 2 (24/10/2026, tarde)
+- `modelduel init`, `modelduel.toml` (leído por `run`) y `modelduel doctor [--red]`; `modelduel` sin orden muestra los primeros pasos; errores de claves con la orden para definirlas.
+- Supervisor «subreaper» en Linux: los procesos con `setsid`/doble fork ya no sobreviven (pendiente de ayer).
+- CSP sin `'unsafe-inline'` en `style-src` (hash de cada `<style>`).
+- README: prueba en una orden con entorno virtual, flujo `init` → `doctor` → `run` y orden `docker run` para código no fiable.
+
 ## Siguiente
 - **Límite de memoria en Windows:** Implementar `JOB_OBJECT_LIMIT_PROCESS_MEMORY` en el *Job Object* del runner para igualar la seguridad de POSIX.
 - **Aislamiento en contenedores:** Añadir opción `--docker` o `--podman` para ejecutar los tests dentro de un contenedor si la herramienta está disponible, proporcionando un sandbox real.
 - **Aislamiento de red en Linux:** Intentar usar `unshare -n` (namespaces de red) para desactivar el acceso a internet del código generado cuando el sistema lo permita.
 - **Más tareas de ejemplo:** Ampliar `examples/tasks/` con retos de algoritmos más complejos y manipulación de datos (ej. JSON, CSV).
 - **Resultados reales:** Poblar la carpeta `results/` con duelos reales entre modelos actuales para que la clasificación pública sea útil.
-- **Procesos que se desligan:** una solución que llame a `setsid()` (o doble fork) sale del grupo de procesos y sobrevive al `killpg`. En Linux se podría usar `prctl(PR_SET_CHILD_SUBREAPER)` o un cgroup propio para recogerlos (revisión cruzada de GPT-5.6 Luna, 24/10/2026).
+- **Procesos que se desligan en macOS:** no hay subreaper; valorar recorrer los procesos con la marca `MODELDUEL_RUN` (`ps -E`) también allí.
+- **Modo «solo generar»:** guardar las respuestas sin ejecutarlas para ejecutar los tests en otra máquina o en un contenedor con `--network none`.
 - **Disco:** `RLIMIT_FSIZE` limita cada archivo, no el total; valorar un tope de disco (cuota o contenedor).
 
 ## Ideas

@@ -7,6 +7,9 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
 1. [Qué es y cuándo usarlo](#qué-es-y-cuándo-usarlo)
 2. [Instalación](#instalación)
 3. [Tu primer duelo con la demo](#tu-primer-duelo-con-la-demo)
+   - [Preparar una carpeta con `modelduel init`](#preparar-una-carpeta-con-modelduel-init)
+   - [El archivo `modelduel.toml`](#el-archivo-modeldueltoml)
+   - [Comprobar la instalación con `modelduel doctor`](#comprobar-la-instalación-con-modelduel-doctor)
 4. [Un duelo real con modelos de verdad](#un-duelo-real-con-modelos-de-verdad)
    - [OmniRoute](#omniroute)
    - [Gemini](#gemini)
@@ -51,10 +54,16 @@ Necesitas **Python 3.12 o superior** y **pytest** en el mismo entorno (modelduel
 
 ### Desde PyPI (recomendado)
 
+Instálalo en un **entorno virtual**: en muchas distribuciones de Linux `pip install` fuera de uno da error, y así no se mezcla con el Python del sistema.
+
 ```bash
+python3 -m venv modelduel-env
+source modelduel-env/bin/activate      # Windows (PowerShell): modelduel-env\Scripts\Activate.ps1
 pip install "modelduel[pytest]"
 modelduel --version
 ```
+
+Cada vez que abras una terminal nueva, vuelve a activar el entorno con la segunda línea. Si algo falla, `modelduel doctor` te dice qué falta y cómo arreglarlo.
 
 `[pytest]` instala también pytest; es lo mismo que `pip install modelduel pytest`. Escribe `modelduel` seguido de la versión instalada si todo va bien. Así tienes la orden `modelduel` **con las tareas y respuestas de ejemplo incluidas** (ver `modelduel demo` en la sección siguiente).
 
@@ -175,6 +184,62 @@ modelduel report runs/demo/results.json --format md --out runs/demo
 Las tareas de ejemplo son `slugify` (fácil), `merge_intervals` (media) y `parse_duration` (difícil).
 
 ---
+
+### Preparar una carpeta con `modelduel init`
+
+`modelduel init` deja lista una carpeta para tus duelos:
+
+```bash
+modelduel init mi-duelo                                        # sin claves: respuestas grabadas
+modelduel init mi-duelo --proveedor gemini --proveedor openai  # con modelos reales
+```
+
+Crea `mi-duelo/tasks/` (tres tareas de ejemplo), `mi-duelo/replays/` (respuestas grabadas) y `mi-duelo/modelduel.toml`. Los proveedores posibles son `gemini`, `openai`, `openrouter`, `ollama` y `omniroute` (puedes repetir `--proveedor`). Para cada uno, la terminal muestra las variables que tienes que definir (con la orden para Linux/macOS y para PowerShell), dónde conseguir la clave y dónde ver la lista de modelos. En `modelduel.toml` los modelos aparecen como `gemini:CAMBIA-ESTO`: cámbialo por el nombre exacto del modelo antes de lanzar el duelo (si se te olvida, `modelduel run` te lo recuerda).
+
+`init` nunca sobrescribe: si la carpeta ya tiene `modelduel.toml`, `tasks/` o `replays/`, se para. Tampoco deja mezclar `openai`, `openrouter` y `ollama`, porque los tres usan las mismas variables (`OPENAI_BASE_URL` y `OPENAI_API_KEY`); para enfrentar modelos de varias empresas, usa OpenRouter u OmniRoute.
+
+### El archivo `modelduel.toml`
+
+Dentro de una carpeta con `modelduel.toml`, `modelduel run` sin argumentos usa sus valores. También puedes indicar otro archivo con `--config ruta/al/archivo.toml`. Lo que pongas en la orden **manda** sobre el archivo (por ejemplo, `modelduel run --runs 3` cambia solo las ejecuciones). Las rutas son relativas a la carpeta del archivo.
+
+| Clave | Tipo | Por defecto | Ejemplo |
+|---|---|---|---|
+| `tareas` | texto (obligatoria) | | `"tasks"` |
+| `modelos` | lista de 2 a 6 textos `proveedor:modelo` (obligatoria) | | `["gemini:<modelo>", "openai:<modelo>"]` |
+| `ejecuciones` | número entero | `1` | `3` |
+| `tiempo_limite` | segundos | `20` | `30` |
+| `salida` | texto (carpeta de resultados) | ninguna: hay que dar `--out` | `"resultados"` |
+| `formato` | `html`, `md` o `html,md` | `html` | `"html,md"` |
+
+Las claves de las APIs **no** van en este archivo: se leen siempre de variables de entorno. Si el archivo tiene un error (TOML mal escrito, una clave desconocida o un valor del tipo equivocado), modelduel dice cuál y en qué archivo. `modelduel demo` ignora cualquier `modelduel.toml`.
+
+### Comprobar la instalación con `modelduel doctor`
+
+```bash
+modelduel doctor          # sin red
+modelduel doctor --red    # también pide a cada proveedor su lista de modelos
+```
+
+Revisa la versión de Python, que pytest esté instalado en el mismo entorno (si no, da la orden exacta para instalarlo), que estén los ejemplos, qué protección aplica tu sistema al ejecutar el código de los modelos, las variables de entorno y, si hay un `modelduel.toml` en la carpeta, que sea válido, que cada modelo tenga su clave y que haya tareas. Salida acortada:
+
+```text
+Instalación
+  ✓ Python 3.12.3
+  ✓ pytest 8.3.3
+
+Variables de entorno
+  ✓ GEMINI_API_KEY: definida (no se muestra)
+  · OPENAI_API_KEY: no definida
+
+Configuración
+  ✓ modelduel.toml es válido
+  ✓ gemini:<modelo>: listo
+  ✗ openai:<modelo> necesita OPENAI_API_KEY para https://api.openai.com/v1: export OPENAI_API_KEY="PEGA_AQUI_TU_CLAVE"
+
+1 problema: corrige lo marcado con ✗ y vuelve a ejecutar `modelduel doctor`.
+```
+
+`✓` está bien, `✗` es un fallo, `!` es un aviso (por ejemplo, una clave con comillas de más) y `·` es solo información. Las claves **nunca** se muestran (ni un trozo), y de las URL se quitan usuario y contraseña. Con `--red`, pide a cada proveedor de la configuración su lista de modelos (`GET …/models`), que no gasta tokens, y explica los fallos típicos: clave no válida (401/403), URL base incorrecta (404) o servicio apagado. Termina con código 0 si no hay ningún `✗` y con 1 si lo hay.
 
 ## Un duelo real con modelos de verdad
 
@@ -307,6 +372,8 @@ Para volver a usar OpenAI de verdad después de OpenRouter u Ollama, quita la va
 ---
 
 ## Crear tu propia tarea paso a paso
+
+Atajo: `modelduel init mi-duelo` crea una carpeta con tres tareas de ejemplo y su `modelduel.toml`; copia una de `mi-duelo/tasks/`, cámbiale el enunciado y los tests, y lánzala con `modelduel run` desde `mi-duelo`. Abajo está el detalle de cada archivo.
 
 Una tarea es una **carpeta** con dos archivos obligatorios (`task.md` y `test_task.py`) y uno opcional (`meta.toml`). Vamos a crear una nueva, «detectar palíndromos», y a probarla sin gastar nada.
 
@@ -738,21 +805,34 @@ La carpeta de salida se comprueba **antes** de llamar a las APIs, para no perder
 
 ## Seguridad: qué aísla y qué no
 
-Los modelos escriben código y modelduel **lo ejecuta en tu ordenador**. Qué hace para reducir el riesgo:
+Los modelos escriben código y modelduel **lo ejecuta en tu ordenador**. Qué hace para reducir el riesgo (`modelduel doctor` te dice cuáles aplica tu sistema):
 
-- Guarda cada solución en un **directorio temporal** que se borra al terminar.
+- Guarda cada solución en un **directorio temporal** que se borra al terminar, y apunta `HOME` allí.
 - Ejecuta los tests en un **subproceso con límite de tiempo** (`--timeout`).
-- Le quita al subproceso las **variables de entorno con aspecto de secreto** (las que contienen `KEY`, `TOKEN`, `SECRET`, `PASSWORD` o `CREDENTIAL` en el nombre), de modo que no ve tus claves de API.
-- Al terminar mata **todos los procesos** que haya lanzado la solución.
+- Le quita al subproceso las **variables de entorno con aspecto de secreto** (las que contienen `KEY`, `TOKEN`, `SECRET`, `PASS`, `AUTH`, `CREDENTIAL`, `SESSION`, `PROXY` y similares, además de `SSH_AUTH_SOCK`, `DATABASE_URL`, `KUBECONFIG`…), de modo que no ve tus claves de API.
+- En Linux y macOS aplica **límites del sistema**: CPU, archivos de 256 MiB como máximo, 256 descriptores y, en Linux, 4 GiB de memoria.
+- Al terminar mata **todos los procesos** que haya lanzado la solución. En Linux lo hace un supervisor que también recoge los que intentan escapar con `setsid` o un doble fork.
 - Las claves no aparecen nunca en el informe, en los errores ni en la URL de las peticiones.
 
 Qué **no** hace, y conviene tener presente:
 
 - **No es un aislamiento real.** El código del modelo puede leer y escribir en el resto de tu disco y usar la red con tus permisos de usuario.
-- Un proceso que se desligue a propósito del grupo (por ejemplo con `setsid`) puede sobrevivir.
-- Una solución que escriba sin parar puede llenar el disco temporal hasta que se agote el límite de tiempo.
+- Una solución que escriba sin parar puede llenar el disco (cada archivo hasta 256 MiB) hasta que se agote el límite de tiempo.
+- En macOS, un proceso que se desligue a propósito con `setsid` puede sobrevivir; en Windows no hay límite de memoria.
 
-Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelos con modelos que no conozcas sobre datos sensibles y, si puedes, lanza modelduel dentro de un **contenedor o una máquina virtual**.
+Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelos con modelos que no conozcas sobre datos sensibles y, para código en el que no confíes, lanza modelduel dentro de un **contenedor o una máquina virtual**. Con Docker o Podman, desde la carpeta de tu duelo:
+
+```bash
+docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --memory 4g --cpus 2 --pids-limit 512 \
+  -e GEMINI_API_KEY -e OPENAI_API_KEY \
+  -v "$PWD":/trabajo -w /trabajo \
+  python:3.12-slim \
+  sh -c 'pip install --quiet --user "modelduel[pytest]" && ~/.local/bin/modelduel run'
+```
+
+El código solo ve la carpeta actual; `-e NOMBRE` sin valor pasa la clave de tu terminal sin escribirla en la orden; `--memory`, `--cpus` y `--pids-limit` ponen techo a la memoria, la CPU y los procesos. La red sigue abierta porque modelduel tiene que hablar con las APIs.
 
 ---
 
