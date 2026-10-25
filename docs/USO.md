@@ -23,9 +23,10 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
 9. [Clasificación pública](#clasificación-pública)
 10. [Opciones: `--runs`, `--timeout`, `--retries`, `--resume`, `--format` y `--prices`](#opciones---runs---timeout---retries---resume---format-y---prices)
 11. [Códigos de salida](#códigos-de-salida)
-12. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
-13. [Límites conocidos](#límites-conocidos)
-14. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
+12. [Aislamiento: `--sandbox`, red cortada y solo generar](#aislamiento---sandbox-red-cortada-y-solo-generar)
+13. [Seguridad: qué aísla y qué no](#seguridad-qué-aísla-y-qué-no)
+14. [Límites conocidos](#límites-conocidos)
+15. [Preguntas frecuentes y solución de problemas](#preguntas-frecuentes-y-solución-de-problemas)
 
 ---
 
@@ -121,7 +122,7 @@ modelduel demo --out otra-carpeta     # elegir la carpeta de salida
 modelduel demo --copy MIS-EJEMPLOS    # no ejecuta nada: copia las tareas y respuestas de ejemplo
 ```
 
-`demo --copy` crea `MIS-EJEMPLOS/tasks` (las tres tareas) y `MIS-EJEMPLOS/replays` (las respuestas grabadas) y te dice cómo probarlas. Es el punto de partida más rápido para [crear tus propias tareas](#crear-tu-propia-tarea-paso-a-paso): copia una carpeta de tarea y cámbiala.
+`demo --copy` crea `MIS-EJEMPLOS/tasks` (las ocho tareas) y `MIS-EJEMPLOS/replays` (las respuestas grabadas) y te dice cómo probarlas. Es el punto de partida más rápido para [crear tus propias tareas](#crear-tu-propia-tarea-paso-a-paso): copia una carpeta de tarea y cámbiala.
 
 ### La misma demo con `run`
 
@@ -134,27 +135,28 @@ modelduel run examples/tasks --model replay:alfa --model replay:beta --model rep
 (En Windows, la misma orden; las barras de las rutas también funcionan.) Verás algo así:
 
 ```text
-modelduel 0.2.0 · 3 tareas · 1 ejecución por tarea
+modelduel 0.9.0 · 8 tareas · 1 ejecución por tarea
   A  replay:alfa
   B  replay:beta
   C  replay:gamma
-  Aviso: el código de los modelos se ejecuta en esta máquina (temporal + límite).
+  Aislamiento: red cortada (espacio de nombres de Linux) + temporal, entorno limpio y límites.
+  Aviso: el código de los modelos se ejecuta en esta máquina.
 
   ok  slugify                  A  8/8
   --  slugify                  B  6/8
   ok  slugify                  C  8/8
-  ok  merge_intervals          A  8/8
-  ok  merge_intervals          B  8/8
-  --  merge_intervals          C  6/8
-  --  parse_duration           A  15/16
-  ok  parse_duration           B  16/16
-  ok  parse_duration           C  16/16
+  …
+  --  grid_path                B  0/10 (no_code)
+  --  grid_path                C  0/10 (import_error)
+  ok  topo_order               A  8/8
+  ok  topo_order               B  8/8
+  ok  topo_order               C  8/8
 
-  #   Contendiente     Tareas   Tests   Tiempo   Tokens (ent/sal)        Coste
-  ----------------------------------------------------------------------------
-  1   A replay:alfa       2/3   31/32   10,1 s          1.401/703   0,0017 USD
-  2   C replay:gamma      2/3   30/32    3,7 s          1.314/426   0,0003 USD
-  3   B replay:beta       2/3   30/32   28,1 s        1.373/2.132   0,0248 USD
+  #   Contendiente     Tareas   Tests         Tiempo   Tokens (ent/sal)        Coste
+  ----------------------------------------------------------------------------------
+  1   A replay:alfa       6/8   73/75         31,1 s        4.163/2.225   0,0052 USD
+  2   B replay:beta       4/8   61/75   1 min 27,0 s        4.268/5.959   0,0703 USD
+  3   C replay:gamma      4/8   53/75         10,2 s        3.576/1.384   0,0009 USD
   (precios ficticios de demostración)
 
   Resultados  runs\demo\results.json
@@ -166,7 +168,7 @@ Cada línea `ok` o `--` es un intento: `ok` significa que superó **todos** los 
 - `index.html`: el informe. Ábrelo con doble clic en cualquier navegador.
 - `results.json`: todos los datos en bruto.
 
-`gamma` empata con `beta` en tareas y en tests, pero es mucho más barato, así que queda por delante: ese es el desempate por coste. Con `--a` y `--b` (o con solo dos `--model`) sigues teniendo el duelo de dos de siempre (`modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo`). Cómo se lee la clasificación se explica en [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos).
+`beta` y `gamma` resuelven las mismas tareas (4 de 8), pero `beta` supera más tests y queda por delante; si también empataran en tests, desempataría el coste. La línea de «Aislamiento» dice cómo se ejecutó el código (en Windows, macOS o un Linux sin espacios de nombres verás un aviso de que tiene red). `(no_code)` es una respuesta sin bloque de código y `(import_error)` un código que ni siquiera se puede importar. Con `--a` y `--b` (o con solo dos `--model`) sigues teniendo el duelo de dos de siempre (`modelduel run examples/tasks --a replay:alfa --b replay:beta --out runs/demo`). Cómo se lee la clasificación se explica en [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos).
 
 Otras dos órdenes útiles:
 
@@ -181,7 +183,7 @@ modelduel report runs/demo/results.json --out runs/demo
 modelduel report runs/demo/results.json --format md --out runs/demo
 ```
 
-Las tareas de ejemplo son `slugify` (fácil), `merge_intervals` (media) y `parse_duration` (difícil).
+Las tareas de ejemplo son `slugify`, `merge_intervals`, `parse_duration`, `flatten_json`, `csv_totals`, `wrap_text`, `grid_path` y `topo_order`.
 
 ---
 
@@ -194,7 +196,7 @@ modelduel init mi-duelo                                        # sin claves: res
 modelduel init mi-duelo --proveedor gemini --proveedor openai  # con modelos reales
 ```
 
-Crea `mi-duelo/tasks/` (tres tareas de ejemplo), `mi-duelo/replays/` (respuestas grabadas) y `mi-duelo/modelduel.toml`. Los proveedores posibles son `gemini`, `openai`, `openrouter`, `ollama` y `omniroute` (puedes repetir `--proveedor`). Para cada uno, la terminal muestra las variables que tienes que definir (con la orden para Linux/macOS y para PowerShell), dónde conseguir la clave y dónde ver la lista de modelos. En `modelduel.toml` los modelos aparecen como `gemini:CAMBIA-ESTO`: cámbialo por el nombre exacto del modelo antes de lanzar el duelo (si se te olvida, `modelduel run` te lo recuerda).
+Crea `mi-duelo/tasks/` (ocho tareas de ejemplo), `mi-duelo/replays/` (respuestas grabadas) y `mi-duelo/modelduel.toml`. Los proveedores posibles son `gemini`, `openai`, `openrouter`, `ollama` y `omniroute` (puedes repetir `--proveedor`). Para cada uno, la terminal muestra las variables que tienes que definir (con la orden para Linux/macOS y para PowerShell), dónde conseguir la clave y dónde ver la lista de modelos. En `modelduel.toml` los modelos aparecen como `gemini:CAMBIA-ESTO`: cámbialo por el nombre exacto del modelo antes de lanzar el duelo (si se te olvida, `modelduel run` te lo recuerda).
 
 `init` nunca sobrescribe: si la carpeta ya tiene `modelduel.toml`, `tasks/` o `replays/`, se para. Tampoco deja mezclar `openai`, `openrouter` y `ollama`, porque los tres usan las mismas variables (`OPENAI_BASE_URL` y `OPENAI_API_KEY`); para enfrentar modelos de varias empresas, usa OpenRouter u OmniRoute.
 
@@ -210,6 +212,7 @@ Dentro de una carpeta con `modelduel.toml`, `modelduel run` sin argumentos usa s
 | `tiempo_limite` | segundos | `20` | `30` |
 | `salida` | texto (carpeta de resultados) | ninguna: hay que dar `--out` | `"resultados"` |
 | `formato` | `html`, `md` o `html,md` | `html` | `"html,md"` |
+| `aislamiento` | `auto`, `docker`, `podman` o `ninguno` | `auto` | `"docker"` |
 
 Las claves de las APIs **no** van en este archivo: se leen siempre de variables de entorno. Si el archivo tiene un error (TOML mal escrito, una clave desconocida o un valor del tipo equivocado), modelduel dice cuál y en qué archivo. `modelduel demo` ignora cualquier `modelduel.toml`.
 
@@ -220,7 +223,7 @@ modelduel doctor          # sin red
 modelduel doctor --red    # también pide a cada proveedor su lista de modelos
 ```
 
-Revisa la versión de Python, que pytest esté instalado en el mismo entorno (si no, da la orden exacta para instalarlo), que estén los ejemplos, qué protección aplica tu sistema al ejecutar el código de los modelos, las variables de entorno y, si hay un `modelduel.toml` en la carpeta, que sea válido, que cada modelo tenga su clave y que haya tareas. Salida acortada:
+Revisa la versión de Python, que pytest esté instalado en el mismo entorno (si no, da la orden exacta para instalarlo), que estén los ejemplos, qué protección aplica tu sistema al ejecutar el código de los modelos, las variables de entorno y, si hay un `modelduel.toml` en la carpeta, que sea válido, que cada modelo tenga su clave y que haya tareas. En «Aislamiento disponible» indica si hay Docker o Podman, si la red se puede cortar y cuál es la opción recomendada. Salida acortada:
 
 ```text
 Instalación
@@ -255,7 +258,7 @@ Un contendiente se escribe como `proveedor:modelo`. Hay cuatro proveedores:
 Antes de empezar, ten en cuenta:
 
 - Las **claves** se leen **solo de variables de entorno**, nunca de archivos. Nunca las escribas dentro del proyecto ni las subas a GitHub.
-- **Cada llamada a una API real puede costar dinero.** El número de llamadas es `tareas × ejecuciones × contendientes`. Con las tres tareas de ejemplo, dos contendientes y `--runs 3` son 18 llamadas (en una liga de seis, 54).
+- **Cada llamada a una API real puede costar dinero.** El número de llamadas es `tareas × ejecuciones × contendientes`. Con las ocho tareas de ejemplo, dos contendientes y `--runs 3` son 48 llamadas (en una liga de seis, 144).
 - El nombre del `<modelo>` es el que use el proveedor (consulta su documentación). En esta guía se escribe `<modelo>` para que pongas el tuyo.
 - Las variables de entorno solo valen para la terminal donde las defines y desaparecen al cerrarla. Cambia `PEGA_AQUI_TU_CLAVE` por tu clave real.
 - Los dos contendientes `openai:` de una misma orden comparten `OPENAI_BASE_URL` y `OPENAI_API_KEY`. Si quieres comparar dos modelos de OpenRouter, usa `openai:` para los dos; si quieres comparar Gemini con uno de OpenRouter, usa `gemini:` y `openai:`.
@@ -373,7 +376,7 @@ Para volver a usar OpenAI de verdad después de OpenRouter u Ollama, quita la va
 
 ## Crear tu propia tarea paso a paso
 
-Atajo: `modelduel init mi-duelo` crea una carpeta con tres tareas de ejemplo y su `modelduel.toml`; copia una de `mi-duelo/tasks/`, cámbiale el enunciado y los tests, y lánzala con `modelduel run` desde `mi-duelo`. Abajo está el detalle de cada archivo.
+Atajo: `modelduel init mi-duelo` crea una carpeta con ocho tareas de ejemplo y su `modelduel.toml`; copia una de `mi-duelo/tasks/`, cámbiale el enunciado y los tests, y lánzala con `modelduel run` desde `mi-duelo`. Abajo está el detalle de cada archivo.
 
 Una tarea es una **carpeta** con dos archivos obligatorios (`task.md` y `test_task.py`) y uno opcional (`meta.toml`). Vamos a crear una nueva, «detectar palíndromos», y a probarla sin gastar nada.
 
@@ -584,14 +587,14 @@ En la consola, y arriba del informe de liga, hay una fila por contendiente, de m
 Los empates completos **comparten posición**. En la demo:
 
 ```text
-  #   Contendiente     Tareas   Tests   Tiempo   Tokens (ent/sal)        Coste
-  ----------------------------------------------------------------------------
-  1   A replay:alfa       2/3   31/32   10,1 s          1.401/703   0,0017 USD
-  2   C replay:gamma      2/3   30/32    3,7 s          1.314/426   0,0003 USD
-  3   B replay:beta       2/3   30/32   28,1 s        1.373/2.132   0,0248 USD
+  #   Contendiente     Tareas   Tests         Tiempo   Tokens (ent/sal)        Coste
+  ----------------------------------------------------------------------------------
+  1   A replay:alfa       6/8   73/75         31,1 s        4.163/2.225   0,0052 USD
+  2   B replay:beta       4/8   61/75   1 min 27,0 s        4.268/5.959   0,0703 USD
+  3   C replay:gamma      4/8   53/75         10,2 s        3.576/1.384   0,0009 USD
 ```
 
-`alfa` va primero porque, con las mismas tareas resueltas que los demás (2 de 3), supera más tests (31 frente a 30). `gamma` y `beta` empatan en tareas y en tests, y `gamma` queda delante por ser más barato. Con tres tareas, una sola respuesta cambia el orden: léelo con cautela.
+`alfa` va primero porque resuelve más tareas (6 de 8). `beta` y `gamma` empatan en tareas (4 de 8) y `beta` queda delante por superar más tests (61 frente a 53), aunque sea mucho más caro: el coste solo cuenta si también empatan en tests. Con pocas tareas, una sola respuesta cambia el orden: léelo con cautela.
 
 Con tres o más contendientes, el informe HTML añade, debajo de la clasificación, una **comparativa** con una barra fina por contendiente y métrica, una **matriz por tarea** (tests superados y un estado escrito —«resuelta», «no resuelta», «sin hacer»…, para no depender del color) y el desplegable de código y salida de cada intento. En móvil, las tablas se desplazan en horizontal dentro de su propio marco (también con el teclado).
 
@@ -803,6 +806,61 @@ La carpeta de salida se comprueba **antes** de llamar a las APIs, para no perder
 
 ---
 
+## Aislamiento: `--sandbox`, red cortada y solo generar
+
+`--sandbox` decide dónde se ejecuta el código de los modelos. El valor por defecto es `auto`.
+
+| Valor | Qué hace |
+|---|---|
+| `auto` | Usa el aislamiento disponible. En Linux intenta cortar la red sin instalar nada; si no puede, avisa. |
+| `docker` | Ejecuta cada tarea en un contenedor desechable, sin red ni privilegios, con solo lectura salvo la carpeta temporal, 1 GiB de memoria, 1 CPU y 128 procesos como máximo. |
+| `podman` | Lo mismo, usando Podman. |
+| `ninguno` | No usa el aislamiento del contenedor ni corta la red. Solo tiene sentido si una tarea necesita red. |
+
+Para `docker` necesitas Docker instalado y que tu usuario pueda usarlo: compruébalo con `docker info`. Para `podman`, necesitas Podman instalado. La primera vez que uses un contenedor se descarga la imagen oficial de Python, de unos 50 MB, antes de empezar el duelo. Si Docker o Podman no están instalados, modelduel muestra un error en español con un enlace para instalarlos.
+
+Puedes elegirlo en la orden:
+
+```bash
+modelduel doctor
+modelduel run --sandbox docker
+modelduel run --sandbox podman
+```
+
+También puedes fijarlo en `modelduel.toml`:
+
+```toml
+aislamiento = "docker"
+```
+
+En Linux, `auto` corta la red si el sistema permite crear espacios de nombres de usuario sin root. Algunas configuraciones de Ubuntu 24.04 no lo permiten: modelduel lo avisa al empezar. En Windows y macOS no se corta la red con `auto`; usa `--sandbox docker` o `--sandbox podman`.
+
+### Generar en una máquina y reproducir en otra
+
+`--solo-generar` pide el código a los modelos y lo guarda sin ejecutar nada, ni siquiera pytest:
+
+```bash
+modelduel run --solo-generar --out respuestas-del-duelo
+```
+
+La carpeta contiene `respuestas.json` y una copia de las tareas en `tareas/`. Puedes llevarla a otra máquina o a un contenedor: no contiene claves y no necesita volver a llamar a los modelos.
+
+Para ejecutar los tests y generar el resultado:
+
+```bash
+modelduel run --replay respuestas-del-duelo --sandbox docker
+```
+
+La orden usa los modelos grabados, escribe `results.json` e `index.html` por defecto en la misma carpeta y permite elegir otra con `--out`. `--replay` no admite `--a`, `--b` ni `--model`. Si una tarea cambió desde la generación, modelduel avisa.
+
+Errores frecuentes:
+
+- **«No encuentro «docker» en el PATH»**: instala Docker y vuelve a ejecutar `docker info`.
+- **«Docker no responde»**: inicia Docker y comprueba que tu usuario puede usarlo con `docker info`.
+- **«No se pudo cortar la red»**: en Linux, revisa el aviso de `modelduel doctor`; si necesitas red, usa `--sandbox ninguno`, y si no la necesitas usa un contenedor.
+
+---
+
 ## Seguridad: qué aísla y qué no
 
 Los modelos escriben código y modelduel **lo ejecuta en tu ordenador**. Qué hace para reducir el riesgo (`modelduel doctor` te dice cuáles aplica tu sistema):
@@ -814,31 +872,24 @@ Los modelos escriben código y modelduel **lo ejecuta en tu ordenador**. Qué ha
 - Al terminar mata **todos los procesos** que haya lanzado la solución. En Linux lo hace un supervisor que también recoge los que intentan escapar con `setsid` o un doble fork.
 - Las claves no aparecen nunca en el informe, en los errores ni en la URL de las peticiones.
 
-Qué **no** hace, y conviene tener presente:
+Con `--sandbox docker` o `--sandbox podman`, cada ejecución usa un contenedor desechable sin red ni privilegios, con el sistema de archivos de solo lectura salvo su carpeta temporal, 1 GiB de memoria, 1 CPU y 128 procesos como máximo. Es la opción recomendada para código no fiable. `modelduel doctor` indica si está disponible.
 
-- **No es un aislamiento real.** El código del modelo puede leer y escribir en el resto de tu disco y usar la red con tus permisos de usuario.
+Qué **no** hace el modo sin contenedor, y conviene tener presente:
+
+- **No es un aislamiento real.** El código del modelo puede leer y escribir en el resto de tu disco mediante rutas absolutas y usar la red con tus permisos de usuario.
 - Una solución que escriba sin parar puede llenar el disco (cada archivo hasta 256 MiB) hasta que se agote el límite de tiempo.
-- En macOS, un proceso que se desligue a propósito con `setsid` puede sobrevivir; en Windows no hay límite de memoria.
+- En macOS, un proceso que se desligue a propósito con `setsid` puede sobrevivir.
 
-Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelos con modelos que no conozcas sobre datos sensibles y, para código en el que no confíes, lanza modelduel dentro de un **contenedor o una máquina virtual**. Con Docker o Podman, desde la carpeta de tu duelo:
-
-```bash
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
-  --cap-drop ALL --security-opt no-new-privileges \
-  --memory 4g --cpus 2 --pids-limit 512 \
-  -e GEMINI_API_KEY -e OPENAI_API_KEY \
-  -v "$PWD":/trabajo -w /trabajo \
-  python:3.12-slim \
-  sh -c 'pip install --quiet --user "modelduel[pytest]" && ~/.local/bin/modelduel run'
-```
-
-El código solo ve la carpeta actual; `-e NOMBRE` sin valor pasa la clave de tu terminal sin escribirla en la orden; `--memory`, `--cpus` y `--pids-limit` ponen techo a la memoria, la CPU y los procesos. La red sigue abierta porque modelduel tiene que hablar con las APIs.
+Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelos con modelos que no conozcas sobre datos sensibles y, para código en el que no confíes, usa `modelduel run --sandbox docker` o `--sandbox podman`.
 
 ---
 
 ## Límites conocidos
 
 - Sin `--resume`, un `results.json` ilegible o de un formato más nuevo se sobrescribe sin aviso; solo se protege un duelo incompleto legible.
+- El contenedor limita memoria, CPU y procesos, pero el tamaño total de la carpeta temporal no tiene un límite propio: una solución puede llenarla hasta que se agote el tiempo.
+- La imagen del contenedor se descarga la primera vez y Docker o Podman deben estar instalados y disponibles para tu usuario.
+- En Linux, `auto` puede no cortar la red si el sistema no permite espacios de nombres de usuario; en Windows y macOS hay que usar un contenedor para cortar la red.
 - Un `Retry-After` de entre 30 y 120 s se respeta entero en cada reintento: con `--retries 3`, un proveedor saturado puede costar varios minutos por intento. Baja `--retries` si prefieres rendirte antes.
 - Los proveedores `gemini`, `openai` y `omniroute` solo se han probado con respuestas simuladas, no contra las APIs reales.
 

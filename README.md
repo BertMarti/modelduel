@@ -59,7 +59,7 @@ Solo evalúa funciones de Python comprobables con tests automáticos. Una sola e
 2. **Prueba la demo** sin claves ni coste: `modelduel demo`. Enfrenta respuestas grabadas de `alfa`, `beta` y `gamma` y deja el informe en `modelduel-demo/`.
 
 > [!NOTE]
-> `modelduel init`, `modelduel doctor` y `modelduel run` sin argumentos (pasos 3 a 6) llegan en la versión 0.8.0. Si `modelduel --version` dice 0.7.0, es que aún no está en PyPI: instala la última versión desde GitHub con `pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"`. La demo funciona con las dos.
+> `modelduel init`, `modelduel doctor` y `modelduel run` sin argumentos (pasos 3 a 6) llegan en la versión 0.9.0. Si `modelduel --version` dice una versión anterior, es que aún no está en PyPI: instala la última versión desde GitHub con `pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"`. La demo funciona con las dos.
 
 3. **Prepara tu duelo** con los proveedores que vayas a usar:
 
@@ -67,7 +67,7 @@ Solo evalúa funciones de Python comprobables con tests automáticos. Una sola e
    modelduel init mi-duelo --proveedor gemini --proveedor openai
    ```
 
-   Crea la carpeta `mi-duelo` con tres tareas de ejemplo, respuestas grabadas y un archivo `modelduel.toml` explicado. En la terminal te dice qué variables de entorno necesitas y dónde conseguir cada clave. Sin `--proveedor`, el duelo usa respuestas grabadas y funciona ya, sin claves.
+   Crea la carpeta `mi-duelo` con ocho tareas de ejemplo, respuestas grabadas y un archivo `modelduel.toml` explicado. En la terminal te dice qué variables de entorno necesitas y dónde conseguir cada clave. Sin `--proveedor`, el duelo usa respuestas grabadas y funciona ya, sin claves.
 
 4. **Define las claves y elige los modelos.** Las claves van en variables de entorno, nunca en un archivo:
 
@@ -92,6 +92,19 @@ Solo evalúa funciones de Python comprobables con tests automáticos. Una sola e
 7. **Usa tus propias tareas:** cambia el enunciado (`task.md`) y los tests (`test_task.py`) de las carpetas de `mi-duelo/tasks` y vuelve a lanzar `modelduel run`. Para que el resultado sea fiable, sube `ejecuciones` a 3 o más.
 
 ¿Prefieres no usar archivo de configuración? Todo se puede pasar en la orden: `modelduel run CARPETA_DE_TAREAS --a gemini:<modelo> --b openai:<modelo> --runs 3 --out resultados`.
+
+### Ejecutar el código con más aislamiento
+
+Antes de lanzar un duelo, comprueba las opciones disponibles:
+
+```bash
+modelduel doctor
+modelduel run --sandbox docker
+```
+
+`--sandbox docker` (o `--sandbox podman`) ejecuta cada tarea en un contenedor desechable, sin red ni privilegios y con límites estrictos. Es la opción recomendada para código que no conoces. En Linux, el modo `auto` corta la red si el sistema lo permite; en Windows y macOS usa Docker o Podman para cortar la red.
+
+Si quieres pedir el código sin ejecutarlo, usa `modelduel run --solo-generar --out respuestas-del-duelo`. Después puedes llevar esa carpeta a otra máquina y ejecutar `modelduel run --replay respuestas-del-duelo --sandbox docker`, sin claves.
 
 ### Proveedores
 
@@ -119,26 +132,11 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 ## Seguridad
 
 > [!WARNING]
-> **El código generado por los modelos se ejecuta en tu máquina.** modelduel crea un directorio temporal propio y lo borra al terminar, ejecuta los tests en un subproceso con límite de tiempo, elimina las variables de entorno que parecen secretos (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASS`, `AUTH`, `CREDENTIAL`, `PRIVATE`, `COOKIE`, `SESSION`, `PROXY`, `WEBHOOK` y similares), retira `SSH_AUTH_SOCK` y apunta `HOME`/`USERPROFILE` al temporal. En Linux y macOS aplica además límites del sistema: límite de CPU, archivos de 256 MiB como máximo, 256 descriptores y sin volcados de memoria; en Linux, también 4 GiB de memoria (espacio de direcciones). Al terminar mata el árbol de procesos: en Linux, con un supervisor que recoge también los procesos que intentan desligarse (`setsid`); en macOS, el grupo de procesos; en Windows, un Job Object. `modelduel doctor` te dice qué medidas aplica tu sistema.
+> **El código generado por los modelos se ejecuta en tu máquina.** La opción más segura es `modelduel run --sandbox docker` (o `--sandbox podman`): cada tarea corre en un contenedor desechable de la imagen oficial de Python, sin red ni privilegios, con el sistema de archivos de solo lectura salvo su carpeta temporal, 1 GiB de memoria, 1 CPU y 128 procesos como máximo. La primera vez descarga la imagen.
 >
-> Esto **no es un aislamiento real**: el código conserva acceso a la red y al disco mediante rutas absolutas, y el espacio total que puede llenar en disco solo lo acota el tiempo. En Windows no hay límite de memoria. Úsalo con tareas de confianza y, para código en el que no confíes, dentro de un contenedor o una máquina virtual.
+> En Linux, el modo `auto` corta la red sin instalar nada cuando el sistema lo permite; si no puede hacerlo, te avisa. En Windows el código tiene además un límite de memoria de 1 GiB por proceso. El modo `--sandbox ninguno` desactiva la red cortada y solo tiene sentido para tareas que necesiten red.
 
-**Con un contenedor** (Docker o Podman), desde la carpeta de tu duelo:
-
-```bash
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
-  --cap-drop ALL --security-opt no-new-privileges \
-  --memory 4g --cpus 2 --pids-limit 512 \
-  -e GEMINI_API_KEY -e OPENAI_API_KEY \
-  -v "$PWD":/trabajo -w /trabajo \
-  python:3.12-slim \
-  sh -c 'pip install --quiet --user "modelduel[pytest]" && ~/.local/bin/modelduel run'
-```
-
-- El código de los modelos solo ve la carpeta actual (montada en `/trabajo`), no el resto de tu disco.
-- `-e GEMINI_API_KEY` sin valor pasa la clave que ya tienes en la terminal, sin escribirla en la orden.
-- `--memory`, `--cpus` y `--pids-limit` ponen techo a la memoria, la CPU y el número de procesos; `--cap-drop ALL` y `no-new-privileges` quitan privilegios.
-- La red sigue abierta porque modelduel tiene que hablar con las APIs de los modelos.
+> Sin contenedor, la protección sigue siendo un temporal, límites de recursos, un subproceso y un entorno sin secretos. No es un aislamiento real: la solución puede leer y escribir rutas del disco mediante rutas absolutas, y el espacio total que puede llenar solo lo acota el tiempo. `modelduel doctor` te dice qué medidas están disponibles.
 
 ## Preguntas frecuentes
 
@@ -152,9 +150,11 @@ docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
 
 **¿Funciona con Ollama u OpenRouter?** Sí. Ambos se usan mediante `openai:<modelo>` y `OPENAI_BASE_URL`; OpenRouter requiere su clave y Ollama normalmente no.
 
-**¿Es seguro?** Reduce el riesgo con temporales, límites, un entorno limpio y eliminación del árbol de procesos, pero no es un sandbox. No uses tareas de confianza dudosa sobre datos sensibles; usa un contenedor o una máquina virtual cuando puedas.
+**¿Es seguro?** Para código no fiable, usa `modelduel run --sandbox docker` o `--sandbox podman`: es el nivel más seguro y limita red, privilegios, memoria, CPU y procesos. En Linux, `auto` intenta cortar la red sin instalar nada. Sin contenedor, modelduel reduce el riesgo con temporales, límites y un entorno limpio, pero la solución puede leer y escribir rutas del disco; no lo uses sobre datos sensibles.
 
-**¿Puedo usar mis propias tareas?** Sí. `modelduel init` crea una carpeta con tres tareas de ejemplo que puedes copiar y cambiar. Cada tarea pide una función concreta en `task.md` y la comprueba desde `test_task.py`.
+**¿Puedo generar en un ordenador y ejecutar en otro?** Sí. Ejecuta `modelduel run --solo-generar --out respuestas-del-duelo` para guardar `respuestas.json` y una copia de las tareas en `tareas/`. Lleva esa carpeta a otra máquina y ejecuta `modelduel run --replay respuestas-del-duelo --sandbox docker`; no necesita claves y avisa si una tarea ha cambiado.
+
+**¿Puedo usar mis propias tareas?** Sí. `modelduel init` crea una carpeta con ocho tareas de ejemplo que puedes copiar y cambiar. Cada tarea pide una función concreta en `task.md` y la comprueba desde `test_task.py`.
 
 **¿Qué significa «una sola ejecución es una señal débil»?** Un modelo puede responder de forma distinta a la misma tarea. Usa `--runs 3` o más y varias tareas antes de sacar conclusiones.
 
