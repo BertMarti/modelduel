@@ -494,7 +494,7 @@ def run_tests(
             ),
         )
     result = _classify(returncode, counts, output, duration, expected, timeout)
-    if sandbox.is_container and returncode == -9 and counts is None:  # SIGKILL
+    if sandbox.is_container and returncode in (-9, 137) and counts is None:  # SIGKILL
         result.message = (
             "El contenedor terminó los tests a la fuerza: ¿superó la memoria "
             f"({CONTAINER_MEMORY.upper()}iB) o el número de procesos?"
@@ -661,7 +661,9 @@ def _execute_container(
                 proc.kill()
                 proc.wait()
     duration = round(time.perf_counter() - start, 3)
-    if returncode == TIMEOUT_EXIT_CODE:
+    # ``timeout -s KILL`` sale con 124 o, si la señal le alcanza también a él, con 137 (128 + 9):
+    # un 137 al llegar al límite es tiempo agotado; antes, el contenedor lo mató (p. ej. memoria).
+    if returncode == TIMEOUT_EXIT_CODE or (returncode == 137 and duration >= timeout):
         return None, duration
     # Señales que el proceso de dentro recibe por un límite (Windows no define todas).
     limit_signals = {

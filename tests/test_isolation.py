@@ -37,7 +37,6 @@ from modelduel.sandbox import (
 )
 from tests.conftest import ADD_TESTS
 
-posix_only = pytest.mark.skipif(os.name == "nt", reason="el docker falso es un script POSIX")
 ADD_OK = "```python\ndef add(a, b):\n    return a + b\n```"
 GOOD = "def add(a, b):\n    return a + b\n"
 
@@ -159,7 +158,9 @@ class FakeRun:
 def test_preparar_con_la_imagen_ya_descargada_no_descarga():
     fake = FakeRun({})
     ready = prepare_container(_docker(), run=fake)
-    assert [c[1] for c in fake.calls] == ["image", "info"]
+    # En Windows (Docker Desktop) no hay UID que pasar y no se consulta «info».
+    expected = ["image", "info"] if hasattr(os, "getuid") else ["image"]
+    assert [c[1] for c in fake.calls] == expected
     if hasattr(os, "getuid"):
         assert ready.user_args == ("--user", f"{os.getuid()}:{os.getgid()}")
 
@@ -199,10 +200,13 @@ def test_usuario_segun_el_motor():
 
 # ---------------------------------------------------------------- ejecución con un docker falso
 
-FAKE_DOCKER = r'''#!{python}
+# El «docker» falso es ``python`` (así funciona igual en Windows): la orden queda
+# ``python run --rm …`` o ``python rm -f …`` y Python ejecuta los archivos «run» y «rm» de la
+# carpeta actual, que son este script.
+FAKE_DOCKER = r'''
 """docker falso: ejecuta en local lo que iría en el contenedor (solo para tests)."""
 import os, subprocess, sys
-args = sys.argv[1:]
+args = [os.path.basename(sys.argv[0]), *sys.argv[1:]]
 log = os.environ["FAKE_DOCKER_LOG"]
 with open(log, "a") as fh:
     fh.write(" ".join(args[:2]) + "\n")
@@ -233,16 +237,17 @@ sys.exit(proc.returncode)
 
 @pytest.fixture
 def fake_docker(tmp_path, monkeypatch):
-    script = tmp_path / "docker"
-    script.write_text(FAKE_DOCKER.replace("{python}", sys.executable), encoding="utf-8")
-    script.chmod(0o755)
+    folder = tmp_path / "docker-falso"
+    folder.mkdir()
+    for verb in ("run", "rm"):
+        (folder / verb).write_text(FAKE_DOCKER, encoding="utf-8")
+    monkeypatch.chdir(folder)
     log = tmp_path / "docker.log"
     monkeypatch.setenv("FAKE_DOCKER_LOG", str(log))
     monkeypatch.setenv("FAKE_DOCKER_IMAGE", DEFAULT_IMAGE)
-    return Sandbox(kind="docker", executable=str(script)), log
+    return Sandbox(kind="docker", executable=sys.executable), log
 
 
-@posix_only
 def test_contenedor_falso_resuelve_y_limpia(make_task, fake_docker):
     box, log = fake_docker
     result = run_tests(GOOD, make_task(ADD_TESTS), timeout=20, sandbox=box)
@@ -252,7 +257,6 @@ def test_contenedor_falso_resuelve_y_limpia(make_task, fake_docker):
     assert log.read_text().splitlines() == ["run --rm"]  # terminó bien: sin rm -f
 
 
-@posix_only
 def test_contenedor_falso_agota_el_tiempo(make_task, fake_docker):
     box, _log = fake_docker
     slow = "import time\n\ndef add(a, b):\n    time.sleep(30)\n"
@@ -260,7 +264,6 @@ def test_contenedor_falso_agota_el_tiempo(make_task, fake_docker):
     assert result.status == "timeout"
 
 
-@posix_only
 def test_contenedor_que_no_arranca_es_un_error_claro(make_task, fake_docker, monkeypatch):
     box, _log = fake_docker
     monkeypatch.setenv("FAKE_DOCKER_EXIT", "125")
@@ -269,7 +272,6 @@ def test_contenedor_que_no_arranca_es_un_error_claro(make_task, fake_docker, mon
     assert "docker no pudo ejecutar los tests" in result.message
 
 
-@posix_only
 def test_contenedor_matado_por_memoria_no_cuenta(make_task, fake_docker, monkeypatch):
     box, _log = fake_docker
     monkeypatch.setenv("FAKE_DOCKER_EXIT", "137")
@@ -278,7 +280,6 @@ def test_contenedor_matado_por_memoria_no_cuenta(make_task, fake_docker, monkeyp
     assert "memoria" in result.message
 
 
-@posix_only
 def test_si_el_cliente_no_vuelve_se_borra_el_contenedor(make_task, fake_docker, monkeypatch):
     box, log = fake_docker
     monkeypatch.setattr(runner, "CONTAINER_GRACE_S", 0.0)
@@ -288,7 +289,6 @@ def test_si_el_cliente_no_vuelve_se_borra_el_contenedor(make_task, fake_docker, 
     assert any(line.startswith("rm -f") for line in log.read_text().splitlines())
 
 
-@posix_only
 def test_run_con_sandbox_docker_falso_de_principio_a_fin(
     examples_dir, tmp_path, monkeypatch, capsys, fake_docker
 ):
