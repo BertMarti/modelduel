@@ -36,7 +36,7 @@ from pathlib import Path
 from modelduel.sandbox import (
     CONTAINER_FAILURE_CODES,
     CONTAINER_GRACE_S,
-    CONTAINER_MEMORY,
+    CONTAINER_MEMORY_TEXT,
     CONTAINER_ROOT,
     TIMEOUT_EXIT_CODE,
     Sandbox,
@@ -497,7 +497,7 @@ def run_tests(
     if sandbox.is_container and returncode in (-9, 137) and counts is None:  # SIGKILL
         result.message = (
             "El contenedor terminó los tests a la fuerza: ¿superó la memoria "
-            f"({CONTAINER_MEMORY.upper()}iB) o el número de procesos?"
+            f"({CONTAINER_MEMORY_TEXT}) o el número de procesos?"
         )
     if _hit_file_size_limit(output):
         result.message = file_size_message()
@@ -702,6 +702,10 @@ def _execute(
     extra: dict = {}
     if os.name != "nt":
         extra["start_new_session"] = True  # grupo de procesos propio para matarlo entero
+    else:  # pragma: no cover - solo Windows
+        # Suspendido hasta estar dentro del Job Object: así no hay ventana en la que la solución
+        # pueda lanzar un hijo fuera del Job ni reservar memoria sin límite.
+        extra["creationflags"] = CREATE_SUSPENDED
     start = time.perf_counter()
     with open(output_path, "wb") as out:
         proc = subprocess.Popen(
@@ -714,6 +718,8 @@ def _execute(
             **extra,
         )
         tree = _ProcessTree(proc)
+        if os.name == "nt":  # pragma: no cover - solo Windows
+            _win_start_in_job(proc, tree)
         try:
             returncode: int | None = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -991,15 +997,45 @@ def _win_limit_memory(kernel32, job) -> bool:  # pragma: no cover - solo Windows
     )
 
 
+CREATE_SUSPENDED = 0x00000004
+
+
+def _win_start_in_job(proc: subprocess.Popen, tree: _ProcessTree) -> None:  # pragma: no cover
+    """Reanuda ``proc`` (creado suspendido) solo si ya está en un Job con el límite de memoria.
+
+    Falla cerrado: sin Job o sin límite, se mata el proceso antes de que ejecute nada.
+    """
+    resumed = False
+    if tree.job is not None:
+        try:
+            import ctypes
+
+            ntdll = ctypes.WinDLL("ntdll")  # type: ignore[attr-defined]
+            ntdll.NtResumeProcess.argtypes = (ctypes.c_void_p,)
+            ntdll.NtResumeProcess.restype = ctypes.c_long
+            resumed = ntdll.NtResumeProcess(int(proc._handle)) == 0  # type: ignore[attr-defined]
+        except (OSError, AttributeError, ValueError):
+            resumed = False
+    if not resumed:
+        tree.kill()
+        proc.kill()
+        proc.wait()
+        raise _SetupFailed(
+            "No se pudo meter los tests en un Job Object de Windows con el límite de memoria, "
+            "así que no se ejecutaron. Usa --sandbox docker."
+        )
+
+
 def _win_job_for(proc: subprocess.Popen) -> int | None:  # pragma: no cover - solo Windows
-    """Mete ``proc`` en un Job Object nuevo (sus hijos entran solos). ``None`` si no se puede."""
+    """Mete ``proc`` en un Job Object nuevo con el límite de memoria. ``None`` si no se puede."""
     try:
         kernel32 = _kernel32()
         job = kernel32.CreateJobObjectW(None, None)
         if not job:
             return None
-        # Si el límite no se puede poner, el Job sigue sirviendo para matar el árbol.
-        _win_limit_memory(kernel32, job)
+        if not _win_limit_memory(kernel32, job):
+            kernel32.CloseHandle(job)
+            return None
         if not kernel32.AssignProcessToJobObject(job, int(proc._handle)):  # type: ignore[attr-defined]
             kernel32.CloseHandle(job)
             return None

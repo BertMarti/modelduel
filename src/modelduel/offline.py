@@ -26,6 +26,10 @@ from modelduel.runner import build_prompt
 from modelduel.tasks import Task, TaskError
 
 MAX_RESPONSES_SIZE = 50 * 1024 * 1024
+# Topes de lo que se acepta de una carpeta generada en otra máquina (dato no fiable).
+MAX_RUNS = 100
+MAX_BUNDLE_BYTES = 50 * 1024 * 1024
+MAX_BUNDLE_FILES = 2000
 RESPONSES_FILE = "respuestas.json"
 RESPONSES_TASKS_DIR = "tareas"
 RESPONSES_SCHEMA = 1
@@ -215,8 +219,8 @@ def load_responses(path: Path) -> dict:
             raise ResultsError(f"{path} tiene specs vacíos o repetidos.")
         specs.append(spec)
     runs = data.get("runs")
-    if not isinstance(runs, int) or isinstance(runs, bool) or runs < 1:
-        raise ResultsError(f"{path} tiene un número de ejecuciones inválido.")
+    if not isinstance(runs, int) or isinstance(runs, bool) or not 1 <= runs <= MAX_RUNS:
+        raise ResultsError(f"{path} tiene un número de ejecuciones inválido (de 1 a {MAX_RUNS}).")
     if data.get("status") != "complete":
         raise ResultsError(f"{path}: la generación se cortó; vuelve a generarla.")
     if not isinstance(data.get("tasks"), list):
@@ -234,6 +238,14 @@ def load_responses(path: Path) -> dict:
         for side in contenders:
             if not isinstance(attempts.get(side), list):
                 raise ResultsError(f"{path} contiene intentos inválidos para {side.upper()}.")
+            numbers = [a.get("run") for a in attempts[side] if isinstance(a, dict)]
+            if len(set(numbers)) != len(attempts[side]) or any(
+                not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= runs for n in numbers
+            ):
+                raise ResultsError(
+                    f"{path} contiene un intento inválido: cada ejecución debe ir de 1 a {runs} "
+                    "y aparecer una sola vez."
+                )
             for attempt in attempts[side]:
                 if (
                     not isinstance(attempt, dict)
@@ -245,6 +257,28 @@ def load_responses(path: Path) -> dict:
                 ):
                     raise ResultsError(f"{path} contiene un intento inválido.")
     return data
+
+
+def check_bundle(folder: Path) -> None:
+    """Rechaza una carpeta de tareas traída de otra máquina con enlaces o demasiado grande.
+
+    Un enlace simbólico (p. ej. ``test_task.py -> ~/.ssh/id_rsa``) haría que el runner copiase un
+    archivo del anfitrión a la carpeta de la ejecución, donde la solución podría leerlo.
+    """
+    total = files = 0
+    for path in [Path(folder), *Path(folder).rglob("*")]:
+        if path.is_symlink():
+            raise ResultsError(
+                f"{path} es un enlace simbólico: las tareas de --replay no pueden tener enlaces."
+            )
+        if path.is_file():
+            files += 1
+            total += path.stat().st_size
+        if files > MAX_BUNDLE_FILES or total > MAX_BUNDLE_BYTES:
+            raise ResultsError(
+                f"{folder} es demasiado grande para unas tareas ({MAX_BUNDLE_FILES} archivos o "
+                f"{MAX_BUNDLE_BYTES // (1024 * 1024)} MiB como máximo)."
+            )
 
 
 def copy_tasks(tasks: list[Task], out: Path) -> None:

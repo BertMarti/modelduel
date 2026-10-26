@@ -248,3 +248,46 @@ def test_resume_con_replay_reutiliza_los_intentos(generated, capsys):
     capsys.readouterr()
     assert main(["run", "--replay", str(generated), "--resume"]) == 0
     assert "4 intentos ya hechos de 4" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda d: d.update(runs=10**9), "de 1 a 100"),
+        (
+            lambda d: d["tasks"][0]["attempts"]["a"].append(
+                dict(d["tasks"][0]["attempts"]["a"][0])
+            ),
+            "una sola vez",
+        ),
+        (lambda d: d["tasks"][0]["attempts"]["a"][0].update(run=2), "de 1 a 1"),
+    ],
+)
+def test_ejecuciones_desmesuradas_o_repetidas_se_rechazan(generated, capsys, change, message):
+    # Revisión cruzada (fase 3): un runs enorme en un respuestas.json ajeno bloqueaba el duelo.
+    path = generated / "respuestas.json"
+    data = _load(path)
+    change(data)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert main(["run", "--replay", str(generated)]) == EXIT_USAGE
+    assert message in capsys.readouterr().err
+
+
+def test_tareas_con_enlaces_simbolicos_se_rechazan(generated, tmp_path, capsys):
+    # Un test_task.py enlazado a un archivo del anfitrión acabaría copiado junto a la solución.
+    secreto = tmp_path / "secreto.txt"
+    secreto.write_text("no debe salir", encoding="utf-8")
+    enlace = generated / "tareas" / "slugify" / "datos.txt"
+    try:
+        enlace.symlink_to(secreto)
+    except (OSError, NotImplementedError):
+        pytest.skip("este sistema no deja crear enlaces simbólicos")
+    assert main(["run", "--replay", str(generated)]) == EXIT_USAGE
+    assert "enlace simbólico" in capsys.readouterr().err
+    assert not (generated / "results.json").exists()
+
+
+def test_tareas_demasiado_grandes_se_rechazan(generated, monkeypatch, capsys):
+    monkeypatch.setattr("modelduel.offline.MAX_BUNDLE_BYTES", 10)
+    assert main(["run", "--replay", str(generated)]) == EXIT_USAGE
+    assert "demasiado grande" in capsys.readouterr().err

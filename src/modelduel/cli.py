@@ -28,6 +28,7 @@ from modelduel.heartbeat import Heartbeat
 from modelduel.leaderboard import build_leaderboard
 from modelduel.offline import (
     RESPONSES_TASKS_DIR,
+    check_bundle,
     generate_responses,
     load_responses,
     recorded_providers,
@@ -604,6 +605,7 @@ def _cmd_replay(args: argparse.Namespace, config: Config | None) -> int:
             f"falta la carpeta de tareas: no hay {bundled}. Indícala: "
             f"modelduel run TAREAS --replay {args.replay}"
         )
+    check_bundle(args.tasks)
     tasks = discover_tasks(args.tasks)
     if args.out is None:
         args.out = config.out if config and config.out else source.parent

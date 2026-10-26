@@ -38,6 +38,7 @@ CONTAINER_TOOLS = ("docker", "podman")
 SANDBOX_CHOICES = ("auto", "docker", "podman", "ninguno")
 # Techos del contenedor (además de los setrlimit del arranque, que también se aplican dentro).
 CONTAINER_MEMORY = "1g"
+CONTAINER_MEMORY_TEXT = "1 GiB"
 CONTAINER_CPUS = "1"
 CONTAINER_PIDS = 128
 CONTAINER_TMPFS = "/tmp:rw,nosuid,nodev,size=64m"
@@ -77,7 +78,7 @@ class Sandbox:
         if self.is_container:
             return (
                 f"contenedor {self.kind} sin red, sin privilegios y de solo lectura "
-                f"({CONTAINER_MEMORY.upper()}iB de memoria, {CONTAINER_CPUS} CPU, "
+                f"({CONTAINER_MEMORY_TEXT} de memoria, {CONTAINER_CPUS} CPU, "
                 f"{CONTAINER_PIDS} procesos)"
             )
         if self.isolate_network:
@@ -130,7 +131,7 @@ def network_isolation_hint() -> str:
     """Por qué no hay aislamiento de red local y qué hacer."""
     if not sys.platform.startswith("linux"):
         return (
-            "en este sistema la solución tiene red: para código no fiable usa "
+            "en Windows y macOS la red solo se corta con un contenedor. Para código no fiable usa "
             "--sandbox docker (o podman) o --solo-generar"
         )
     return (
