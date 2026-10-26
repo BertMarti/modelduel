@@ -58,9 +58,6 @@ Solo evalúa funciones de Python comprobables con tests automáticos. Una sola e
 
 2. **Prueba la demo** sin claves ni coste: `modelduel demo`. Enfrenta respuestas grabadas de `alfa`, `beta` y `gamma` y deja el informe en `modelduel-demo/`.
 
-> [!NOTE]
-> `modelduel init`, `modelduel doctor` y `modelduel run` sin argumentos (pasos 3 a 6), el aislamiento con `--sandbox` y el modo `--solo-generar` llegan con la versión 1.0.0. Si `modelduel --version` dice una versión anterior (mientras la 1.0.0 no esté en PyPI, `pip` instala la 0.7.0), instala la 1.0.0 desde GitHub con `pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"`. La demo funciona con las dos.
-
 3. **Prepara tu duelo** con los proveedores que vayas a usar:
 
    ```bash
@@ -131,7 +128,7 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 
 ## Seguridad
 
-> [!WARNING]
+> ⚠️ **Aviso:**
 > **El código generado por los modelos se ejecuta en tu máquina.** La opción más segura es `modelduel run --sandbox docker` (o `--sandbox podman`): cada tarea corre en un contenedor desechable de la imagen oficial de Python, sin red ni privilegios, con el sistema de archivos de solo lectura salvo su carpeta temporal, 1 GiB de memoria, 1 CPU y 128 procesos como máximo. La primera vez descarga la imagen.
 >
 > En Linux, el modo `auto` corta la red sin instalar nada cuando el sistema lo permite; si no puede hacerlo, te avisa. En Windows el código tiene además un límite de memoria de 1 GiB por proceso. El modo `--sandbox ninguno` desactiva la red cortada y solo tiene sentido para tareas que necesiten red.
@@ -165,8 +162,6 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 ## Lo que tienes que hacer tú
 
 Solo una cosa, y solo para duelos con modelos reales: crear la clave del proveedor en su web ([Google AI Studio](https://aistudio.google.com/apikey), [OpenAI](https://platform.openai.com/api-keys) u [OpenRouter](https://openrouter.ai/keys)) y definirla en tu terminal. Ollama y la demo no necesitan ninguna.
-
-**Pendiente del mantenedor (Alberto):** publicar la 1.0.0 en PyPI creando la Release `v1.0.0` en GitHub; la publicación es automática y no tiene vuelta atrás. Los pasos están en [Publicar una versión en PyPI](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md#publicar-una-versión-en-pypi-mantenedor). Hasta entonces, `pip install "modelduel[pytest]"` instala la 0.7.0: sirve para la demo, pero no trae `init`, `doctor` ni `--sandbox` (usa la instalación desde GitHub de la nota de arriba).
 
 Novedades: consulta el [registro de cambios](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md).
 
