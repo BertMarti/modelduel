@@ -216,18 +216,19 @@ modelduel run --resume    # continúa un duelo cortado
 # Todo en la orden, sin archivo de configuración (o repite --model para una liga de 2 a 6)
 modelduel run tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo</code></pre>
   <p>Las claves van en variables de entorno (<code>export GEMINI_API_KEY="…"</code>), nunca en un archivo. <code>modelduel init</code> te dice cuáles necesitas y dónde conseguirlas.</p>
-  <p><code>init</code>, <code>doctor</code> y <code>run</code> sin argumentos llegan en la 0.8.0. Si <code>modelduel --version</code> dice 0.7.0, aún no está en PyPI: instálala desde GitHub con <code>pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"</code>.</p>
+  <p><code>init</code>, <code>doctor</code> y <code>run</code> sin argumentos llegan en la 0.9.0. Si <code>modelduel --version</code> dice una versión anterior, aún no está en PyPI: instálala desde GitHub con <code>pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"</code>.</p>
   <p>El paquete está en <a href="https://pypi.org/project/modelduel/">PyPI</a>. Para la última versión sin publicar: <code>pip install git+https://github.com/BertMarti/modelduel pytest</code>.</p>
 </section>
 
 <section aria-labelledby="novedades">
-  <h2 id="novedades">Novedades de v0.8.0</h2>
+  <h2 id="novedades">Novedades de v0.9.0</h2>
   <ul>
-    <li><strong>Configurar es más fácil</strong>: <code>modelduel init</code> prepara una carpeta con tareas de ejemplo y un <code>modelduel.toml</code>; <code>modelduel doctor</code> comprueba la instalación, las claves y la conexión; <code>modelduel run</code> sin argumentos usa la configuración.</li>
-    <li><strong>Ejecución más protegida</strong>: en Linux, los procesos que intentan escapar con <code>setsid</code> también se matan al terminar; en Linux y macOS el código de los modelos corre con límites de CPU, tamaño de archivo (256 MiB) y descriptores, más memoria (4 GiB) en Linux, con <code>HOME</code> en el temporal y sin el agente SSH ni más variables con credenciales. Los informes llevan una política de seguridad que prohíbe JavaScript.</li>
-    <li>Desde v0.7.0: <strong>señal de vida</strong>: si una llamada a un modelo tarda más de unos 10 s, modelduel avisa cada 10 s por <code>stderr</code> de que sigue esperando. El límite de red por defecto baja a 90 s (<code>MODELDUEL_HTTP_TIMEOUT</code> lo cambia).</li>
-    <li>Desde v0.6.0: <strong>informe en Markdown</strong>: <code>modelduel report results.json --format md --out DIR</code> genera <code>informe.md</code>, listo para pegar en un PR o un issue, con el texto de <code>results.json</code> escapado.</li>
-    <li>Desde v0.5.0: el <strong>duelo en directo</strong> de esta página y los informes más legibles. Desde v0.4.0: proveedor <code>omniroute:</code> y <a href="leaderboard/">clasificación pública</a>. Desde v0.2.0: liga de 2 a 6, reintentos y <code>--resume</code>.</li>
+    <li><strong>Sandbox con contenedor</strong>: <code>--sandbox docker</code> o <code>--sandbox podman</code> ejecuta cada tarea sin red ni privilegios, con límites de memoria, CPU y procesos.</li>
+    <li><strong>Red cortada por defecto en Linux</strong>: el modo <code>auto</code> lo intenta sin instalar nada y avisa si el sistema no lo permite.</li>
+    <li><strong>Generar y reproducir</strong>: <code>--solo-generar</code> guarda las respuestas sin ejecutar tests y <code>--replay</code> permite ejecutarlas después, incluso en otra máquina o contenedor.</li>
+    <li><strong>Ocho tareas de ejemplo</strong>: programación, JSON, CSV, texto y algoritmos para probar modelduel.</li>
+    <li><strong>Más protección en Windows</strong>: el código de los modelos tiene un límite de memoria de 1 GiB por proceso.</li>
+    <li>Desde v0.8.0: <code>modelduel init</code>, <code>modelduel doctor</code> y <code>modelduel.toml</code>, y procesos que no escapan con <code>setsid</code>. Antes: informe en Markdown, señal de vida, duelo en directo, <a href="leaderboard/">clasificación pública</a>, liga de 2 a 6 y <code>--resume</code>.</li>
   </ul>
   <p>Todos los cambios, en el <a href="https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md">registro de cambios</a>; el uso paso a paso, en la <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">guía de uso</a>.</p>
 </section>
@@ -274,7 +275,7 @@ def test_basico():
 <section aria-labelledby="seguridad">
   <div class="warning">
     <h2 id="seguridad">Seguridad</h2>
-    <p><strong>El código generado por los modelos se ejecuta en tu máquina.</strong> modelduel lo hace siempre en un directorio temporal, en un subproceso con límite de tiempo y sin tus variables de entorno secretas, pero eso no es un aislamiento real. Úsalo con tareas de confianza e, idealmente, dentro de un contenedor o una máquina virtual.</p>
+    <p><strong>El código generado por los modelos se ejecuta en tu máquina.</strong> Para código no fiable, usa <code>modelduel run --sandbox docker</code> (o <code>--sandbox podman</code>): cada tarea corre en un contenedor desechable, sin red ni privilegios y con límites estrictos. Sin contenedor, modelduel usa un temporal, límites y un entorno sin secretos, pero la solución puede leer y escribir rutas del disco; el espacio total solo lo acota el tiempo. En Linux, <code>auto</code> corta la red si el sistema lo permite.</p>
   </div>
 </section>
 

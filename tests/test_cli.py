@@ -25,12 +25,11 @@ def test_run_de_extremo_a_extremo_con_replay(examples_dir, tmp_path, capsys):
     assert code == 0
     results = json.loads((out / "results.json").read_text(encoding="utf-8"))
     summary = results["summary"]
-    # alfa: todo bien salvo un caso límite de parse_duration.
-    assert summary["a"]["tasks_solved"] == 2
-    assert summary["a"]["tests_passed"] == summary["a"]["tests_total"] - 1
-    # beta: falla dos tests de slugify y resuelve el resto.
-    assert summary["b"]["tasks_solved"] == 2
-    assert summary["b"]["tests_passed"] == summary["b"]["tests_total"] - 2
+    # alfa: falla un caso de flatten_json y otro de parse_duration.
+    assert summary["a"]["tasks_solved"] == 6
+    assert summary["a"]["tests_passed"] == summary["a"]["tests_total"] - 2
+    # beta: falla slugify, flatten_json y csv_totals, y no tiene código para grid_path.
+    assert summary["b"]["tasks_solved"] == 4
     by_task = {t["id"]: t for t in results["tasks"]}
     assert not by_task["parse_duration"]["results"]["a"][0]["solved"]
     assert not by_task["slugify"]["results"]["b"][0]["solved"]

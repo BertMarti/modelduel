@@ -6,6 +6,24 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.9.0] - 2026-10-26
+
+### Seguridad
+
+- **`--sandbox docker` / `--sandbox podman`**: cada ejecución de los tests corre en un contenedor desechable de la imagen oficial `python:3.13.17-slim` fijada por digest, sin red (`--network none`), sin privilegios (`--cap-drop ALL`, `no-new-privileges`, usuario sin root), con el sistema de archivos de solo lectura salvo la carpeta de la ejecución y un `/tmp` en memoria de 64 MiB, 1 GiB de memoria sin swap, 1 CPU y 128 procesos. La imagen se descarga antes del duelo; si Docker o Podman no están instalados, un error en español dice cómo instalarlos. También con `aislamiento = "docker"` en `modelduel.toml`.
+- **Red cortada por defecto en Linux** (`--sandbox auto`): el supervisor entra en un espacio de nombres de usuario y de red propio (como `unshare --map-current-user --net`, sin root). Si el sistema no lo permite, `run` y `doctor` lo avisan; si falla a mitad, no se ejecuta nada. `--sandbox ninguno` lo desactiva.
+- **Límite de memoria en Windows**: `JOB_OBJECT_LIMIT_PROCESS_MEMORY` (1 GiB por proceso) y `KILL_ON_JOB_CLOSE` en el Job Object del runner. Los tests arrancan suspendidos y solo se reanudan dentro del Job con el límite; si no se puede poner, no se ejecutan.
+- En la red cortada de Linux `lo` queda encendido, así que los tests con un servidor en `127.0.0.1` siguen funcionando. El contenedor lleva además `--security-opt label=disable` (SELinux en Fedora/RHEL) y `/tmp` con `noexec`; en Windows, 2 GiB entre todos los procesos y 128 procesos como máximo.
+- **Prueba previa del aislamiento**: antes de la primera llamada a una API, `run` comprueba que el contenedor arranca o que la red se puede cortar; si no, termina con código 2 sin gastar nada (y si fallara a mitad, el duelo se para en vez de seguir pagando intentos que no se ejecutan).
+- `--replay` trata la carpeta como dato no fiable: `respuestas.json` de 50 MiB como máximo, de 1 a 100 ejecuciones, nombres de contendiente imprimibles (sin secuencias ANSI), y tareas sin enlaces simbólicos ni más de 2000 archivos o 50 MiB.
+
+### Añadido
+
+- **Modo solo generar**: `modelduel run … --solo-generar --out CARPETA` guarda las respuestas (`respuestas.json`) y una copia de las tareas sin ejecutar nada (no necesita pytest); `modelduel run --replay CARPETA [--sandbox docker]` ejecuta después los tests, en otra máquina o en un contenedor, sin llamar a ninguna API.
+- `modelduel doctor`: apartado «Aislamiento disponible» (Docker/Podman, red cortada o nada) con la opción recomendada.
+- Cinco tareas de ejemplo nuevas con respuestas grabadas: `flatten_json` (JSON), `csv_totals` (CSV), `wrap_text` (texto), `grid_path` y `topo_order` (algoritmos). La demo enseña también los estados «sin código» y «error de importación».
+- CI: tests y un duelo con Docker de verdad en Ubuntu, el límite de memoria en Windows y el flujo generar → reproducir.
+
 ## [0.8.0] - 2026-10-24
 
 ### Seguridad

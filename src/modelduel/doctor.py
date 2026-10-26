@@ -32,7 +32,12 @@ from modelduel.providers.base import USER_AGENT, http_timeout, redact
 from modelduel.providers.gemini import DEFAULT_BASE_URL as GEMINI_URL
 from modelduel.providers.openai_compat import DEFAULT_BASE_URL as OPENAI_URL
 from modelduel.providers.openai_compat import OmniRouteProvider
-from modelduel.runner import isolation_summary
+from modelduel.runner import isolation_summary, supervisor_supported
+from modelduel.sandbox import (
+    available_container_tools,
+    network_isolation_available,
+    network_isolation_hint,
+)
 from modelduel.tasks import TaskError, discover_tasks
 
 OK, FAIL, WARN, INFO = "✓", "✗", "!", "·"
@@ -107,6 +112,63 @@ def install_checks() -> list[Check]:
 def protection_checks() -> list[Check]:
     group = "Protección al ejecutar el código de los modelos"
     return [Check(INFO, item, group) for item in isolation_summary()]
+
+
+def isolation_checks(
+    tools: list[str] | None = None,
+    netns: bool | None = None,
+    config: Config | None = None,
+) -> list[Check]:
+    """Qué aislamiento hay disponible (contenedor, red cortada o nada) y cuál conviene.
+
+    Solo mira el PATH y prueba los espacios de nombres en un proceso aparte: no arranca
+    contenedores ni habla con el demonio de Docker.
+    """
+    group = "Aislamiento disponible"
+    tools = available_container_tools() if tools is None else tools
+    if netns is None:
+        netns = network_isolation_available() and supervisor_supported()
+    checks = []
+    for tool in tools:
+        checks.append(
+            Check(
+                OK, f"{tool} instalado: --sandbox {tool} ejecuta los tests en un contenedor", group
+            )
+        )
+    if not tools:
+        checks.append(
+            Check(INFO, "ni Docker ni Podman en el PATH (contenedor no disponible)", group)
+        )
+    if netns:
+        checks.append(
+            Check(OK, "red cortada por defecto (espacio de nombres de red, sin root)", group)
+        )
+    else:
+        checks.append(Check(WARN, network_isolation_hint(), group))
+    if tools:
+        best = f"recomendado para código no fiable: --sandbox {tools[0]}"
+        best += " (o «aislamiento» en modelduel.toml)"
+    elif netns:
+        best = (
+            "recomendado: el modo por defecto ya corta la red; para un aislamiento completo "
+            "(disco, memoria, procesos) instala Docker o Podman y usa --sandbox docker"
+        )
+    else:
+        best = (
+            "recomendado: instala Docker o Podman y usa --sandbox docker, o genera con "
+            "--solo-generar y ejecuta los tests en otra máquina con --replay"
+        )
+    checks.append(Check(INFO, best, group))
+    wanted = config.sandbox if config is not None else None
+    if wanted in ("docker", "podman") and wanted not in tools:
+        checks.append(
+            Check(
+                FAIL,
+                f'modelduel.toml pide aislamiento = "{wanted}", pero {wanted} no está instalado',
+                group,
+            )
+        )
+    return checks
 
 
 def env_checks(env: Mapping[str, str]) -> list[Check]:
@@ -293,9 +355,9 @@ def collect_checks(
     request: Request | None = None,
 ) -> list[Check]:
     env = os.environ if env is None else env
-    checks = install_checks() + protection_checks() + env_checks(env)
     found, config = config_checks(find_config(config_path), env)
-    checks += found
+    checks = install_checks() + protection_checks() + isolation_checks(config=config)
+    checks += env_checks(env) + found
     if network:
         checks += network_checks(_kinds_to_probe(config, env), env, request or http_get_status)
     else:

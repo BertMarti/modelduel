@@ -26,6 +26,14 @@ from modelduel.doctor import collect_checks, render
 from modelduel.duel import run_duel
 from modelduel.heartbeat import Heartbeat
 from modelduel.leaderboard import build_leaderboard
+from modelduel.offline import (
+    RESPONSES_TASKS_DIR,
+    check_bundle,
+    generate_responses,
+    load_responses,
+    recorded_providers,
+    responses_path,
+)
 from modelduel.pricing import PricingError, load_prices
 from modelduel.providers import ProviderError, get_provider
 from modelduel.providers.base import DEFAULT_RETRIES
@@ -42,7 +50,21 @@ from modelduel.results import (
     summarize,
 )
 from modelduel.resume import ResumeError, plan_resume
-from modelduel.runner import DEFAULT_TIMEOUT, RunnerError, ensure_pytest_available
+from modelduel.runner import (
+    DEFAULT_TIMEOUT,
+    RunnerError,
+    check_sandbox,
+    ensure_pytest_available,
+    supervisor_supported,
+)
+from modelduel.sandbox import (
+    SANDBOX_CHOICES,
+    Sandbox,
+    SandboxError,
+    network_isolation_hint,
+    prepare_container,
+    resolve_sandbox,
+)
 from modelduel.tasks import TaskError, discover_tasks, is_task_dir
 
 # Códigos de salida: 0 duelo completado (aunque los modelos fallen tests), 1 no se pudieron
@@ -170,6 +192,31 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--replays", type=Path, metavar="DIR", help="carpeta de respuestas grabadas para replay"
     )
+    run.add_argument(
+        "--sandbox",
+        choices=SANDBOX_CHOICES,
+        default=None,
+        metavar="MODO",
+        help="dónde se ejecutan los tests: auto (en local, con la red cortada en Linux si se "
+        "puede), docker o podman (contenedor sin red ni privilegios) o ninguno",
+    )
+    run.add_argument(
+        "--sandbox-imagen",
+        dest="sandbox_image",
+        metavar="IMAGEN",
+        help="imagen de Python para --sandbox docker|podman (por defecto, la oficial fijada)",
+    )
+    run.add_argument(
+        "--solo-generar",
+        action="store_true",
+        help="pide el código y guarda las respuestas en --out SIN ejecutar nada",
+    )
+    run.add_argument(
+        "--replay",
+        type=Path,
+        metavar="CARPETA",
+        help="ejecuta los tests sobre las respuestas guardadas con --solo-generar (sin APIs)",
+    )
     run.add_argument("--out", type=Path, metavar="DIR", help="carpeta de salida")
 
     init = sub.add_parser("init", help="prepara una carpeta con tareas, respuestas y configuración")
@@ -265,7 +312,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "leaderboard":
             return cmd_leaderboard(args)
         return cmd_list_tasks(args)
-    except (TaskError, ConfigError, PricingError, ResultsError, RunnerError, ResumeError) as exc:
+    except (
+        TaskError,
+        ConfigError,
+        PricingError,
+        ResultsError,
+        RunnerError,
+        ResumeError,
+        SandboxError,
+    ) as exc:
         print(f"modelduel: error: {exc}", file=sys.stderr)
         return EXIT_USAGE
     except ProviderError as exc:
@@ -320,17 +375,13 @@ def _reject_duplicates(providers: dict) -> None:
 
 def cmd_run(args: argparse.Namespace) -> int:
     config = _config_for_run(args)
+    _check_modes(args)
+    if args.replay is not None:
+        return _cmd_replay(args, config)
     _apply_config(args, config)
-    if args.runs < 1:
-        raise TaskError("--runs debe ser 1 o más.")
-    if not math.isfinite(args.timeout) or args.timeout <= 0:
-        raise TaskError("--timeout debe ser un número de segundos mayor que 0.")
-    if args.retries < 0:
-        raise TaskError("--retries debe ser 0 o más.")
-    formats = parse_formats(args.format)
+    _check_numbers(args)
     specs = collect_specs(args)
     tasks = discover_tasks(args.tasks)
-    prices = load_prices(args.prices)
     # examples/tasks[/<tarea>] -> examples/replays
     tasks_root = args.tasks.parent if is_task_dir(args.tasks) else args.tasks
     replay_dirs = [
@@ -347,7 +398,77 @@ def cmd_run(args: argparse.Namespace) -> int:
         for side, spec in zip(ALL_SIDES, specs, strict=False)
     }
     _reject_duplicates(providers)
+    if args.solo_generar:
+        return _cmd_generate(args, tasks, providers)
+    return _duel_and_report(args, tasks, providers, parse_formats(args.format))
+
+
+def _check_modes(args: argparse.Namespace) -> None:
+    """Combinaciones de --solo-generar, --replay, --resume y --sandbox que no tienen sentido."""
+    generate = getattr(args, "solo_generar", False)
+    replay = getattr(args, "replay", None)
+    if generate and replay is not None:
+        raise TaskError(
+            "--solo-generar y --replay son pasos distintos: primero genera (--solo-generar) y "
+            "después reproduce (--replay CARPETA)."
+        )
+    if generate and args.resume:
+        raise TaskError(
+            "--solo-generar no admite --resume: vuelve a generar en una carpeta --out nueva."
+        )
+    if generate and getattr(args, "sandbox", None) not in (None, "auto"):
+        raise TaskError(
+            "--solo-generar no ejecuta nada, así que --sandbox no tiene efecto aquí. Úsalo al "
+            "reproducir: modelduel run --replay CARPETA --sandbox docker"
+        )
+    if replay is not None and (args.a or args.b or args.model):
+        raise TaskError(
+            "--replay usa los contendientes grabados en respuestas.json: quita --a, --b y --model."
+        )
+
+
+def _check_numbers(args: argparse.Namespace) -> None:
+    if args.runs < 1:
+        raise TaskError("--runs debe ser 1 o más.")
+    if not math.isfinite(args.timeout) or args.timeout <= 0:
+        raise TaskError("--timeout debe ser un número de segundos mayor que 0.")
+    if args.retries < 0:
+        raise TaskError("--retries debe ser 0 o más.")
+
+
+def _resolve_sandbox(args: argparse.Namespace) -> Sandbox:
+    """``--sandbox`` (o «aislamiento» de modelduel.toml) listo para usar, con su aviso."""
+    sandbox = resolve_sandbox(getattr(args, "sandbox", None), getattr(args, "sandbox_image", None))
+    if sandbox.is_container:
+        sandbox = prepare_container(sandbox, notify=lambda msg: print(f"  {msg}", flush=True))
+    elif sandbox.isolate_network and not supervisor_supported():
+        sandbox = Sandbox()
+    check_sandbox(sandbox)  # antes de gastar nada: si el aislamiento falla, se para aquí
+    return sandbox
+
+
+def _sandbox_lines(sandbox: Sandbox, choice: str | None) -> list[str]:
+    lines = [f"  Aislamiento: {sandbox.describe()}."]
+    if sandbox.is_container:
+        return lines
+    if (choice or "auto") == "ninguno":
+        lines.append("  Aviso: --sandbox ninguno: el código de los modelos tiene red.")
+    elif not sandbox.isolate_network:
+        lines.append(f"  Aviso: no se pudo cortar la red: {network_isolation_hint()}.")
+    lines.append("  Aviso: el código de los modelos se ejecuta en esta máquina.")
+    return lines
+
+
+def _duel_and_report(
+    args: argparse.Namespace,
+    tasks: list,
+    providers: dict,
+    formats: tuple[str, ...],
+    intro: str | None = None,
+) -> int:
+    """Lo común de un duelo normal y de uno reproducido: ejecutar, guardar e informar."""
     ensure_pytest_available()
+    sandbox = _resolve_sandbox(args)
     # Antes de gastar llamadas a las APIs: la carpeta de salida tiene que poder crearse.
     _prepare_out(args.out)
     results_path = args.out / "results.json"
@@ -370,7 +491,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     )
     for side, provider in providers.items():
         print(f"  {side.upper()}  {provider.spec}")
-    print("  Aviso: el código de los modelos se ejecuta en esta máquina (temporal + límite).")
+    if intro:
+        print(f"  {intro}")
+    for line in _sandbox_lines(sandbox, getattr(args, "sandbox", None)):
+        print(line)
     if args.resume:
         total = len(tasks) * args.runs * len(providers)
         if previous is None:
@@ -403,7 +527,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         results = run_duel(
             tasks,
             providers,
-            prices,
+            load_prices(args.prices),
             runs=args.runs,
             timeout=args.timeout,
             progress=lambda line: print(line, flush=True),
@@ -411,6 +535,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             reuse=reuse,
             created_at=(previous or {}).get("created_at"),
             heartbeat=lambda label: Heartbeat(label, _alive),
+            sandbox=sandbox,
         )
     except KeyboardInterrupt:
         return _interrupted(latest.get("results"), args.out, formats)
@@ -422,6 +547,80 @@ def cmd_run(args: argparse.Namespace) -> int:
     for path in report_paths:
         print(f"  Informe     {path}")
     return 0
+
+
+def _cmd_generate(args: argparse.Namespace, tasks: list, providers: dict) -> int:
+    """``run --solo-generar``: guarda las respuestas sin ejecutar ningún código."""
+    load_prices(args.prices)  # una tabla rota se descubre ya, no al reproducir
+    _prepare_out(args.out)
+    print(
+        f"modelduel {__version__} · {plural(len(tasks), 'tarea', 'tareas')} · "
+        f"{plural(args.runs, 'ejecución', 'ejecuciones')} por tarea · solo generar"
+    )
+    for side, provider in providers.items():
+        print(f"  {side.upper()}  {provider.spec}")
+    print("  Modo solo generar: no se ejecuta ningún código.")
+    print()
+    try:
+        path = generate_responses(
+            tasks,
+            providers,
+            args.runs,
+            args.out,
+            progress=lambda line: print(line, flush=True),
+            heartbeat=lambda label: Heartbeat(label, _alive),
+        )
+    except OSError as exc:
+        raise OutputError(f"no se pudo escribir en {args.out}: {exc.strerror or exc}.") from exc
+    print()
+    print(f"  Respuestas  {path}")
+    print(f"  Tareas      {args.out / RESPONSES_TASKS_DIR}")
+    print("Siguiente paso (mejor en un contenedor o en otra máquina, sin claves):")
+    print(f"  modelduel run --replay {args.out} --sandbox docker --out RESULTADOS")
+    print(f"  modelduel run --replay {args.out} --out RESULTADOS   (sin contenedor)")
+    return 0
+
+
+def _cmd_replay(args: argparse.Namespace, config: Config | None) -> int:
+    """``run --replay CARPETA``: ejecuta los tests sobre respuestas grabadas, sin APIs."""
+    source = responses_path(args.replay)
+    recorded = load_responses(source)
+    if args.runs is not None and args.runs != recorded["runs"]:
+        raise TaskError(
+            f"--runs {args.runs} no coincide con las respuestas grabadas ({recorded['runs']}): "
+            "quítalo."
+        )
+    args.runs = recorded["runs"]
+    if args.timeout is None:
+        args.timeout = config.timeout if config and config.timeout else DEFAULT_TIMEOUT
+    if args.format is None:
+        args.format = config.format if config and config.format else "html"
+    if getattr(args, "sandbox", None) is None and config is not None:
+        args.sandbox = config.sandbox
+    _check_numbers(args)
+    formats = parse_formats(args.format)
+    bundled = source.parent / RESPONSES_TASKS_DIR
+    if args.tasks is None:
+        args.tasks = bundled if bundled.is_dir() else (config.tasks if config else None)
+    if args.tasks is None:
+        raise TaskError(
+            f"falta la carpeta de tareas: no hay {bundled}. Indícala: "
+            f"modelduel run TAREAS --replay {args.replay}"
+        )
+    check_bundle(args.tasks)
+    tasks = discover_tasks(args.tasks)
+    if args.out is None:
+        args.out = config.out if config and config.out else source.parent
+    providers, warnings = recorded_providers(recorded, tasks, source)
+    for warning in warnings:
+        print(f"  Aviso: {warning}")
+    return _duel_and_report(
+        args,
+        tasks,
+        providers,
+        formats,
+        intro=f"Reproduciendo respuestas grabadas de {source}: no se llama a ninguna API.",
+    )
 
 
 def _config_for_run(args: argparse.Namespace) -> Config | None:
@@ -447,6 +646,8 @@ def _apply_config(args: argparse.Namespace, config: Config | None) -> None:
                 setattr(args, name, value)
         if args.format is None:
             args.format = config.format
+        if getattr(args, "sandbox", None) is None:
+            args.sandbox = config.sandbox
     args.runs = 1 if args.runs is None else args.runs
     args.timeout = DEFAULT_TIMEOUT if args.timeout is None else args.timeout
     args.format = "html" if args.format is None else args.format
@@ -475,7 +676,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     specs = init_project(folder, providers)
     print(f"Listo: {folder}/")
     print(f"  modelduel.toml  configuración ({', '.join(specs)})")
-    print("  tasks/          3 tareas de ejemplo (enunciado + tests): cámbialas por las tuyas")
+    count = sum(path.is_dir() for path in (folder / "tasks").iterdir())
+    print(f"  tasks/          {count} tareas de ejemplo (enunciado + tests): cámbialas por tuyas")
     print("  replays/        respuestas grabadas para probar sin claves")
     if providers:
         print()
@@ -587,6 +789,10 @@ def cmd_demo(args: argparse.Namespace) -> int:
         out=args.out,
         config=None,
         use_config=False,
+        sandbox=None,
+        sandbox_image=None,
+        solo_generar=False,
+        replay=None,
     )
     code = cmd_run(run_args)
     if code == 0:

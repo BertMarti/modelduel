@@ -49,6 +49,9 @@ jobs:
         run: mypy
 
       - name: Tests
+        # En Ubuntu, además, los tests de Docker de verdad (contenedor sin red ni privilegios).
+        env:
+          MODELDUEL_TEST_DOCKER: ${{ runner.os == 'Linux' && '1' || '0' }}
         run: pytest --cov --cov-report=term
 
       - name: Demo con respuestas grabadas (liga de tres)
@@ -76,6 +79,23 @@ jobs:
           done
           test -s runs/duelo-md/index.html
           test ! -e runs/md/index.html
+
+      - name: Solo generar y reproducir (sin APIs)
+        shell: bash
+        run: |
+          modelduel run examples/tasks --model replay:alfa --model replay:beta --solo-generar --out runs/generado
+          test -s runs/generado/respuestas.json
+          test ! -e runs/generado/results.json
+          modelduel run --replay runs/generado --out runs/reproducido
+          grep -q "Informe de duelo" runs/reproducido/index.html
+
+      - name: Duelo dentro de Docker (--sandbox docker)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          modelduel run examples/tasks/slugify --a replay:alfa --b replay:beta --sandbox docker --out runs/docker | tee runs/docker.log
+          grep -q "Aislamiento: contenedor docker sin red" runs/docker.log
+          python -c "import json,sys; d=json.load(open('runs/docker/results.json')); r=d['tasks'][0]['results']; sys.exit(0 if r['a'][0]['solved'] and r['b'][0]['passed']==6 else 1)"
 
       - name: Comprobar el informe
         shell: bash

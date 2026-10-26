@@ -5,7 +5,16 @@ from modelduel.tasks import TaskError, count_tests, discover_tasks, load_task
 
 def test_ejemplos_en_orden_de_dificultad(examples_dir):
     tasks = discover_tasks(examples_dir / "tasks")
-    assert [t.id for t in tasks] == ["slugify", "merge_intervals", "parse_duration"]
+    assert [t.id for t in tasks] == [
+        "slugify",
+        "merge_intervals",
+        "parse_duration",
+        "flatten_json",
+        "csv_totals",
+        "wrap_text",
+        "grid_path",
+        "topo_order",
+    ]
     assert all(t.title and t.difficulty for t in tasks)
     assert all(t.expected_tests >= 5 for t in tasks)
 

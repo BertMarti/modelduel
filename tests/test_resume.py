@@ -301,7 +301,7 @@ def cut(monkeypatch):
 
 def test_cli_ctrl_c_deja_parcial_e_informe_y_resume_lo_completa(cli_args, cut, capsys):
     args, out = cli_args
-    cut.cut_at = 4  # 3 tareas x 2 contendientes = 6 llamadas; se corta en la cuarta
+    cut.cut_at = 4  # 8 tareas x 2 contendientes = 16 llamadas; se corta en la cuarta
     assert main(args) == 130
     captured = capsys.readouterr()
     assert "--resume" in captured.err
@@ -309,18 +309,18 @@ def test_cli_ctrl_c_deja_parcial_e_informe_y_resume_lo_completa(cli_args, cut, c
     assert partial["status"] == "in_progress"
     done = sum(len(v) for t in partial["tasks"] for v in t["results"].values())
     assert done == 3
-    assert "Duelo incompleto: 3 de 6 intentos" in (out / "index.html").read_text(encoding="utf-8")
+    assert "Duelo incompleto: 3 de 16 intentos" in (out / "index.html").read_text(encoding="utf-8")
 
     cut.calls, cut.cut_at = 0, None
     assert main([*args, "--resume"]) == 0
     printed = capsys.readouterr().out
-    assert "Reanudando: 3 intentos ya hechos de 6; quedan 3." in printed
+    assert "Reanudando: 3 intentos ya hechos de 16; quedan 13." in printed
     assert printed.count("· ya hecho") == 3
-    assert cut.calls == 3  # solo lo que faltaba
+    assert cut.calls == 13  # solo lo que faltaba
     final = json.loads((out / "results.json").read_text(encoding="utf-8"))
     assert final["status"] == "complete"
-    assert final["summary"]["a"]["tasks_solved"] == 2
-    assert final["summary"]["b"]["tasks_solved"] == 2
+    assert final["summary"]["a"]["tasks_solved"] == 6
+    assert final["summary"]["b"]["tasks_solved"] == 4
     assert "Duelo incompleto" not in (out / "index.html").read_text(encoding="utf-8")
 
 
@@ -360,7 +360,7 @@ def test_cli_resume_de_un_duelo_completo_no_llama_a_nadie(cli_args, cut, capsys)
     capsys.readouterr()
     assert main([*args, "--resume"]) == 0
     assert cut.calls == 0
-    assert "Reanudando: 6 intentos ya hechos de 6; quedan 0." in capsys.readouterr().out
+    assert "Reanudando: 16 intentos ya hechos de 16; quedan 0." in capsys.readouterr().out
 
 
 def test_cli_resume_con_otros_contendientes_falla_con_mensaje(cli_args, cut, capsys):
@@ -504,7 +504,7 @@ def test_ctrl_c_respeta_el_formato_pedido(cli_args, cut):
     args, out = cli_args
     cut.cut_at = 4
     assert main([*args, "--format", "md"]) == 130
-    assert "Duelo incompleto: 3 de 6 intentos" in (out / "informe.md").read_text(encoding="utf-8")
+    assert "Duelo incompleto: 3 de 16 intentos" in (out / "informe.md").read_text(encoding="utf-8")
     assert not (out / "index.html").exists()
 
 

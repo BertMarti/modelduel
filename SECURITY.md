@@ -20,13 +20,19 @@ terminar mata todo el árbol de procesos. En Linux lo hace un supervisor «subre
 (`prctl(PR_SET_CHILD_SUBREAPER)`), así que tampoco sobreviven los procesos que se desligan con
 `setsid()` o un doble fork. `modelduel doctor` muestra qué medidas aplica tu sistema.
 
-**No es un aislamiento real**: el código tiene red, puede leer y escribir rutas absolutas del
-disco y el disco total que llena solo lo acota el tiempo (256 MiB por archivo). En macOS un proceso
-que se desligue con `setsid()` puede sobrevivir; en Windows no hay límite de memoria. Una solución
-hostil que mate a su supervisor deja la limpieza en manos de una marca en el entorno, que puede
-borrar si vuelve a ejecutarse con otro entorno. Para código de modelos en los que no confíes,
-ejecuta modelduel dentro de un contenedor (hay una orden `docker run` lista para copiar en el
-README, apartado «Seguridad») o en una máquina virtual.
+Desde la 0.9.0, en Linux la red de la solución se corta por defecto con un espacio de nombres de
+usuario y de red (sin root; si el sistema no lo permite, se avisa), y en Windows el Job Object
+limita la memoria a 1 GiB por proceso.
+
+**Sin contenedor no es un aislamiento completo**: el código puede leer y escribir rutas absolutas
+del disco y el disco total que llena solo lo acota el tiempo (256 MiB por archivo); en macOS y
+Windows tiene red. En macOS un proceso que se desligue con `setsid()` puede sobrevivir. Una
+solución hostil que mate a su supervisor deja la limpieza en manos de una marca en el entorno, que
+puede borrar si vuelve a ejecutarse con otro entorno. Para código de modelos en los que no
+confíes, usa **`modelduel run --sandbox docker`** (o `podman`): cada ejecución corre en un
+contenedor desechable sin red, sin privilegios, de solo lectura y con techos de memoria, CPU y
+procesos. También puedes generar con `--solo-generar` y ejecutar los tests en otra máquina con
+`--replay`.
 
 Sí son vulnerabilidades, por ejemplo:
 
@@ -37,6 +43,13 @@ Sí son vulnerabilidades, por ejemplo:
 - Que el código de un modelo sobreviva al final de la ejecución en Linux (salvo matando antes a su
   supervisor y cambiando de entorno, documentado arriba), o en cualquier sistema sin desligarse a
   propósito del árbol de procesos.
+- Que con `--sandbox docker|podman` el código llegue a la red, escriba fuera de su carpeta
+  temporal y `/tmp`, reciba variables de tu entorno o se ejecute como root; o que en Linux, con la
+  red cortada por defecto, llegue a otra interfaz que no sea `lo`.
+- Que un `respuestas.json` manipulado haga que `--replay` ejecute algo fuera del runner (el código
+  de las respuestas y los tests copiados SÍ se ejecutan, como en cualquier duelo: reprodúcelos con
+  `--sandbox docker` si no son tuyos).
 
-No lo son: que el código generado use la red o lea archivos con rutas absolutas (está documentado
-arriba).
+No lo son: que sin contenedor el código generado lea archivos con rutas absolutas, o use la red
+en macOS, en Windows, con `--sandbox ninguno` o en un Linux que no permite espacios de nombres
+(está documentado arriba y `modelduel doctor` lo dice).
