@@ -104,10 +104,10 @@ La publicación es automática y **no usa tokens**: `release.yml` usa *Trusted P
 3. El workflow construye el sdist y la wheel, comprueba que el commit está en `main` y que la etiqueta coincide con la versión, ejecuta `twine check --strict`, prueba la wheel en un entorno limpio y, si todo va bien, publica en PyPI a través del *environment* `pypi`. Sigue el resultado en la pestaña *Actions*.
 4. Comprueba la publicación desde un entorno limpio: `pip install "modelduel[pytest]"` y `modelduel demo`.
 
-**Pendiente ahora (v0.9.0, 26/10/2026):** la versión y el `CHANGELOG.md` ya están al día en `main`; solo falta el paso 2. Desde un clon con `main` actualizado (la 0.9.0 sustituye a la 0.8.0, que nunca se publicó):
+**Pendiente ahora (v1.0.0, 26/10/2026):** la versión y el `CHANGELOG.md` ya están al día en `main`; solo falta el paso 2. La 1.0.0 sustituye a la 0.8.0 y la 0.9.0, que nunca se publicaron (en PyPI está la 0.7.0). Desde un clon con `main` actualizado, con las notas de `CHANGELOG.md` (la entrada 1.0.0 lleva el resumen frente a la 0.7.0):
 
 ```bash
-gh release create v0.9.0 --repo BertMarti/modelduel --target main --title "v0.9.0 · aislamiento con contenedor, red cortada y solo generar" --notes "$(awk '/^## \[0.9.0\]/{f=1;next} /^## \[0.7.0\]/{f=0} f' CHANGELOG.md)"
+gh release create v1.0.0 --repo BertMarti/modelduel --target main --title "modelduel 1.0.0 · configurar en un minuto y código de los modelos aislado" --notes "$(awk '/^## \[1.0.0\]/{f=1;next} /^## \[0.9.0\]/{f=0} f' CHANGELOG.md)"
 ```
 
 Para comprobar el paquete en local sin publicar: `pip install build twine`, `python -m build` y `twine check dist/*`.

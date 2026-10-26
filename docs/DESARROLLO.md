@@ -151,6 +151,7 @@ El proyecto lo ha desarrollado un equipo de agentes de IA, cada uno en su rama y
 - **v0.4.0 a v0.7.0:** Claude Code implementó proveedores, clasificación pública, accesibilidad, duelo en directo, Markdown y señal de vida.
 - **v0.8.0 (24/10/2026):** mejoras nocturnas de seguridad, interfaz y documentación con Claude Code como jefe y GPT-5.6 Luna y modelos gratuitos de OpenCode como delegados.
 - **v0.9.0 (26/10/2026):** aislamiento (`--sandbox`, red cortada, memoria en Windows), solo generar/reproducir y cinco tareas nuevas; Claude Code como jefe, GPT-5.6 Luna como delegado.
+- **v1.0.0 (26/10/2026):** primera versión estable; reúne lo preparado como 0.8.0 y 0.9.0 (que no llegaron a PyPI), con repaso de calidad, documentación fiel y el workflow de publicación pasando también la suite. Claude Code como jefe.
 
 ## Versiones
 

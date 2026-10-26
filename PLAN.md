@@ -36,12 +36,20 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
 - **Más tareas de ejemplo:** `flatten_json`, `csv_totals`, `wrap_text`, `grid_path` y `topo_order` (8 en total).
 - `modelduel doctor` informa del aislamiento disponible y recomienda el mejor.
 
-## Siguiente
+## Hecho en la fase 5 (26/10/2026, v1.0.0)
+- Versión **1.0.0** (estado «estable» en PyPI y Python 3.13 en los clasificadores); el CHANGELOG resume qué trae frente a la 0.7.0 publicada (la 0.8.0 y la 0.9.0 no llegaron a PyPI).
+- `release.yml` pasa la suite y exige la entrada del CHANGELOG antes de publicar; sigue publicando solo al crear una Release, con Trusted Publishing y el environment `pypi` (solo etiquetas `v*`).
+- Repaso de calidad como usuario nuevo (`init` → `doctor` → `run` → `--solo-generar` → `--replay` y errores habituales): sin fallos medios ni altos; «No existe …» en español para `report` y `--prices` con archivos que faltan.
+- Documentación fiel: qué mide el marcador y qué no (soluciones que engañan a los tests), qué proveedores se han usado contra la API real y novedades de la 1.0 en la portada.
+- Clasificación de lo pendiente: nada de lo de abajo es un fallo medio o alto de lo que se promete; son límites documentados (README, USO «Límites conocidos», SECURITY) o mejoras.
+
+## Después de la 1.0
 - **Resultados reales:** Poblar la carpeta `results/` con duelos reales entre modelos actuales para que la clasificación pública sea útil (necesita claves y gasto: decisión de Alberto).
-- **Disco:** `RLIMIT_FSIZE` limita cada archivo, no el total, y el contenedor monta la carpeta de la ejecución sin tope; valorar copiar los archivos a un tmpfs del contenedor (`docker create` + `docker cp`) o un volumen con cuota.
-- **Procesos que se desligan en macOS:** no hay subreaper; valorar recorrer los procesos con la marca `MODELDUEL_RUN` (`ps -E`) también allí.
+- **Disco (baja; documentado):** `RLIMIT_FSIZE` limita cada archivo, no el total, y el contenedor monta la carpeta de la ejecución sin tope; valorar copiar los archivos a un tmpfs del contenedor (`docker create` + `docker cp`) o un volumen con cuota.
+- **Procesos que se desligan en macOS (baja; documentado):** no hay subreaper; valorar recorrer los procesos con la marca `MODELDUEL_RUN` (`ps -E`) también allí.
 - **Contenedor sin el pytest del anfitrión:** opción de imagen propia con pytest (publicada en GHCR) para no depender de montar los paquetes del entorno local.
-- **Resultados falsificables (ya existía):** el código de la solución corre en el mismo proceso que pytest y puede escribir un `junit.xml` falso (o tocar pytest) para «aprobar»; en el contenedor, `/sandbox` (donde va el XML) es escribible. El aislamiento protege la máquina, no la honradez del marcador: valorar sacar el XML por otra vía (p. ej. un descriptor heredado solo por pytest) y comprobar que el número de tests coincide con el recogido antes de importar la solución.
+- **Resultados falsificables (límite de diseño; documentado en README, USO y SECURITY desde la 1.0):** el código de la solución corre en el mismo proceso que pytest y puede escribir un `junit.xml` falso (o tocar pytest) para «aprobar»; en el contenedor, `/sandbox` (donde va el XML) es escribible. El aislamiento protege la máquina, no la honradez del marcador: valorar sacar el XML por otra vía (p. ej. un descriptor heredado solo por pytest) y comprobar que el número de tests coincide con el recogido antes de importar la solución.
+- **Probar `openai:` y `omniroute:` con una API real** (Gemini ya se usó de verdad; necesita claves y algo de gasto: decisión de Alberto).
 - **Actualizar la imagen fijada** cuando salga un parche de Python (Dependabot no ve la constante de `sandbox.py`; cómo hacerlo en `docs/DESARROLLO.md`).
 
 ## Ideas

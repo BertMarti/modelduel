@@ -135,7 +135,7 @@ modelduel run examples/tasks --model replay:alfa --model replay:beta --model rep
 (En Windows, la misma orden; las barras de las rutas también funcionan.) Verás algo así:
 
 ```text
-modelduel 0.9.0 · 8 tareas · 1 ejecución por tarea
+modelduel 1.0.0 · 8 tareas · 1 ejecución por tarea
   A  replay:alfa
   B  replay:beta
   C  replay:gamma
@@ -893,7 +893,8 @@ Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelo
 - La imagen del contenedor se descarga la primera vez y Docker o Podman deben estar instalados y disponibles para tu usuario.
 - En Linux, `auto` puede no cortar la red si el sistema no permite espacios de nombres de usuario; en Windows y macOS hay que usar un contenedor para cortar la red.
 - Un `Retry-After` de entre 30 y 120 s se respeta entero en cada reintento: con `--retries 3`, un proveedor saturado puede costar varios minutos por intento. Baja `--retries` si prefieres rendirte antes.
-- Los proveedores `gemini`, `openai` y `omniroute` solo se han probado con respuestas simuladas, no contra las APIs reales.
+- El proveedor `gemini` se ha usado contra la API real; `openai` y `omniroute` se prueban con un servidor simulado que imita la API de OpenAI (la misma que usan OpenRouter, Ollama y OmniRoute). Si algo falla con un proveedor real, `modelduel doctor --red` comprueba la conexión sin gastar tokens.
+- El marcador mide lo que comprueban tus tests. El código del modelo se ejecuta en el mismo proceso que pytest, así que una solución escrita para engañar (por ejemplo, devolver un objeto que dice ser igual a cualquier cosa, o tocar pytest o su informe) podría aprobar. El informe enseña el código de cada modelo: revísalo si un resultado te sorprende, y escribe tests que comprueben también el tipo del resultado (`assert type(r) is int`).
 
 ---
 
