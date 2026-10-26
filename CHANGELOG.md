@@ -8,7 +8,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
-- La 1.0.0 ya está en PyPI: `pip install "modelduel[pytest]"` vuelve a ser el único camino de instalación en README, guía de uso y portada (se retiran las notas para instalar desde GitHub mientras no estaba publicada).
+- La 1.0.0 ya está en PyPI: `pip install "modelduel[pytest]"` vuelve a ser el único camino de instalación también en la guía de uso, la portada y CONTRIBUTING (se retiran las notas para instalar desde GitHub mientras no estaba publicada; el README ya iba limpio en la 1.0.0).
 
 ## [1.0.0] - 2026-10-26
 
@@ -25,12 +25,14 @@ Primera versión estable. Reúne todo lo preparado como 0.8.0 y 0.9.0, que no ll
 ### Cambiado
 
 - Estado de desarrollo «estable» (`Development Status :: 5 - Production/Stable`) y Python 3.13 en los clasificadores (el CI ya lo probaba).
-- `release.yml` pasa también la suite de tests y exige la entrada del `CHANGELOG.md` con la versión de la etiqueta antes de publicar.
+- `release.yml` pasa también la suite de tests y exige la entrada del `CHANGELOG.md` con la versión de la etiqueta antes de publicar; sus acciones van fijadas por SHA (también la de publicar en PyPI, antes una rama móvil) y la publicación se puede reintentar (`skip-existing`).
+- El README (que es también la descripción del paquete en PyPI) ya no lleva avisos temporales ni alertas de GitHub que PyPI no sabe mostrar.
+- El sdist ya no incluye `tests/`: muchos comprueban la web, los resultados de ejemplo y los workflows del repositorio, que no viajan en el paquete.
 - La documentación (README, guía de uso, `SECURITY.md`) explica qué mide el marcador y qué no: una solución escrita para engañar a los tests podría aprobar, así que el informe enseña el código de cada modelo.
 
 ### Corregido
 
-- `modelduel report` con un `results.json` que no existe, o `--prices` con un archivo que no existe, dicen «No existe …» en español en vez del error del sistema en inglés.
+- `modelduel report` con un `results.json` que no existe y `modelduel run --prices` con un archivo de precios que no existe dicen «No existe …» en español en vez del error del sistema en inglés.
 
 ## [0.9.0] - 2026-10-26 (no publicada en PyPI)
 

@@ -51,6 +51,8 @@ def test_los_ejemplos_viajan_dentro_de_la_wheel():
     assert wheel["force-include"] == {"examples": "modelduel/examples"}
     sdist = PYPROJECT["tool"]["hatch"]["build"]["targets"]["sdist"]["include"]
     assert "/examples" in sdist and "/src" in sdist
+    # Los tests leen site/, results/ y .github/: en el sdist estarían rotos.
+    assert "/tests" not in sdist
 
 
 def test_el_readme_no_tiene_enlaces_relativos_que_se_rompan_en_pypi():
@@ -67,7 +69,16 @@ def test_el_readme_no_tiene_enlaces_relativos_que_se_rompan_en_pypi():
 def test_release_usa_trusted_publishing_sin_tokens():
     assert "release:" in RELEASE and "types: [published]" in RELEASE
     assert "id-token: write" in RELEASE
-    assert "pypa/gh-action-pypi-publish@release/v1" in RELEASE
+    # Acción de publicar fijada por SHA (no la rama móvil release/v1) y reintentable.
+    assert re.search(r"pypa/gh-action-pypi-publish@[0-9a-f]{40} # v1\.", RELEASE)
+    assert "skip-existing: true" in RELEASE
+
+
+def test_las_acciones_de_la_release_van_fijadas_por_sha():
+    uses = re.findall(r"uses: (\S+)", RELEASE)
+    assert uses
+    for action in uses:
+        assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", action), action
     assert re.search(r"environment:\s*\n\s+name: pypi", RELEASE)
     assert "twine check --strict" in RELEASE and "python -m build" in RELEASE
     # Ni secretos, ni contraseñas, ni usuario/token de PyPI.

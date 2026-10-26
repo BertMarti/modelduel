@@ -53,10 +53,11 @@ packages = ["src/modelduel"]
 [tool.hatch.build.targets.wheel.force-include]
 "examples" = "modelduel/examples"
 
+# Sin /tests: muchos tests comprueban el repositorio (la web de site/, los results/ de ejemplo y
+# los workflows), que no forman parte del paquete; la suite se pasa desde el repo (CI y release.yml).
 [tool.hatch.build.targets.sdist]
 include = [
     "/src",
-    "/tests",
     "/examples",
     "/docs",
     "/README.md",

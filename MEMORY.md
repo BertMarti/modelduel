@@ -128,7 +128,7 @@ Base heredada de v0.1.0:
 - 2026-09-30 (docs): «Cómo se ha hecho» (README y web): v0.1.0 con lead, builder y qa en Claude Opus y docs en Sonnet; toda la v0.2.0 en Sonnet; OpenCode previsto pero sin poder ejecutarse en modo autónomo; Alberto supervisa y fusiona.
 
 ## Siguiente paso
-- **1.0.0 publicada en PyPI** (Release `v1.0.0`, Trusted Publishing). Esta rama (`v1-tras-publicar`) retira las notas de instalación desde GitHub: `pip install "modelduel[pytest]"` es el camino normal. Comprobar en un entorno limpio `pip install "modelduel[pytest]"`, `modelduel --version` (1.0.0) y `modelduel demo`.
+- **1.0.0 publicada en PyPI** (Release `v1.0.0`, Trusted Publishing). Esta rama (`v1-tras-publicar`) retira las notas de instalación desde GitHub: `pip install "modelduel[pytest]"` es el camino normal. Comprobar en un entorno limpio `pip install "modelduel[pytest]"`, `modelduel --version` (1.0.0) y `modelduel demo`. Regla: el README es la descripción de PyPI (no se puede cambiar tras publicar): nada temporal ni alertas `> [!NOTE]` de GitHub (usar `> **Aviso:**`).
 - Alberto: probar una vez `openai:` (y `omniroute:` si lo usa) contra la API real con claves propias; `gemini:` ya se usó de verdad (01/10/2026).
 - Historia (hecho): PR de v0.2.0 fusionados, *trusted publisher* y environment `pypi` creados (el environment solo admite etiquetas `v*`), releases v0.1.0, v0.6.0 y v0.7.0 publicadas; las 0.8.0 y 0.9.0 se prepararon pero no se publicaron.
 
