@@ -128,9 +128,7 @@ Base heredada de v0.1.0:
 - 2026-09-30 (docs): «Cómo se ha hecho» (README y web): v0.1.0 con lead, builder y qa en Claude Opus y docs en Sonnet; toda la v0.2.0 en Sonnet; OpenCode previsto pero sin poder ejecutarse en modo autónomo; Alberto supervisa y fusiona.
 
 ## Siguiente paso
-- **Release 1.0.0 (fase 5, 26/10/2026):** tras fusionar la PR de `v1-2026-10-26`, el orquestador publica la Release `v1.0.0` (irreversible: sube a PyPI por Trusted Publishing; sustituye a la 0.8.0 y la 0.9.0, que nunca se publicaron). Texto de la release preparado aparte; orden equivalente desde un clon con `main` al día:
-  `gh release create v1.0.0 --repo BertMarti/modelduel --target main --title "modelduel 1.0.0 · configurar en un minuto y código de los modelos aislado" --notes "$(awk '/^## \[1.0.0\]/{f=1;next} /^## \[0.9.0\]/{f=0} f' CHANGELOG.md)"`
-- **Después de publicar:** fusionar la rama `v1-tras-publicar` (ya preparada, sin PR): quita de README, USO y portada las notas «mientras la 1.0.0 no esté en PyPI, instala desde GitHub» y el «Pendiente del mantenedor». Comprobar en un entorno limpio `pip install "modelduel[pytest]"`, `modelduel --version` (1.0.0) y `modelduel demo`.
+- **1.0.0 publicada en PyPI** (Release `v1.0.0`, Trusted Publishing). Esta rama (`v1-tras-publicar`) retira las notas de instalación desde GitHub: `pip install "modelduel[pytest]"` es el camino normal. Comprobar en un entorno limpio `pip install "modelduel[pytest]"`, `modelduel --version` (1.0.0) y `modelduel demo`.
 - Alberto: probar una vez `openai:` (y `omniroute:` si lo usa) contra la API real con claves propias; `gemini:` ya se usó de verdad (01/10/2026).
 - Historia (hecho): PR de v0.2.0 fusionados, *trusted publisher* y environment `pypi` creados (el environment solo admite etiquetas `v*`), releases v0.1.0, v0.6.0 y v0.7.0 publicadas; las 0.8.0 y 0.9.0 se prepararon pero no se publicaron.
 
