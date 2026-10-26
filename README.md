@@ -59,7 +59,7 @@ Solo evalúa funciones de Python comprobables con tests automáticos. Una sola e
 2. **Prueba la demo** sin claves ni coste: `modelduel demo`. Enfrenta respuestas grabadas de `alfa`, `beta` y `gamma` y deja el informe en `modelduel-demo/`.
 
 > [!NOTE]
-> `modelduel init`, `modelduel doctor` y `modelduel run` sin argumentos (pasos 3 a 6) llegan en la versión 0.9.0. Si `modelduel --version` dice una versión anterior, es que aún no está en PyPI: instala la última versión desde GitHub con `pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"`. La demo funciona con las dos.
+> `modelduel init`, `modelduel doctor` y `modelduel run` sin argumentos (pasos 3 a 6), el aislamiento con `--sandbox` y el modo `--solo-generar` llegan en la versión 0.9.0. Si `modelduel --version` dice una versión anterior (en PyPI aún está la 0.7.0), instala la última desde GitHub con `pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"`. La demo funciona con las dos.
 
 3. **Prepara tu duelo** con los proveedores que vayas a usar:
 
@@ -120,14 +120,14 @@ Para OpenRouter, configura `OPENAI_BASE_URL=https://openrouter.ai/api/v1`. Para 
 Al terminar, la terminal muestra la clasificación (aquí, la de la demo):
 
 ```text
-  #   Contendiente     Tareas   Tests   Tiempo   Tokens (ent/sal)        Coste
-  ----------------------------------------------------------------------------
-  1   A replay:alfa       2/3   31/32   10,1 s          1.401/703   0,0017 USD
-  2   C replay:gamma      2/3   30/32    3,7 s          1.314/426   0,0003 USD
-  3   B replay:beta       2/3   30/32   28,1 s        1.373/2.132   0,0248 USD
+  #   Contendiente     Tareas   Tests         Tiempo   Tokens (ent/sal)        Coste
+  ----------------------------------------------------------------------------------
+  1   A replay:alfa       6/8   73/75         31,1 s        4.163/2.225   0,0052 USD
+  2   B replay:beta       4/8   61/75   1 min 27,0 s        4.268/5.959   0,0703 USD
+  3   C replay:gamma      4/8   53/75         10,2 s        3.576/1.384   0,0009 USD
 ```
 
-Primero cuentan las tareas resueltas, después los tests superados y, si todos los precios son comparables, el coste. Los precios de la demo son ficticios.
+Primero cuentan las tareas resueltas, después los tests superados y, si todos los precios son comparables, el coste: `beta` y `gamma` resuelven 4 de 8, pero `beta` supera más tests. Los precios de la demo son ficticios y los tiempos cambian en cada máquina.
 
 ## Seguridad
 
@@ -163,6 +163,8 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 ## Lo que tienes que hacer tú
 
 Solo una cosa, y solo para duelos con modelos reales: crear la clave del proveedor en su web ([Google AI Studio](https://aistudio.google.com/apikey), [OpenAI](https://platform.openai.com/api-keys) u [OpenRouter](https://openrouter.ai/keys)) y definirla en tu terminal. Ollama y la demo no necesitan ninguna.
+
+**Pendiente del mantenedor (Alberto):** publicar la 0.9.0 en PyPI creando la Release `v0.9.0` en GitHub; la publicación es automática y no tiene vuelta atrás. Los pasos están en [Publicar una versión en PyPI](https://github.com/BertMarti/modelduel/blob/main/CONTRIBUTING.md#publicar-una-versión-en-pypi-mantenedor). Hasta entonces, `pip install "modelduel[pytest]"` instala la 0.7.0: sirve para la demo, pero no trae `init`, `doctor` ni `--sandbox` (usa la instalación desde GitHub de la nota de arriba).
 
 Novedades: consulta el [registro de cambios](https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md).
 
