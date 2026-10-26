@@ -11,6 +11,7 @@ import shutil
 
 import pytest
 
+from modelduel import sandbox
 from modelduel.cli import EXIT_USAGE, main
 from modelduel.config import ConfigError, init_project, load_config
 from modelduel.doctor import collect_checks
@@ -93,7 +94,11 @@ def proyecto(tmp_path, examples_dir, monkeypatch):
     return tmp_path
 
 
-def test_run_con_aislamiento_docker_ausente_sale_con_error_de_uso(proyecto, examples_dir, capsys):
+def test_run_con_aislamiento_docker_ausente_sale_con_error_de_uso(
+    proyecto, examples_dir, capsys, monkeypatch
+):
+    # Docker ausente también en el CI, donde MODELDUEL_TEST_DOCKER=1 deja ver el real.
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _name, *a, **k: None)
     code = main(["run", "--replays", str(examples_dir / "replays")])
     assert code == EXIT_USAGE
     err = capsys.readouterr().err
