@@ -41,6 +41,7 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
 - **Disco:** `RLIMIT_FSIZE` limita cada archivo, no el total, y el contenedor monta la carpeta de la ejecución sin tope; valorar copiar los archivos a un tmpfs del contenedor (`docker create` + `docker cp`) o un volumen con cuota.
 - **Procesos que se desligan en macOS:** no hay subreaper; valorar recorrer los procesos con la marca `MODELDUEL_RUN` (`ps -E`) también allí.
 - **Contenedor sin el pytest del anfitrión:** opción de imagen propia con pytest (publicada en GHCR) para no depender de montar los paquetes del entorno local.
+- **Resultados falsificables (ya existía):** el código de la solución corre en el mismo proceso que pytest y puede escribir un `junit.xml` falso (o tocar pytest) para «aprobar»; en el contenedor, `/sandbox` (donde va el XML) es escribible. El aislamiento protege la máquina, no la honradez del marcador: valorar sacar el XML por otra vía (p. ej. un descriptor heredado solo por pytest) y comprobar que el número de tests coincide con el recogido antes de importar la solución.
 - **Actualizar la imagen fijada** cuando salga un parche de Python (Dependabot no ve la constante de `sandbox.py`; cómo hacerlo en `docs/DESARROLLO.md`).
 
 ## Ideas

@@ -166,6 +166,7 @@ def test_varias_ejecuciones_se_reproducen_cada_una(tasks_dir, tmp_path):
         (lambda d: d["contenders"].pop("b"), "entre 2 y 6"),
         (lambda d: d["contenders"].update(b={"spec": "replay:alfa"}), "repetidos"),
         (lambda d: d["contenders"].update(b={"spec": ""}), "repetidos"),
+        (lambda d: d["contenders"].update(b={"spec": "x\x1b[2Jborra"}), "no imprimibles"),
         (lambda d: d.update(contenders={"b": {"spec": "x"}, "a": {"spec": "y"}}), "orden"),
         (lambda d: d.update(tasks="nada"), "lista de tareas"),
         (lambda d: d["tasks"][0]["attempts"].update(a=[{"run": "1"}]), "intento inválido"),

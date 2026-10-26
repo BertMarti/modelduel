@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -71,7 +72,8 @@ def test_la_orden_del_contenedor_aisla_red_privilegios_y_recursos(tmp_path):
     assert cmd[:3] == ["/usr/bin/docker", "run", "--rm"]
     assert _value_after(options, "--network") == ["none"]
     assert _value_after(options, "--cap-drop") == ["ALL"]
-    assert _value_after(options, "--security-opt") == ["no-new-privileges"]
+    # label=disable: los montajes funcionan con SELinux en «enforcing» (Fedora/RHEL, Podman).
+    assert _value_after(options, "--security-opt") == ["no-new-privileges", "label=disable"]
     assert "--read-only" in options
     assert _value_after(options, "--pull") == ["never"]
     assert _value_after(options, "--memory") == [CONTAINER_MEMORY]
@@ -80,7 +82,8 @@ def test_la_orden_del_contenedor_aisla_red_privilegios_y_recursos(tmp_path):
     assert _value_after(options, "--cpus") == ["1"]
     assert _value_after(options, "--user") == ["1000:1000"]
     assert _value_after(options, "--name") == ["modelduel-abc"]
-    assert _value_after(options, "--tmpfs")[0].startswith("/tmp:")
+    tmpfs = _value_after(options, "--tmpfs")[0]
+    assert tmpfs.startswith("/tmp:") and {"noexec", "nosuid", "nodev"} <= set(tmpfs.split(","))
     assert "--privileged" not in cmd
     mounts_text = _value_after(options, "--mount")
     assert mounts_text[0] == f"type=bind,source={tmp_path},target=/sandbox"
@@ -333,8 +336,19 @@ NET_TESTS = textwrap.dedent(
 
 
     def test_no_hay_salida_a_internet():
+        # 192.0.2.1 (TEST-NET-1, RFC 5737) no es de nadie: sin ruta, falla al momento.
         with pytest.raises(OSError):
-            socket.create_connection(("1.1.1.1", 53), timeout=2)
+            socket.create_connection(("192.0.2.1", 9), timeout=2)
+
+
+    def test_loopback_funciona_para_servidores_locales():
+        with socket.create_server(("127.0.0.1", 0)) as server:
+            client = socket.create_connection(server.getsockname(), timeout=2)
+            conn, _ = server.accept()
+            client.sendall(b"hola")
+            assert conn.recv(4) == b"hola"
+            conn.close()
+            client.close()
 
 
     def test_mismo_usuario_sin_root():
@@ -357,14 +371,67 @@ def test_con_sandbox_ninguno_la_red_no_se_toca(make_task):
     assert not result.solved
 
 
-def test_fallo_al_cortar_la_red_no_ejecuta_nada(make_task, monkeypatch):
-    def refuse(*_args, **_kwargs):
-        raise runner._SetupFailed("No se pudo cortar la red de los tests")
+def _refuse(*_args, **_kwargs):
+    raise runner._SetupFailed("No se pudo cortar la red de los tests")
 
-    monkeypatch.setattr(runner, "_execute", refuse)
-    result = run_tests(GOOD, make_task(ADD_TESTS), sandbox=Sandbox(isolate_network=True))
-    assert result.status == "error" and not result.solved
-    assert "cortar la red" in result.message
+
+def test_fallo_al_cortar_la_red_para_el_duelo(make_task, monkeypatch):
+    monkeypatch.setattr(runner, "_execute", _refuse)
+    with pytest.raises(runner.RunnerError, match="cortar la red"):
+        run_tests(GOOD, make_task(ADD_TESTS), sandbox=Sandbox(isolate_network=True))
+
+
+class _CountingProvider:
+    calls = 0
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.spec = inner.spec
+
+    def complete(self, prompt, *, task_id=None):
+        _CountingProvider.calls += 1
+        return self.inner.complete(prompt, task_id=task_id)
+
+
+def test_si_el_aislamiento_falla_no_se_llama_a_ninguna_api(
+    examples_dir, tmp_path, monkeypatch, capsys
+):
+    # Revisión final (Fable): antes, cada intento quedaba en «error» y el duelo seguía pagando.
+    from modelduel.providers import get_provider
+
+    _CountingProvider.calls = 0
+    monkeypatch.setattr(
+        "modelduel.cli.get_provider",
+        lambda spec, dirs=None, **_k: _CountingProvider(get_provider(spec, dirs)),
+    )
+    monkeypatch.setattr(
+        "modelduel.cli.resolve_sandbox", lambda *_a, **_k: Sandbox(isolate_network=True)
+    )
+    monkeypatch.setattr("modelduel.cli.supervisor_supported", lambda: True)
+    monkeypatch.setattr(runner, "_execute", _refuse)
+    args = ["run", str(examples_dir / "tasks" / "slugify"), "--a", "replay:alfa"]
+    assert main([*args, "--b", "replay:beta", "--out", str(tmp_path / "o")]) == 2
+    assert "cortar la red" in capsys.readouterr().err
+    assert _CountingProvider.calls == 0
+    assert not (tmp_path / "o" / "results.json").exists()
+
+
+def test_contenedor_que_no_arranca_para_antes_de_empezar(fake_docker, monkeypatch):
+    box, _log = fake_docker
+    monkeypatch.setenv("FAKE_DOCKER_EXIT", "125")
+    with pytest.raises(runner.RunnerError, match="No se ha llamado a ninguna API"):
+        runner.check_sandbox(box)
+
+
+def test_prueba_previa_del_contenedor_falso_pasa(fake_docker):
+    box, log = fake_docker
+    runner.check_sandbox(box)
+    assert log.read_text().splitlines() == ["run --rm"]
+
+
+def test_sin_aislamiento_extra_no_hay_prueba_previa(monkeypatch):
+    monkeypatch.setattr(runner, "_execute", _refuse)
+    runner.check_sandbox(Sandbox())  # nada que probar: no llama a _execute
 
 
 def test_sin_supervisor_no_se_ejecuta_con_red_por_sorpresa(tmp_path, monkeypatch):
@@ -383,9 +450,8 @@ def test_supervisor_que_no_puede_cortar_la_red_avisa(make_task, monkeypatch):
     monkeypatch.setattr(runner, "_SUPERVISOR", broken)
     if not runner.supervisor_supported():
         pytest.skip("sin subreaper")
-    result = run_tests(GOOD, make_task(ADD_TESTS), sandbox=Sandbox(isolate_network=True))
-    assert result.status == "error"
-    assert "No se pudo cortar la red" in result.message
+    with pytest.raises(runner.RunnerError, match="No se pudo cortar la red"):
+        run_tests(GOOD, make_task(ADD_TESTS), sandbox=Sandbox(isolate_network=True))
 
 
 # ---------------------------------------------------------------- Windows
@@ -393,13 +459,24 @@ def test_supervisor_que_no_puede_cortar_la_red_avisa(make_task, monkeypatch):
 
 @pytest.mark.skipif(ctypes.sizeof(ctypes.c_void_p) != 8, reason="tamaños de 64 bits")
 def test_estructura_del_limite_de_memoria_de_windows():
-    info = runner.job_memory_limit_info(512 * 1024 * 1024)
-    # sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION) en Windows de 64 bits.
+    info = runner.job_memory_limit_info(512 * 1024 * 1024, 768 * 1024 * 1024, 64)
+    # sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION) en Windows de 64 bits, y desplazamientos de
+    # winnt.h de los campos que se rellenan.
     assert ctypes.sizeof(info) == 144
+    basic = type(info.BasicLimitInformation)
+    assert basic.LimitFlags.offset == 16 and basic.ActiveProcessLimit.offset == 40
+    assert type(info).ProcessMemoryLimit.offset == 112
+    assert type(info).JobMemoryLimit.offset == 120
     assert info.ProcessMemoryLimit == 512 * 1024 * 1024
+    assert info.JobMemoryLimit == 768 * 1024 * 1024
+    assert info.BasicLimitInformation.ActiveProcessLimit == 64
     flags = info.BasicLimitInformation.LimitFlags
-    assert flags & runner.JOB_OBJECT_LIMIT_PROCESS_MEMORY
-    assert flags & runner.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    assert (
+        flags == 0x8 | 0x100 | 0x200 | 0x2000
+    )  # ACTIVE_PROCESS, PROCESS/JOB_MEMORY, KILL_ON_CLOSE
+    default = runner.job_memory_limit_info()
+    assert default.BasicLimitInformation.ActiveProcessLimit == 128
+    assert default.JobMemoryLimit == 2 * default.ProcessMemoryLimit
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Job Object solo en Windows")
@@ -469,7 +546,7 @@ HOSTILE_TESTS = textwrap.dedent(
 
     def test_sin_red():
         with pytest.raises(OSError):
-            socket.create_connection(("1.1.1.1", 53), timeout=2)
+            socket.create_connection(("192.0.2.1", 9), timeout=2)
 
 
     def test_sistema_de_solo_lectura():
@@ -499,3 +576,10 @@ def test_docker_de_verdad_agota_el_tiempo(make_task):
     slow = "import time\n\ndef add(a, b):\n    time.sleep(60)\n"
     result = run_tests(slow, make_task(ADD_TESTS), timeout=3, sandbox=box)
     assert result.status == "timeout"
+
+
+def test_preparar_comprueba_los_montajes_de_pytest_antes_de_empezar(monkeypatch):
+    # Revisión final: una ruta de pytest imposible de montar se detecta antes de las APIs.
+    monkeypatch.setattr(sandbox, "pytest_mounts", lambda: (("_pytest", Path("/a,b/_pytest")),))
+    with pytest.raises(SandboxError, match="«,»"):
+        prepare_container(_docker(), run=FakeRun({}))

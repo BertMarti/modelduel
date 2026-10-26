@@ -857,6 +857,8 @@ Errores frecuentes:
 
 - **«No encuentro «docker» en el PATH»**: instala Docker y vuelve a ejecutar `docker info`.
 - **«Docker no responde»**: inicia Docker y comprueba que tu usuario puede usarlo con `docker info`.
+- **«Permission denied» dentro del contenedor en Fedora/RHEL**: modelduel ya lanza los contenedores con `--security-opt label=disable` para que SELinux deje leer las carpetas montadas; si aun así falla, comprueba que tu usuario puede usar Podman o Docker (`podman info`).
+- **«la prueba del aislamiento … falló»**: antes de llamar a ninguna API, modelduel ejecuta una prueba con el aislamiento elegido; si falla, se para sin gastar nada. Revisa `modelduel doctor` y la salida que acompaña al mensaje.
 - **«No se pudo cortar la red»**: en Linux, revisa el aviso de `modelduel doctor`; si necesitas red, usa `--sandbox ninguno`, y si no la necesitas usa un contenedor.
 
 ---

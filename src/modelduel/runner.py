@@ -38,6 +38,7 @@ from modelduel.sandbox import (
     CONTAINER_GRACE_S,
     CONTAINER_MEMORY_TEXT,
     CONTAINER_ROOT,
+    NETNS_ENTER,
     TIMEOUT_EXIT_CODE,
     Sandbox,
     container_command,
@@ -128,6 +129,9 @@ CPU_MARGIN_S = 5
 # Windows: memoria comprometida máxima de cada proceso del Job Object
 # (JOB_OBJECT_LIMIT_PROCESS_MEMORY). Al superarla, la reserva falla (MemoryError en Python).
 WINDOWS_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024
+# Y entre todos los procesos del Job, como mucho el doble y 128 procesos vivos a la vez.
+WINDOWS_JOB_MEMORY_LIMIT_BYTES = 2 * WINDOWS_MEMORY_LIMIT_BYTES
+WINDOWS_ACTIVE_PROCESS_LIMIT = 128
 
 # Arranque del subproceso: aplica los límites y ejecuta pytest en el mismo proceso. Así no hace
 # falta ``preexec_fn`` (inseguro con hilos, y modelduel tiene el de la señal de vida).
@@ -170,20 +174,16 @@ raise SystemExit(pytest.main(sys.argv[1:]))
 _SUPERVISOR = """\
 import ctypes, os, signal, subprocess, sys, time
 status_fd, timeout, isolate, cmd = int(sys.argv[1]), float(sys.argv[2]), sys.argv[3], sys.argv[4:]
+__NETNS_ENTER__
 try:
     ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)  # PR_SET_CHILD_SUBREAPER
 except (OSError, AttributeError):
     pass  # sin subreaper solo se ven los descendientes que no se hayan desligado
 if isolate == "net":
-    # Espacio de nombres de usuario y de red propios (como `unshare --map-current-user --net`):
-    # sin root, el mismo UID dentro y solo un `lo` apagado. Si falla, no se ejecuta nada.
+    # Red propia (sandbox.NETNS_ENTER): sin root, el mismo UID dentro y solo `lo`. Si falla, no
+    # se ejecuta nada.
     try:
-        uid, gid = os.getuid(), os.getgid()
-        os.unshare(os.CLONE_NEWUSER | os.CLONE_NEWNET)
-        maps = (("setgroups", "deny"), ("uid_map", f"{uid} {uid} 1"), ("gid_map", f"{gid} {gid} 1"))
-        for name, text in maps:
-            with open("/proc/self/" + name, "w") as fh:
-                fh.write(text)
+        enter_netns()
     except (OSError, AttributeError):
         os.write(status_fd, b"nonet")
         raise SystemExit(0)
@@ -282,6 +282,7 @@ finally:
     reap_all()
     os.write(status_fd, status.encode())
 """
+_SUPERVISOR = _SUPERVISOR.replace("__NETNS_ENTER__", NETNS_ENTER)
 # Margen del padre sobre el límite de tiempo antes de no fiarse del supervisor y matar el grupo.
 SUPERVISOR_GRACE_S = 10.0
 # Marca en el entorno de cada ejecución: si el supervisor muere (p. ej. la solución lo mata),
@@ -349,7 +350,9 @@ def isolation_summary() -> list[str]:
     if os.name == "nt":
         items.append(
             "Job Object que mata el árbol de procesos y limita la memoria a "
-            f"{WINDOWS_MEMORY_LIMIT_BYTES // 2**30} GiB por proceso"
+            f"{WINDOWS_MEMORY_LIMIT_BYTES // 2**30} GiB por proceso "
+            f"({WINDOWS_JOB_MEMORY_LIMIT_BYTES // 2**30} GiB y "
+            f"{WINDOWS_ACTIVE_PROCESS_LIMIT} procesos en total)"
         )
         return items
     items.append("límites del sistema (setrlimit): CPU, memoria, archivos y descriptores")
@@ -478,7 +481,9 @@ def run_tests(
         output = _truncate(_clean_output(_read_capped(output_path), root))
         counts = parse_junit(junit) if junit.is_file() else None
     except _SetupFailed as exc:
-        return TestRun(status="error", total=expected, message=str(exc))
+        # No es culpa del modelo y afectaría a todos los intentos: se para el duelo (así no se
+        # sigue pagando llamadas a las APIs cuyo código no se va a ejecutar).
+        raise RunnerError(str(exc)) from None
     finally:
         _remove_tree(root)
 
@@ -502,6 +507,44 @@ def run_tests(
     if _hit_file_size_limit(output):
         result.message = file_size_message()
     return result
+
+
+def check_sandbox(sandbox: Sandbox, timeout: float = 60.0) -> None:
+    """Ejecución de prueba con el aislamiento elegido, antes de la primera llamada a una API.
+
+    Si el contenedor no arranca o la red no se puede cortar, ``RunnerError`` (la orden termina
+    con código 2) en vez de un duelo entero de intentos fallidos y pagados.
+    """
+    if not (sandbox.is_container or sandbox.isolate_network):
+        return
+    root = Path(tempfile.mkdtemp(prefix="modelduel-prueba-"))
+    try:
+        (root / "work").mkdir()
+        (root / "tmp").mkdir()
+        output_path = root / "output.log"
+        if sandbox.is_container:
+            code, _ = _execute_container(sandbox, root, ["-c", "pass"], output_path, timeout)
+        else:
+            env = safe_env(home=root / "tmp")
+            code, _ = _execute(
+                [sys.executable, "-c", "pass"],
+                root / "work",
+                env,
+                output_path,
+                timeout,
+                isolate_network=True,
+            )
+        detail = _truncate(_clean_output(_read_capped(output_path), root), 400)
+    except _SetupFailed as exc:
+        raise RunnerError(str(exc)) from None
+    finally:
+        _remove_tree(root)
+    if code != 0:
+        raise RunnerError(
+            f"la prueba del aislamiento ({sandbox.describe()}) falló con código {code}"
+            + (f": {detail}" if detail else "")
+            + ". No se ha llamado a ninguna API. Revisa `modelduel doctor`."
+        )
 
 
 def file_size_message() -> str:
@@ -923,7 +966,9 @@ def _kernel32():  # pragma: no cover - solo Windows
 
 # Estructuras de winnt.h para JOBOBJECT_EXTENDED_LIMIT_INFORMATION. Se definen con tipos de
 # ctypes de tamaño fijo para poder comprobar su tamaño también fuera de Windows (tests).
+JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 0x00000008
 JOB_OBJECT_LIMIT_PROCESS_MEMORY = 0x00000100
+JOB_OBJECT_LIMIT_JOB_MEMORY = 0x00000200
 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
 JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS = 9
 
@@ -970,16 +1015,26 @@ def _job_limit_structs():
     return ExtendedLimitInformation
 
 
-def job_memory_limit_info(limit: int = WINDOWS_MEMORY_LIMIT_BYTES):
-    """``JOBOBJECT_EXTENDED_LIMIT_INFORMATION`` con el tope de memoria por proceso.
+def job_memory_limit_info(
+    limit: int = WINDOWS_MEMORY_LIMIT_BYTES,
+    job_limit: int = WINDOWS_JOB_MEMORY_LIMIT_BYTES,
+    processes: int = WINDOWS_ACTIVE_PROCESS_LIMIT,
+):
+    """``JOBOBJECT_EXTENDED_LIMIT_INFORMATION`` con los topes del Job de los tests.
 
-    ``KILL_ON_JOB_CLOSE`` además: si modelduel muere, Windows cierra el Job y mata el árbol.
+    Memoria por proceso y del Job entero, número de procesos vivos y ``KILL_ON_JOB_CLOSE``: si
+    modelduel muere, Windows cierra el Job y mata el árbol.
     """
     info = _job_limit_structs()()
     info.BasicLimitInformation.LimitFlags = (
-        JOB_OBJECT_LIMIT_PROCESS_MEMORY | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        JOB_OBJECT_LIMIT_PROCESS_MEMORY
+        | JOB_OBJECT_LIMIT_JOB_MEMORY
+        | JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+        | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
     )
+    info.BasicLimitInformation.ActiveProcessLimit = processes
     info.ProcessMemoryLimit = limit
+    info.JobMemoryLimit = job_limit
     return info
 
 

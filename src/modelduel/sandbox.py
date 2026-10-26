@@ -41,7 +41,7 @@ CONTAINER_MEMORY = "1g"
 CONTAINER_MEMORY_TEXT = "1 GiB"
 CONTAINER_CPUS = "1"
 CONTAINER_PIDS = 128
-CONTAINER_TMPFS = "/tmp:rw,nosuid,nodev,size=64m"
+CONTAINER_TMPFS = "/tmp:rw,nosuid,nodev,noexec,size=64m"
 # Rutas dentro del contenedor.
 CONTAINER_ROOT = "/sandbox"
 CONTAINER_DEPS = "/deps"
@@ -89,18 +89,38 @@ class Sandbox:
 # ---------------------------------------------------------------- red local (Linux)
 
 # Lo mismo que hace el supervisor antes de lanzar pytest; aquí solo para saber si se puede.
-_NETNS_PROBE = """\
+# Entrar en un espacio de nombres de usuario y de red propio (como
+# `unshare --map-current-user --net`, sin root) y encender `lo`, que nace apagado: sin él ni
+# 127.0.0.1 funciona y fallarían las tareas cuyos tests levantan un servidor local. El ioctl
+# SIOCSIFFLAGS (0x8914) necesita CAP_NET_ADMIN, que se tiene en el espacio de nombres nuevo hasta
+# el siguiente execve (pytest ya no lo conserva). Lo usan el supervisor y la prueba previa.
+NETNS_ENTER = """\
+def enter_netns():
+    import fcntl, os, socket, struct
+    uid, gid = os.getuid(), os.getgid()
+    os.unshare(os.CLONE_NEWUSER | os.CLONE_NEWNET)
+    maps = (("setgroups", "deny"), ("uid_map", f"{uid} {uid} 1"), ("gid_map", f"{gid} {gid} 1"))
+    for name, text in maps:
+        with open("/proc/self/" + name, "w") as fh:
+            fh.write(text)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        # struct ifreq: nombre (16) + ifr_flags (IFF_UP | IFF_RUNNING) + relleno hasta 40 bytes.
+        fcntl.ioctl(sock, 0x8914, struct.pack("16sH22s", b"lo", 0x1 | 0x40, b""))
+"""
+
+_NETNS_PROBE = (
+    NETNS_ENTER
+    + """\
 import os, socket
-uid, gid = os.getuid(), os.getgid()
-os.unshare(os.CLONE_NEWUSER | os.CLONE_NEWNET)
-maps = (("setgroups", "deny"), ("uid_map", f"{uid} {uid} 1"), ("gid_map", f"{gid} {gid} 1"))
-for name, text in maps:
-    with open("/proc/self/" + name, "w") as fh:
-        fh.write(text)
+uid = os.getuid()
+enter_netns()
 assert os.getuid() == uid
 names = [n for _, n in socket.if_nameindex()]
 assert names == ["lo"], names
+with socket.create_server(("127.0.0.1", 0)) as server:
+    socket.create_connection(server.getsockname(), timeout=2).close()
 """
+)
 
 
 @functools.cache
@@ -228,6 +248,9 @@ def prepare_container(
                     f"conexión, o descárgala a mano con `{tool} pull {sandbox.image}`."
                 )
         user_args = _user_args(sandbox, run)
+        # Antes de la primera llamada a una API: pytest se encuentra y sus rutas se pueden montar.
+        for top, path in pytest_mounts():
+            _mount(path, f"{CONTAINER_DEPS}/{top}", readonly=True)
     except subprocess.TimeoutExpired as exc:
         raise SandboxError(
             f"{tool} no responde ({' '.join(exc.cmd[1:3])}). Comprueba que está en marcha "
@@ -389,6 +412,11 @@ def container_command(
         "--security-opt",
         "no-new-privileges",
         "--read-only",
+        # Sin etiquetas SELinux para los montajes: con SELinux en «enforcing» (Fedora/RHEL, sobre
+        # todo con Podman) un bind mount sin etiquetar da «Permission denied». Sin SELinux no
+        # cambia nada. Se prefiere a «:z», que reetiquetaría tus site-packages.
+        "--security-opt",
+        "label=disable",
         "--tmpfs",
         CONTAINER_TMPFS,
         "--memory",

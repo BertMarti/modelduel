@@ -53,6 +53,7 @@ from modelduel.resume import ResumeError, plan_resume
 from modelduel.runner import (
     DEFAULT_TIMEOUT,
     RunnerError,
+    check_sandbox,
     ensure_pytest_available,
     supervisor_supported,
 )
@@ -442,6 +443,7 @@ def _resolve_sandbox(args: argparse.Namespace) -> Sandbox:
         sandbox = prepare_container(sandbox, notify=lambda msg: print(f"  {msg}", flush=True))
     elif sandbox.isolate_network and not supervisor_supported():
         sandbox = Sandbox()
+    check_sandbox(sandbox)  # antes de gastar nada: si el aislamiento falla, se para aquí
     return sandbox
 
 

@@ -217,6 +217,9 @@ def load_responses(path: Path) -> dict:
         spec = contenders[side].get("spec") if isinstance(contenders[side], dict) else None
         if not isinstance(spec, str) or not spec.strip() or spec in specs:
             raise ResultsError(f"{path} tiene specs vacíos o repetidos.")
+        if not spec.isprintable() or len(spec) > 200:
+            # Se imprime en la terminal: nada de secuencias de control (ANSI) de otra máquina.
+            raise ResultsError(f"{path} tiene un contendiente con caracteres no imprimibles.")
         specs.append(spec)
     runs = data.get("runs")
     if not isinstance(runs, int) or isinstance(runs, bool) or not 1 <= runs <= MAX_RUNS:
