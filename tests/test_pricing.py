@@ -68,3 +68,8 @@ def test_load_prices_invalidos(tmp_path, content):
     path.write_text(content, encoding="utf-8")
     with pytest.raises(PricingError):
         load_prices(path)
+
+
+def test_load_prices_archivo_que_no_existe(tmp_path):
+    with pytest.raises(PricingError, match="No existe el archivo de precios"):
+        load_prices(tmp_path / "precios.json")

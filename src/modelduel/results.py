@@ -152,6 +152,11 @@ def _replace(source: Path, target: Path) -> None:
 def load_results(path: Path) -> dict:
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    except FileNotFoundError as exc:
+        raise ResultsError(
+            f"No existe {path}: indica el results.json que dejó `modelduel run` "
+            "en su carpeta --out."
+        ) from exc
     except OSError as exc:
         raise ResultsError(f"No se pudo leer {path}: {exc}") from exc
     except json.JSONDecodeError as exc:

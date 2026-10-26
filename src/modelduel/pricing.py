@@ -51,6 +51,8 @@ def load_prices(path: Path | None) -> dict[str, Price]:
         return table
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    except FileNotFoundError as exc:
+        raise PricingError(f"No existe el archivo de precios {path}.") from exc
     except OSError as exc:
         raise PricingError(f"No se pudo leer {path}: {exc}") from exc
     except json.JSONDecodeError as exc:
