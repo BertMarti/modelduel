@@ -12,7 +12,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 - **`--sandbox docker` / `--sandbox podman`**: cada ejecución de los tests corre en un contenedor desechable de la imagen oficial `python:3.13.17-slim` fijada por digest, sin red (`--network none`), sin privilegios (`--cap-drop ALL`, `no-new-privileges`, usuario sin root), con el sistema de archivos de solo lectura salvo la carpeta de la ejecución y un `/tmp` en memoria de 64 MiB, 1 GiB de memoria sin swap, 1 CPU y 128 procesos. La imagen se descarga antes del duelo; si Docker o Podman no están instalados, un error en español dice cómo instalarlos. También con `aislamiento = "docker"` en `modelduel.toml`.
 - **Red cortada por defecto en Linux** (`--sandbox auto`): el supervisor entra en un espacio de nombres de usuario y de red propio (como `unshare --map-current-user --net`, sin root). Si el sistema no lo permite, `run` y `doctor` lo avisan; si falla a mitad, no se ejecuta nada. `--sandbox ninguno` lo desactiva.
-- **Límite de memoria en Windows**: `JOB_OBJECT_LIMIT_PROCESS_MEMORY` (1 GiB por proceso) y `KILL_ON_JOB_CLOSE` en el Job Object del runner.
+- **Límite de memoria en Windows**: `JOB_OBJECT_LIMIT_PROCESS_MEMORY` (1 GiB por proceso) y `KILL_ON_JOB_CLOSE` en el Job Object del runner. Los tests arrancan suspendidos y solo se reanudan dentro del Job con el límite; si no se puede poner, no se ejecutan.
+- `--replay` trata la carpeta como dato no fiable: `respuestas.json` de 50 MiB como máximo, de 1 a 100 ejecuciones, y tareas sin enlaces simbólicos ni más de 2000 archivos o 50 MiB.
 
 ### Añadido
 
