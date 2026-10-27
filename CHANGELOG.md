@@ -6,6 +6,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Cambiado
+
+- La 1.0.0 ya está en PyPI: `pip install "modelduel[pytest]"` vuelve a ser el único camino de instalación también en la guía de uso, la portada y CONTRIBUTING (se retiran las notas para instalar desde GitHub mientras no estaba publicada; el README ya iba limpio en la 1.0.0).
+
 ## [1.0.0] - 2026-10-26
 
 Primera versión estable. Reúne todo lo preparado como 0.8.0 y 0.9.0, que no llegaron a publicarse en PyPI: si vienes de la **0.7.0** (la última en PyPI), esto es lo que cambia. El detalle de cada parte está en las entradas [0.9.0] y [0.8.0] de abajo.

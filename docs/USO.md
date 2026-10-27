@@ -68,9 +68,9 @@ Cada vez que abras una terminal nueva, vuelve a activar el entorno con la segund
 
 `[pytest]` instala también pytest; es lo mismo que `pip install modelduel pytest`. Escribe `modelduel` seguido de la versión instalada si todo va bien. Así tienes la orden `modelduel` **con las tareas y respuestas de ejemplo incluidas** (ver `modelduel demo` en la sección siguiente).
 
-El paquete está en <https://pypi.org/project/modelduel/>.
+El paquete está en <https://pypi.org/project/modelduel/>. Si ya tenías una versión anterior, actualízala con `pip install -U "modelduel[pytest]"`: `init`, `doctor` y `--sandbox` necesitan la 1.0.0 o posterior.
 
-### Desde GitHub (la última versión, publicada o no en PyPI)
+### Desde GitHub (versión en desarrollo)
 
 ```bash
 pip install git+https://github.com/BertMarti/modelduel pytest
