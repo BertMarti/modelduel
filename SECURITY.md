@@ -20,7 +20,7 @@ terminar mata todo el árbol de procesos. En Linux lo hace un supervisor «subre
 (`prctl(PR_SET_CHILD_SUBREAPER)`), así que tampoco sobreviven los procesos que se desligan con
 `setsid()` o un doble fork. `modelduel doctor` muestra qué medidas aplica tu sistema.
 
-Desde la 0.9.0, en Linux la red de la solución se corta por defecto con un espacio de nombres de
+En Linux, la red de la solución se corta por defecto con un espacio de nombres de
 usuario y de red (sin root; si el sistema no lo permite, se avisa), y en Windows el Job Object
 limita la memoria a 1 GiB por proceso.
 
@@ -53,3 +53,8 @@ Sí son vulnerabilidades, por ejemplo:
 No lo son: que sin contenedor el código generado lea archivos con rutas absolutas, o use la red
 en macOS, en Windows, con `--sandbox ninguno` o en un Linux que no permite espacios de nombres
 (está documentado arriba y `modelduel doctor` lo dice).
+
+Tampoco lo es que una solución escrita para engañar apruebe tests que no resuelve (por ejemplo,
+devolviendo un objeto que dice ser igual a cualquier cosa o tocando pytest, con el que comparte
+proceso): el marcador mide lo que comprueban los tests de la tarea. El informe enseña el código de
+cada modelo para poder revisarlo (ver «Límites conocidos» en `docs/USO.md`).

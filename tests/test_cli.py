@@ -343,3 +343,10 @@ def test_la_senal_de_vida_va_por_stderr_y_no_con_replay(
     assert code == 0
     assert captured.err.count("esperando a gemini:lento (tarea slugify)… 10 s") == 1
     assert "esperando" not in captured.out and "replay" not in captured.err
+
+
+def test_report_sin_results_dice_que_no_existe(tmp_path, capsys):
+    falta = tmp_path / "no-hay.json"
+    assert main(["report", str(falta), "--out", str(tmp_path / "o")]) == EXIT_USAGE
+    err = capsys.readouterr().err
+    assert "No existe" in err and "Errno" not in err

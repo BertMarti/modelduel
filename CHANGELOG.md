@@ -6,7 +6,31 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
-## [0.9.0] - 2026-10-26
+## [1.0.0] - 2026-10-26
+
+Primera versión estable. Reúne todo lo preparado como 0.8.0 y 0.9.0, que no llegaron a publicarse en PyPI: si vienes de la **0.7.0** (la última en PyPI), esto es lo que cambia. El detalle de cada parte está en las entradas [0.9.0] y [0.8.0] de abajo.
+
+### Novedades frente a la 0.7.0
+
+- **Configurar en un minuto**: `modelduel init` prepara una carpeta con ocho tareas de ejemplo, respuestas grabadas y un `modelduel.toml` comentado (con `--proveedor` explica qué clave crear y cómo definirla); `modelduel run` sin argumentos usa ese archivo; `modelduel doctor [--red]` comprueba Python, pytest, claves (sin mostrarlas), configuración, aislamiento y conexión; `modelduel` sin orden enseña los primeros pasos.
+- **Código de los modelos aislado**: `--sandbox docker|podman` ejecuta cada intento en un contenedor desechable sin red ni privilegios, de solo lectura y con techos de memoria, CPU y procesos; en Linux la red se corta por defecto sin instalar nada; sin contenedor, la solución corre con límites del sistema, sin tus claves en el entorno y con `HOME` en un temporal, y ningún proceso suyo sobrevive al final (también los que se desligan con `setsid` en Linux). En Windows, límite de memoria en el Job Object. Antes de la primera llamada a una API se prueba el aislamiento elegido: si falla, no se gasta nada.
+- **Generar y reproducir por separado**: `--solo-generar` guarda las respuestas sin ejecutar nada y `--replay CARPETA` ejecuta los tests después, en otra máquina o en un contenedor, sin claves.
+- **Ocho tareas de ejemplo** (antes tres): JSON, CSV, texto y algoritmos además de las de siempre.
+- **Informes y web más seguros y accesibles**: CSP estricta sin `'unsafe-inline'` en informes, clasificación y portada; tablas y navegación cómodas en el móvil.
+
+### Cambiado
+
+- Estado de desarrollo «estable» (`Development Status :: 5 - Production/Stable`) y Python 3.13 en los clasificadores (el CI ya lo probaba).
+- `release.yml` pasa también la suite de tests y exige la entrada del `CHANGELOG.md` con la versión de la etiqueta antes de publicar; sus acciones van fijadas por SHA (también la de publicar en PyPI, antes una rama móvil) y la publicación se puede reintentar (`skip-existing`).
+- El README (que es también la descripción del paquete en PyPI) ya no lleva avisos temporales ni alertas de GitHub que PyPI no sabe mostrar.
+- El sdist ya no incluye `tests/`: muchos comprueban la web, los resultados de ejemplo y los workflows del repositorio, que no viajan en el paquete.
+- La documentación (README, guía de uso, `SECURITY.md`) explica qué mide el marcador y qué no: una solución escrita para engañar a los tests podría aprobar, así que el informe enseña el código de cada modelo.
+
+### Corregido
+
+- `modelduel report` con un `results.json` que no existe y `modelduel run --prices` con un archivo de precios que no existe dicen «No existe …» en español en vez del error del sistema en inglés.
+
+## [0.9.0] - 2026-10-26 (no publicada en PyPI)
 
 ### Seguridad
 
@@ -24,7 +48,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - Cinco tareas de ejemplo nuevas con respuestas grabadas: `flatten_json` (JSON), `csv_totals` (CSV), `wrap_text` (texto), `grid_path` y `topo_order` (algoritmos). La demo enseña también los estados «sin código» y «error de importación».
 - CI: tests y un duelo con Docker de verdad en Ubuntu, el límite de memoria en Windows y el flujo generar → reproducir.
 
-## [0.8.0] - 2026-10-24
+## [0.8.0] - 2026-10-24 (no publicada en PyPI)
 
 ### Seguridad
 
@@ -160,8 +184,8 @@ Primera versión (MVP).
 - Revisión QA: árbol de procesos muerto al terminar, salida acotada, UTF-8 y BOM, tareas sin tests o con errores de sintaxis, errores de red y respuestas vacías de los proveedores, accesibilidad AA y cobertura mínima del 90 % (PR [#2](https://github.com/BertMarti/modelduel/pull/2)).
 - Guía de uso (`docs/USO.md`) y `CONTRIBUTING.md` (PR [#3](https://github.com/BertMarti/modelduel/pull/3)).
 
-[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v0.8.0...HEAD
-[0.8.0]: https://github.com/BertMarti/modelduel/compare/v0.7.0...v0.8.0
+[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/BertMarti/modelduel/compare/v0.7.0...v1.0.0
 [0.7.0]: https://github.com/BertMarti/modelduel/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/BertMarti/modelduel/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/BertMarti/modelduel/compare/v0.4.0...v0.5.0

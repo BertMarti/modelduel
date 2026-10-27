@@ -165,7 +165,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
 </nav>
 
 <header class="hero">
-  <div class="eyebrow">CLI · Python 3.12 · sin dependencias</div>
+  <div class="eyebrow">v1.0 · CLI · Python 3.12+ · sin dependencias</div>
   <h1><span class="a">modelo</span> <span class="vs">vs</span> <span class="b">modelo</span></h1>
   <p class="lede">Dos modelos, una tarea, los mismos tests. <strong>modelduel</strong> pide el código a dos modelos de IA (o a una liga de hasta seis), ejecuta tus tests sobre cada respuesta y te da un informe con quién acierta, cuánto tarda y cuánto cuesta. <em>Tu propia comparativa, sin fiarte de rankings ajenos.</em></p>
   <div class="cta">
@@ -216,19 +216,19 @@ modelduel run --resume    # continúa un duelo cortado
 # Todo en la orden, sin archivo de configuración (o repite --model para una liga de 2 a 6)
 modelduel run tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo</code></pre>
   <p>Las claves van en variables de entorno (<code>export GEMINI_API_KEY="…"</code>), nunca en un archivo. <code>modelduel init</code> te dice cuáles necesitas y dónde conseguirlas.</p>
-  <p><code>init</code>, <code>doctor</code> y <code>run</code> sin argumentos llegan en la 0.9.0. Si <code>modelduel --version</code> dice una versión anterior, aún no está en PyPI: instálala desde GitHub con <code>pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"</code>.</p>
+  <p><code>init</code>, <code>doctor</code>, <code>run</code> sin argumentos y <code>--sandbox</code> llegan con la 1.0.0. Si <code>modelduel --version</code> dice una versión anterior, aún no está en PyPI: instálala desde GitHub con <code>pip install "modelduel[pytest] @ git+https://github.com/BertMarti/modelduel"</code>.</p>
   <p>El paquete está en <a href="https://pypi.org/project/modelduel/">PyPI</a>. Para la última versión sin publicar: <code>pip install git+https://github.com/BertMarti/modelduel pytest</code>.</p>
 </section>
 
 <section aria-labelledby="novedades">
-  <h2 id="novedades">Novedades de v0.9.0</h2>
+  <h2 id="novedades">Novedades de la 1.0</h2>
   <ul>
+    <li><strong>Configurar en un minuto</strong>: <code>modelduel init</code> prepara una carpeta con tareas y un <code>modelduel.toml</code> explicado, <code>modelduel doctor</code> te dice qué falta y <code>modelduel run</code> ya no necesita argumentos.</li>
     <li><strong>Sandbox con contenedor</strong>: <code>--sandbox docker</code> o <code>--sandbox podman</code> ejecuta cada tarea sin red ni privilegios, con límites de memoria, CPU y procesos.</li>
-    <li><strong>Red cortada por defecto en Linux</strong>: el modo <code>auto</code> lo intenta sin instalar nada y avisa si el sistema no lo permite.</li>
-    <li><strong>Generar y reproducir</strong>: <code>--solo-generar</code> guarda las respuestas sin ejecutar tests y <code>--replay</code> permite ejecutarlas después, incluso en otra máquina o contenedor.</li>
-    <li><strong>Ocho tareas de ejemplo</strong>: programación, JSON, CSV, texto y algoritmos para probar modelduel.</li>
-    <li><strong>Más protección en Windows</strong>: el código de los modelos tiene un límite de memoria de 1 GiB por proceso.</li>
-    <li>Desde v0.8.0: <code>modelduel init</code>, <code>modelduel doctor</code> y <code>modelduel.toml</code>, y procesos que no escapan con <code>setsid</code>. Antes: informe en Markdown, señal de vida, duelo en directo, <a href="leaderboard/">clasificación pública</a>, liga de 2 a 6 y <code>--resume</code>.</li>
+    <li><strong>Red cortada por defecto en Linux</strong>, sin instalar nada (avisa si el sistema no lo permite); el código de los modelos corre con límites de recursos y sin tus claves en el entorno.</li>
+    <li><strong>Generar y reproducir</strong>: <code>--solo-generar</code> guarda las respuestas sin ejecutar tests y <code>--replay</code> las ejecuta después, incluso en otra máquina o contenedor.</li>
+    <li><strong>Ocho tareas de ejemplo</strong>: programación, JSON, CSV, texto y algoritmos.</li>
+    <li>Ya estaban: informe en HTML y Markdown, duelo en directo, <a href="leaderboard/">clasificación pública</a>, liga de 2 a 6 modelos, reintentos y <code>--resume</code>.</li>
   </ul>
   <p>Todos los cambios, en el <a href="https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md">registro de cambios</a>; el uso paso a paso, en la <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">guía de uso</a>.</p>
 </section>
