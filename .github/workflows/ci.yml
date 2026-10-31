@@ -14,17 +14,21 @@ concurrency:
 
 jobs:
   test:
-    name: Lint, tests y demo (${{ matrix.os }}, Python ${{ matrix.python }})
+    name: Lint, tests y demo (${{ matrix.os }}, Python ${{ matrix.python }}, Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         python: ["3.12"]
+        # Tareas en JavaScript/TypeScript (experimental): Node 22 ejecuta también las de TS.
+        node: ["22"]
         include:
-          # El paquete admite >=3.12: también se prueba con la siguiente versión.
+          # El paquete admite >=3.12: también se prueba con la siguiente versión, y con el Node
+          # mínimo para JavaScript (20.x: las tareas de TypeScript se saltan con aviso).
           - os: ubuntu-latest
             python: "3.13"
+            node: "20"
     steps:
       - uses: actions/checkout@v7
 
@@ -33,6 +37,10 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: pyproject.toml
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
 
       - name: Instalar
         run: |
@@ -52,7 +60,7 @@ jobs:
         # En Ubuntu, además, los tests de Docker de verdad (contenedor sin red ni privilegios).
         env:
           MODELDUEL_TEST_DOCKER: ${{ runner.os == 'Linux' && '1' || '0' }}
-        run: pytest --cov --cov-report=term
+        run: pytest --cov --cov-report=term -rs
 
       - name: Demo con respuestas grabadas (liga de tres)
         run: modelduel run examples/tasks --model replay:alfa --model replay:beta --model replay:gamma --out site/demo
@@ -89,6 +97,16 @@ jobs:
           modelduel run --replay runs/generado --out runs/reproducido
           grep -q "Informe de duelo" runs/reproducido/index.html
 
+      - name: Tareas en JavaScript y TypeScript (experimental, node:test)
+        shell: bash
+        run: |
+          node --version
+          if [ "${{ matrix.node }}" = "20" ]; then tareas=examples/tasks-js/format_bytes; else tareas=examples/tasks-js; fi
+          modelduel run "$tareas" --model replay:alfa --model replay:beta --model replay:gamma --format html,md --out runs/js | tee runs-js.log
+          grep -q "Tareas con Node (experimental)" runs-js.log
+          grep -q "JavaScript" runs/js/index.html
+          python -c "import json,sys; d=json.load(open('runs/js/results.json')); t={x['id']:x for x in d['tasks']}; f=t['format_bytes']['results']; ok=f['a'][0]['solved'] and not f['b'][0]['solved'] and f['c'][0]['solved']; g=t.get('group_by'); ok=ok and (g is None or (g['results']['a'][0]['solved'] and not g['results']['c'][0]['solved'])); sys.exit(0 if ok else 1)"
+
       - name: Duelo dentro de Docker (--sandbox docker)
         if: runner.os == 'Linux'
         shell: bash
@@ -96,6 +114,9 @@ jobs:
           modelduel run examples/tasks/slugify --a replay:alfa --b replay:beta --sandbox docker --out runs/docker | tee runs/docker.log
           grep -q "Aislamiento: contenedor docker sin red" runs/docker.log
           python -c "import json,sys; d=json.load(open('runs/docker/results.json')); r=d['tasks'][0]['results']; sys.exit(0 if r['a'][0]['solved'] and r['b'][0]['passed']==6 else 1)"
+          # JavaScript y TypeScript en la imagen oficial de Node (sin Node del anfitrión).
+          modelduel run examples/tasks-js --a replay:alfa --b replay:beta --sandbox docker --out runs/docker-js
+          python -c "import json,sys; d=json.load(open('runs/docker-js/results.json')); sys.exit(0 if all(t['results']['a'][0]['solved'] for t in d['tasks']) else 1)"
 
       - name: Comprobar el informe
         shell: bash
