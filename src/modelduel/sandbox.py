@@ -417,6 +417,7 @@ def container_command(
     timeout: float,
     mounts: tuple[tuple[str, Path], ...] | None = None,
     program: str = "python",
+    limits: dict[str, int] | None = None,
 ) -> list[str]:
     """Orden ``docker run`` / ``podman run`` que ejecuta ``python <python_args>`` aislado.
 
@@ -425,7 +426,10 @@ def container_command(
     ``timeout -s KILL`` corta los tests al llegar al límite (sale con 124).
 
     Con ``program="node"`` (tareas JavaScript/TypeScript) se usa la imagen de Node, se ejecuta
-    ``node <python_args>`` y no se monta pytest; el resto del aislamiento es idéntico.
+    ``node <python_args>`` y no se monta pytest; el resto del aislamiento es idéntico. La imagen
+    de Node no trae Python para el arranque que aplica los ``setrlimit``: los mismos ``limits``
+    (``runner.resource_limits``) los pone ``sh`` con ``ulimit`` antes de ``exec node``; si alguno
+    falla, node no llega a ejecutarse.
     """
     if sandbox.executable is None:
         raise SandboxError("falta la ruta de docker/podman.")
@@ -482,10 +486,35 @@ def container_command(
         "-s",
         "KILL",
         f"{timeout:g}",
-        program,
-        *python_args,
     ]
+    if program == "node":
+        cmd += ["sh", "-c", node_ulimit_script(limits or {}), "modelduel-node", *python_args]
+    else:
+        cmd += [program, *python_args]
     return cmd
+
+
+def node_ulimit_script(limits: dict[str, int]) -> str:
+    """``ulimit`` de ``sh`` (dash en la imagen Debian) equivalentes a ``resource_limits``.
+
+    dash mide ``-v`` en KiB y ``-f`` en bloques de 512 bytes; sin ``-S``/``-H`` fija el blando y
+    el duro (la solución no puede subirlos). La CPU lleva el duro un segundo por encima del blando
+    para que llegue SIGXCPU, como en el arranque de Python.
+    """
+    steps = []
+    if "RLIMIT_AS" in limits:
+        steps.append(f"ulimit -v {limits['RLIMIT_AS'] // 1024}")
+    if "RLIMIT_FSIZE" in limits:
+        steps.append(f"ulimit -f {limits['RLIMIT_FSIZE'] // 512}")
+    if "RLIMIT_NOFILE" in limits:
+        steps.append(f"ulimit -n {limits['RLIMIT_NOFILE']}")
+    if "RLIMIT_CORE" in limits:
+        steps.append(f"ulimit -c {limits['RLIMIT_CORE']}")
+    if "RLIMIT_CPU" in limits:
+        cpu = limits["RLIMIT_CPU"]
+        steps += [f"ulimit -S -t {cpu}", f"ulimit -H -t {cpu + 1}"]
+    steps.append('exec node "$@"')
+    return " && ".join(steps)
 
 
 def container_env(program: str = "python") -> list[str]:

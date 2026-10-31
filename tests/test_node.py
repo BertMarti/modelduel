@@ -274,11 +274,23 @@ def test_orden_del_contenedor_para_node(tmp_path):
     text = " ".join(cmd)
     for part in ("--network none", "--cap-drop ALL", "--read-only", "--pids-limit 128"):
         assert part in text
-    assert NODE_IMAGE in cmd and cmd[cmd.index(NODE_IMAGE) + 1 :][:4] == ["-s", "KILL", "7", "node"]
+    after = cmd[cmd.index(NODE_IMAGE) + 1 :]
+    assert after[:5] == ["-s", "KILL", "7", "sh", "-c"]
+    assert after[5].endswith('exec node "$@"') and after[7:] == args
     assert "/deps" not in text and "PYTHONPATH" not in text  # sin pytest montado
     assert "--allow-fs-write=/sandbox" in cmd
     assert NODE_IMAGE.startswith("node:22.") and "@sha256:" in NODE_IMAGE
     assert node_image_version() >= (22, 18, 0)  # borra tipos sin opciones
+
+
+def test_en_el_contenedor_node_arranca_con_los_mismos_limites():
+    from modelduel.sandbox import node_ulimit_script
+
+    script = node_ulimit_script(runner.resource_limits(20))
+    assert script == (
+        "ulimit -v 4194304 && ulimit -f 524288 && ulimit -n 256 && ulimit -c 0 && "
+        'ulimit -S -t 25 && ulimit -H -t 26 && exec node "$@"'
+    )
 
 
 def test_preparar_el_contenedor_solo_descarga_las_imagenes_necesarias():
@@ -604,11 +616,12 @@ for i, part in enumerate(args):
         root = args[i + 1].split("source=")[1].split(",target=")[0]
 image_at = args.index(os.environ["FAKE_DOCKER_IMAGE"])
 _, _, seconds, program, *rest = args[image_at + 1:]
-assert program == "node", program
+assert program == "sh" and rest[0] == "-c", (program, rest[:1])
 root = os.path.realpath(root)
 rest = [part.replace("/sandbox", root) for part in rest]
 try:
-    proc = subprocess.run([shutil.which("node"), *rest], cwd=os.path.join(root, "work"),
+    # El sh real aplica los ulimit y hace exec del node del anfitrión (como en la imagen).
+    proc = subprocess.run(["sh", *rest], cwd=os.path.join(root, "work"),
                           timeout=float(seconds))
 except subprocess.TimeoutExpired:
     sys.exit(124)
@@ -617,6 +630,7 @@ sys.exit(proc.returncode)
 
 
 @needs_node
+@pytest.mark.skipif(os.name == "nt", reason="el docker falso usa sh, como la imagen de Node")
 def test_contenedor_falso_para_node(make_js_task, tmp_path, monkeypatch):
     folder = tmp_path / "docker-falso"
     folder.mkdir()
@@ -632,6 +646,22 @@ def test_contenedor_falso_para_node(make_js_task, tmp_path, monkeypatch):
     result = run_tests(GOOD_JS, task, timeout=30, sandbox=box)
     assert result.solved, result.output
     assert "/sandbox" not in result.output
+    # Los ulimit del contenedor se aplican de verdad: un archivo mayor que el límite falla.
+    monkeypatch.setattr(runner, "FILE_SIZE_LIMIT_BYTES", 1024 * 1024)
+    big = (
+        'import fs from "node:fs";\n'
+        'fs.writeFileSync("grande.bin", Buffer.alloc(4 * 1024 * 1024));\n' + GOOD_JS
+    )
+    result = run_tests(big, make_js_task(name="grande"), timeout=30, sandbox=box)
+    assert not result.solved and result.message == runner.file_size_message(), result.output
+
+
+@needs_node
+def test_codigo_de_salida_cambiado_no_cuenta_como_resuelta(make_js_task):
+    code = "process.exitCode = 3;\n" + GOOD_JS
+    result = run_tests(code, make_js_task(), timeout=20)
+    assert result.passed == 3 and not result.solved
+    assert result.status == "error" and "código 3" in result.message
 
 
 # ---------------------------------------------------------------- Docker de verdad (solo CI)

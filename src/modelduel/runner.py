@@ -620,30 +620,35 @@ def _run_node(
             junit=f"{CONTAINER_ROOT}/junit.xml",
             test_file=test_file,
         )
-        return _execute_container(sandbox, root, args, output_path, timeout, program="node")
+        return _execute_container(
+            sandbox, root, args, output_path, timeout, program="node", limits=json.loads(limits)
+        )
     try:
         info = check_node({language}, find_node())
     except NodeError as exc:
         raise _SetupFailed(str(exc)) from None
     assert info is not None  # check_node lo garantiza para JS/TS
-    # El modelo de permisos de Node compara rutas reales (p. ej. /var -> /private/var en macOS).
-    real_root = str(root.resolve())
+    # El modelo de permisos de Node compara rutas reales (p. ej. /var -> /private/var en macOS o
+    # los nombres cortos RUNNER~1 de Windows): todo con la ruta resuelta, también la carpeta de
+    # trabajo y el archivo de tests.
+    real_root = root.resolve()
+    real_work = workdir.resolve()
     args = node_test_args(
         info.version,
         language,
-        root=real_root,
+        root=str(real_root),
         junit=str(junit.resolve()),
-        test_file=test_file,
+        test_file=str(real_work / test_file),
     )
     if os.name == "nt":  # pragma: no cover - solo Windows: el Job Object limita a node
         cmd = [info.path, *args]
     else:
         cmd = [sys.executable, "-c", _EXEC_BOOTSTRAP, limits, info.path, *args]
-    env = node_env(safe_env(home=tmpdir))
+    env = node_env(safe_env(home=tmpdir.resolve()))
     for name in ("TMP", "TEMP", "TMPDIR"):
-        env[name] = str(tmpdir)
+        env[name] = str(tmpdir.resolve())
     return _execute(
-        cmd, workdir, env, output_path, timeout, isolate_network=sandbox.isolate_network
+        cmd, real_work, env, output_path, timeout, isolate_network=sandbox.isolate_network
     )
 
 
@@ -667,6 +672,15 @@ def _classify_node(
         if HEAP_OOM_TEXT in output:
             result.message = heap_message()
         return result
+    if HEAP_OOM_TEXT in output:
+        # En Windows V8 no muere por una señal: sale con un código positivo.
+        return TestRun(
+            status="error",
+            total=expected,
+            duration_s=duration,
+            output=output,
+            message=heap_message(),
+        )
     if counts is None or counts["total"] == 0:
         if returncode == 0:
             return TestRun(
@@ -691,6 +705,20 @@ def _classify_node(
             ),
         )
     missing = max(expected - counts["total"], 0)
+    if returncode != 0 and counts["passed"] == counts["total"] and not missing:
+        # Todos los tests pasaron pero Node acabó mal (un error sin capturar después de los tests,
+        # o la solución cambió el código de salida): no cuenta como resuelta.
+        return TestRun(
+            status="error",
+            passed=counts["passed"],
+            total=counts["total"],
+            duration_s=duration,
+            output=output,
+            message=(
+                f"Los tests pasaron, pero Node terminó con código {returncode} (¿un error sin "
+                "capturar de la solución o un cambio del código de salida?)."
+            ),
+        )
     result = TestRun(
         status="ok",
         passed=counts["passed"],
@@ -926,6 +954,7 @@ def _execute_container(
     output_path: Path,
     timeout: float,
     program: str = "python",
+    limits: dict[str, int] | None = None,
 ) -> tuple[int | None, float]:
     """Ejecuta los tests en un contenedor desechable; ``None`` si se agota el tiempo.
 
@@ -936,7 +965,13 @@ def _execute_container(
     """
     name = container_name()
     cmd = container_command(
-        sandbox, name=name, root=root, python_args=python_args, timeout=timeout, program=program
+        sandbox,
+        name=name,
+        root=root,
+        python_args=python_args,
+        timeout=timeout,
+        program=program,
+        limits=limits,
     )
     start = time.perf_counter()
     finished = False

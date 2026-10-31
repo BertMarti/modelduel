@@ -139,7 +139,7 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 ## Seguridad
 
 > ⚠️ **Aviso:**
-> **El código generado por los modelos se ejecuta en tu máquina.** La opción más segura es `modelduel run --sandbox docker` (o `--sandbox podman`): cada tarea corre en un contenedor desechable de la imagen oficial de Python, sin red ni privilegios, con el sistema de archivos de solo lectura salvo su carpeta temporal, 1 GiB de memoria, 1 CPU y 128 procesos como máximo. La primera vez descarga la imagen.
+> **El código generado por los modelos se ejecuta en tu máquina.** La opción más segura es `modelduel run --sandbox docker` (o `--sandbox podman`): cada tarea corre en un contenedor desechable de la imagen oficial de Python (o de Node, en las tareas JavaScript/TypeScript), sin red ni privilegios, con el sistema de archivos de solo lectura salvo su carpeta temporal, 1 GiB de memoria, 1 CPU y 128 procesos como máximo. La primera vez descarga la imagen que haga falta.
 >
 > En Linux, el modo `auto` corta la red sin instalar nada cuando el sistema lo permite; si no puede hacerlo, te avisa. En Windows el código tiene además un límite de memoria de 1 GiB por proceso. El modo `--sandbox ninguno` desactiva la red cortada y solo tiene sentido para tareas que necesiten red.
 

@@ -859,7 +859,7 @@ La carpeta de salida se comprueba **antes** de llamar a las APIs, para no perder
 | `podman` | Lo mismo, usando Podman. |
 | `ninguno` | No usa el aislamiento del contenedor ni corta la red. Solo tiene sentido si una tarea necesita red. |
 
-Para `docker` necesitas Docker instalado y que tu usuario pueda usarlo: compruébalo con `docker info`. Para `podman`, necesitas Podman instalado. La primera vez que uses un contenedor se descarga la imagen oficial de Python, de unos 50 MB, antes de empezar el duelo. Si Docker o Podman no están instalados, modelduel muestra un error en español con un enlace para instalarlos.
+Para `docker` necesitas Docker instalado y que tu usuario pueda usarlo: compruébalo con `docker info`. Para `podman`, necesitas Podman instalado. La primera vez que uses un contenedor se descarga la imagen oficial de Python, de unos 50 MB (y, si hay tareas JavaScript o TypeScript, la oficial de Node, `node:22.23.4-slim`), antes de empezar el duelo. Dentro del contenedor se aplican además los mismos límites de CPU, memoria, archivos y descriptores que sin él. Si Docker o Podman no están instalados, modelduel muestra un error en español con un enlace para instalarlos.
 
 Puedes elegirlo en la orden:
 
