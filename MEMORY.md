@@ -130,6 +130,7 @@ Base heredada de v0.1.0:
 - 2026-09-30 (docs): «Cómo se ha hecho» (README y web): v0.1.0 con lead, builder y qa en Claude Opus y docs en Sonnet; toda la v0.2.0 en Sonnet; OpenCode previsto pero sin poder ejecutarse en modo autónomo; Alberto supervisa y fusiona.
 
 ## Siguiente paso
+- **1.1.0 publicada en PyPI** (Release `v1.1.0`). Esta rama (`v1.1-tras-publicar`) retira las notas «mientras la 1.1.0 no esté en PyPI» de USO y portada. Comprobar en limpio `pip install -U "modelduel[pytest]"`, `modelduel --version` (1.1.0) y `modelduel init --js` + `modelduel run`.
 - **1.1.0:** fusionar la PR de `v1.1-2026-10-31` y publicar la Release `v1.1.0` (PyPI). La rama `v1.1-tras-publicar` (sin PR) trae lo que solo es cierto tras publicar. En la Pi hay Node 20: las pruebas de TypeScript solo corren en el CI (Node 22).
 - **1.0.0 publicada en PyPI** (Release `v1.0.0`, Trusted Publishing). Esta rama (`v1-tras-publicar`) retira las notas de instalación desde GitHub: `pip install "modelduel[pytest]"` es el camino normal. Comprobar en un entorno limpio `pip install "modelduel[pytest]"`, `modelduel --version` (1.0.0) y `modelduel demo`. Regla: el README es la descripción de PyPI (no se puede cambiar tras publicar): nada temporal ni alertas `> [!NOTE]` de GitHub (usar `> **Aviso:**`).
 - Alberto: probar una vez `openai:` (y `omniroute:` si lo usa) contra la API real con claves propias; `gemini:` ya se usó de verdad (01/10/2026).

@@ -6,6 +6,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Cambiado
+
+- La 1.1.0 ya está en PyPI: se retiran de la guía de uso y de la portada las notas para instalar desde GitHub mientras no estaba publicada (el README ya iba limpio en la 1.1.0).
+
 ## [1.1.0] - 2026-10-31
 
 ### Añadido
