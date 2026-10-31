@@ -34,6 +34,11 @@ from pathlib import Path
 DEFAULT_IMAGE = (
     "python:3.13.17-slim@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962"
 )
+# Imagen oficial de Node para las tareas de JavaScript/TypeScript (experimental), también fijada
+# por digest del índice multiarquitectura. Node 22.18+ borra los tipos de TypeScript sin opciones.
+NODE_IMAGE = (
+    "node:22.23.4-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da"
+)
 CONTAINER_TOOLS = ("docker", "podman")
 SANDBOX_CHOICES = ("auto", "docker", "podman", "ninguno")
 # Techos del contenedor (además de los setrlimit del arranque, que también se aplican dentro).
@@ -66,6 +71,7 @@ class Sandbox:
     kind: str = "local"  # local | docker | podman
     executable: str | None = None  # ruta de docker/podman
     image: str = DEFAULT_IMAGE
+    node_image: str = NODE_IMAGE
     isolate_network: bool = False  # solo local: espacio de nombres de red propio (Linux)
     user_args: tuple[str, ...] = field(default_factory=tuple)  # --user / --userns del contenedor
 
@@ -206,14 +212,26 @@ def available_container_tools(which: Callable[[str], str | None] | None = None) 
     return [tool for tool in CONTAINER_TOOLS if which(tool)]
 
 
+def images_for(sandbox: Sandbox, languages: tuple[str, ...] | list[str] | set[str]) -> list[str]:
+    """Imágenes que necesita un duelo con tareas de estos lenguajes (Python y/o Node)."""
+    images = []
+    if "python" in languages:
+        images.append(sandbox.image)
+    if {"javascript", "typescript"} & set(languages):
+        images.append(sandbox.node_image)
+    return images
+
+
 def prepare_container(
     sandbox: Sandbox,
     run: Runner | None = None,
     notify: Callable[[str], None] = lambda _msg: None,
+    languages: tuple[str, ...] | list[str] | set[str] = ("python",),
 ) -> Sandbox:
-    """Comprueba el demonio y la imagen (la descarga una vez si falta) antes del duelo.
+    """Comprueba el demonio y las imágenes (las descarga una vez si faltan) antes del duelo.
 
     Así el tiempo de descarga nunca cuenta en el límite de los tests (``--pull never``).
+    ``languages`` dice qué imágenes hacen falta: la de Python y/o la de Node.
     Devuelve el ``Sandbox`` con las opciones de usuario que tocan a este motor.
     """
     if not sandbox.is_container or sandbox.executable is None:
@@ -221,36 +239,13 @@ def prepare_container(
     run = run or subprocess.run
     exe, tool = sandbox.executable, sandbox.kind
     try:
-        found = run(
-            [exe, "image", "inspect", sandbox.image],
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-        if found.returncode != 0:
-            notify(f"Descargando la imagen {sandbox.image} (solo la primera vez)…")
-            pulled = run(
-                [exe, "pull", sandbox.image],
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                text=True,
-                timeout=900,
-                check=False,
-            )
-            if pulled.returncode != 0:
-                detail = _last_line(pulled.stderr or pulled.stdout)
-                raise SandboxError(
-                    f"{tool} no pudo descargar la imagen {sandbox.image}"
-                    + (f" ({detail})" if detail else "")
-                    + f". Comprueba que {tool} está en marcha (`{tool} info`) y que hay "
-                    f"conexión, o descárgala a mano con `{tool} pull {sandbox.image}`."
-                )
+        for image in images_for(sandbox, languages):
+            _ensure_image(exe, tool, image, run, notify)
         user_args = _user_args(sandbox, run)
         # Antes de la primera llamada a una API: pytest se encuentra y sus rutas se pueden montar.
-        for top, path in pytest_mounts():
-            _mount(path, f"{CONTAINER_DEPS}/{top}", readonly=True)
+        if "python" in languages:
+            for top, path in pytest_mounts():
+                _mount(path, f"{CONTAINER_DEPS}/{top}", readonly=True)
     except subprocess.TimeoutExpired as exc:
         raise SandboxError(
             f"{tool} no responde ({' '.join(exc.cmd[1:3])}). Comprueba que está en marcha "
@@ -262,8 +257,42 @@ def prepare_container(
         kind=sandbox.kind,
         executable=sandbox.executable,
         image=sandbox.image,
+        node_image=sandbox.node_image,
         user_args=user_args,
     )
+
+
+def _ensure_image(
+    exe: str, tool: str, image: str, run: Runner, notify: Callable[[str], None]
+) -> None:
+    """``image inspect`` y, si no está, ``pull`` (con un error que dice qué hacer)."""
+    found = run(
+        [exe, "image", "inspect", image],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if found.returncode == 0:
+        return
+    notify(f"Descargando la imagen {image} (solo la primera vez)…")
+    pulled = run(
+        [exe, "pull", image],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=900,
+        check=False,
+    )
+    if pulled.returncode != 0:
+        detail = _last_line(pulled.stderr or pulled.stdout)
+        raise SandboxError(
+            f"{tool} no pudo descargar la imagen {image}"
+            + (f" ({detail})" if detail else "")
+            + f". Comprueba que {tool} está en marcha (`{tool} info`) y que hay "
+            f"conexión, o descárgala a mano con `{tool} pull {image}`."
+        )
 
 
 def _user_args(sandbox: Sandbox, run: Runner) -> tuple[str, ...]:
@@ -387,16 +416,25 @@ def container_command(
     python_args: list[str],
     timeout: float,
     mounts: tuple[tuple[str, Path], ...] | None = None,
+    program: str = "python",
 ) -> list[str]:
     """Orden ``docker run`` / ``podman run`` que ejecuta ``python <python_args>`` aislado.
 
     ``root`` (la carpeta temporal de la ejecución, con ``work/``) se monta en ``/sandbox``; el
     resto del sistema de archivos es de solo lectura y ``/tmp`` es un tmpfs de 64 MiB. Dentro,
     ``timeout -s KILL`` corta los tests al llegar al límite (sale con 124).
+
+    Con ``program="node"`` (tareas JavaScript/TypeScript) se usa la imagen de Node, se ejecuta
+    ``node <python_args>`` y no se monta pytest; el resto del aislamiento es idéntico.
     """
     if sandbox.executable is None:
         raise SandboxError("falta la ruta de docker/podman.")
-    deps = pytest_mounts() if mounts is None else mounts
+    if program not in ("python", "node"):
+        raise SandboxError(f"programa no admitido en el contenedor: {program}.")
+    if program == "node":
+        deps: tuple[tuple[str, Path], ...] = ()
+    else:
+        deps = pytest_mounts() if mounts is None else mounts
     cmd = [
         sandbox.executable,
         "run",
@@ -433,25 +471,27 @@ def container_command(
     ]
     for top, path in deps:
         cmd += ["--mount", _mount(path, f"{CONTAINER_DEPS}/{top}", readonly=True)]
-    for var in container_env():
+    for var in container_env(program):
         cmd += ["--env", var]
     cmd += [
         "--workdir",
         f"{CONTAINER_ROOT}/work",
         "--entrypoint",
         "timeout",
-        sandbox.image,
+        sandbox.node_image if program == "node" else sandbox.image,
         "-s",
         "KILL",
         f"{timeout:g}",
-        "python",
+        program,
         *python_args,
     ]
     return cmd
 
 
-def container_env() -> list[str]:
+def container_env(program: str = "python") -> list[str]:
     """Entorno del contenedor: solo esto (nada del anfitrión, ni claves ni rutas)."""
+    if program == "node":
+        return ["HOME=/tmp", "TMPDIR=/tmp", "NO_COLOR=1", "NODE_DISABLE_COLORS=1"]
     return [
         "HOME=/tmp",
         "TMPDIR=/tmp",
@@ -460,6 +500,15 @@ def container_env() -> list[str]:
         "PYTHONIOENCODING=utf-8",
         "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
     ]
+
+
+def node_image_version(image: str = NODE_IMAGE) -> tuple[int, int, int]:
+    """Versión de Node de la imagen fijada (``node:22.23.4-slim@…`` -> ``(22, 23, 4)``)."""
+    match = re.match(r"[^:]*:(\d+)\.(\d+)\.(\d+)", image)
+    if not match:
+        raise SandboxError(f"no sé qué versión de Node trae la imagen {image}.")
+    major, minor, patch = (int(part) for part in match.groups())
+    return major, minor, patch
 
 
 def container_name() -> str:

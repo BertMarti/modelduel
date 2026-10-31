@@ -68,6 +68,7 @@ def run_duel(
             "id": task.id,
             "title": task.title,
             "difficulty": task.difficulty,
+            "language": task.language,
             "statement": task.statement,
             "fingerprint": task_fingerprint(task),
             "tests_expected": task.expected_tests,
@@ -163,7 +164,7 @@ def run_attempt(
         )
         return attempt
     text = clean_text(response.text)
-    code = extract_code(text)
+    code = extract_code(text, task.language)
     test_run = run_tests(code, task, timeout=timeout, sandbox=sandbox)
     attempt = test_run.to_dict()
     attempt.update(
