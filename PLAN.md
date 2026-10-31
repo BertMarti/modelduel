@@ -47,7 +47,7 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
 - **Tareas en JavaScript y TypeScript (experimental)** (antes en «Ideas»): `language` en `meta.toml`, `test_task.mjs` / `test_task.ts` con `node:test`, por el mismo runner endurecido (límites, supervisor, red cortada, contenedor con la imagen oficial de Node) y con el modelo de permisos de Node; dos tareas de ejemplo (`format_bytes`, `group_by`), `init --js` / `--ts`, Node en `doctor`, lenguaje en los informes, pruebas con soluciones maliciosas y CI con Node 20 y 22.
 
 ## Después de la 1.1
-- **JS/TS fuera de lo experimental:** probar en macOS (sin subreaper) y con WebAssembly bajo el límite de 4 GiB de espacio de direcciones; valorar comprobar los tipos de TypeScript (hoy solo se borran: haría falta `tsc`, que es una dependencia de npm) y `--sandbox-image` también para la imagen de Node.
+- **JS/TS fuera de lo experimental:** probar en macOS (sin subreaper) y con Node anterior a la 20.15 (sin `--disable-wasm-trap-handler`, WebAssembly no cabe en el límite de memoria); valorar comprobar los tipos de TypeScript (hoy solo se borran: haría falta `tsc`, que es una dependencia de npm) y `--sandbox-image` también para la imagen de Node.
 - **Imagen de Node fijada** (`NODE_IMAGE` en `sandbox.py`): actualizarla a mano como la de Python (Dependabot no la ve).
 
 ## Después de la 1.0

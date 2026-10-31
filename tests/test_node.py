@@ -222,18 +222,57 @@ def test_typescript_con_node_viejo_pide_actualizar():
 
 def test_opciones_de_node_con_permisos_limitados_a_la_ejecucion():
     args = node_test_args(
-        (22, 6, 0), "typescript", root="/r", junit="/r/junit.xml", test_file="test_task.ts"
+        (22, 6, 0), "typescript", root="/r", reporter="file:///r/rep.mjs", test_file="test_task.ts"
     )
     assert args[:3] == ["--experimental-permission", "--allow-fs-read=/r", "--allow-fs-write=/r"]
-    assert "--test-reporter-destination=/r/junit.xml" in args
+    assert "--test-reporter=file:///r/rep.mjs" in args
+    assert "--disable-wasm-trap-handler" in args  # WebAssembly dentro del límite de memoria
+    old_node = node_test_args((20, 11, 0), "javascript", root="/r", reporter="r", test_file="t")
+    assert "--disable-wasm-trap-handler" not in old_node  # la opción no existía aún
     assert "--experimental-strip-types" in args
     assert args[-1] == "test_task.ts"
     # Nada de procesos hijos, workers ni complementos: esas opciones nunca se añaden.
     assert not any(
         a.startswith(("--allow-child", "--allow-worker", "--allow-addons")) for a in args
     )
-    modern = node_test_args((24, 1, 0), "typescript", root="/r", junit="/j", test_file="t.ts")
+    modern = node_test_args((24, 1, 0), "typescript", root="/r", reporter="r", test_file="t.ts")
     assert modern[0] == "--permission" and "--experimental-strip-types" not in modern
+
+
+def test_recuento_del_reporter(tmp_path):
+    path = tmp_path / "r.json"
+    assert node.parse_node_results(path) is None
+    path.write_text('{"passed": 2, "failed": 1, "skipped": 1}', encoding="utf-8")
+    counts = node.parse_node_results(path)
+    assert counts["total"] == 4 and counts["errors"] == 0 and not counts["collection_error"]
+    for bad in ('{"passed": -1, "failed": 0, "skipped": 0}', '{"passed": true}', "[]", "{"):
+        path.write_text(bad, encoding="utf-8")
+        assert node.parse_node_results(path) is None
+    assert '"C:\\\\x\\\\r.json"' in node.reporter_source("C:\\x\\r.json")
+
+
+@needs_node
+def test_el_reporter_cuenta_solo_los_tests_hoja(make_js_task):
+    tests = textwrap.dedent(
+        """\
+        import { test, describe, it } from "node:test";
+        import assert from "node:assert/strict";
+        import { add } from "./solution.mjs";
+        test("a", () => assert.equal(add(1, 1), 2));
+        test("b", () => assert.equal(add(1, 1), 3));
+        test.skip("c", () => {});
+        test("padre", async (t) => {
+          await t.test("h1", () => {});
+          await t.test("h2", () => {});
+        });
+        describe("suite", () => {
+          it("i1", () => {});
+        });
+        """
+    )
+    result = run_tests(GOOD_JS, make_js_task(tests), timeout=30)
+    # a, h1, h2, i1 pasan; b falla; c se salta (el padre y la suite no cuentan).
+    assert (result.passed, result.failed, result.skipped) == (4, 1, 1), result.output
 
 
 def test_sin_node_el_duelo_para_antes_de_empezar(make_js_task, monkeypatch):
@@ -265,7 +304,7 @@ def test_orden_del_contenedor_para_node(tmp_path):
         node_image_version(),
         "javascript",
         root="/sandbox",
-        junit="/sandbox/junit.xml",
+        reporter="file:///sandbox/modelduel-reporter.mjs",
         test_file="test_task.mjs",
     )
     cmd = container_command(
@@ -619,6 +658,12 @@ _, _, seconds, program, *rest = args[image_at + 1:]
 assert program == "sh" and rest[0] == "-c", (program, rest[:1])
 root = os.path.realpath(root)
 rest = [part.replace("/sandbox", root) for part in rest]
+# Dentro del contenedor el reporter escribe en /sandbox; aquí, en la carpeta real.
+reporter = os.path.join(root, "modelduel-reporter.mjs")
+with open(reporter, encoding="utf-8") as fh:
+    source = fh.read()
+with open(reporter, "w", encoding="utf-8") as fh:
+    fh.write(source.replace('"/sandbox/', '"' + root + "/"))
 try:
     # El sh real aplica los ulimit y hace exec del node del anfitrión (como en la imagen).
     proc = subprocess.run(["sh", *rest], cwd=os.path.join(root, "work"),

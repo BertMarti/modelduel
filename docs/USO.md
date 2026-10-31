@@ -923,7 +923,7 @@ Con `--sandbox docker` o `--sandbox podman`, cada ejecución usa un contenedor d
 Qué **no** hace el modo sin contenedor, y conviene tener presente:
 
 - **No es un aislamiento real.** El código del modelo puede leer y escribir en el resto de tu disco mediante rutas absolutas y usar la red con tus permisos de usuario (en JavaScript/TypeScript, el modelo de permisos de Node se lo impide salvo que consiga saltárselo).
-- El modelo de permisos de Node es una **red de seguridad**, no una barrera frente a código malicioso. Las tareas JS/TS son experimentales: TypeScript depende del borrado de tipos experimental de Node 22, los tipos no se comprueban, WebAssembly puede fallar con el límite de memoria en algunas compilaciones de Node y no se ha probado en macOS.
+- El modelo de permisos de Node es una **red de seguridad**, no una barrera frente a código malicioso. Las tareas JS/TS son experimentales: TypeScript depende del borrado de tipos experimental de Node 22, los tipos no se comprueban, con Node anterior a la 20.15 WebAssembly puede fallar con el límite de memoria y no se ha probado en macOS.
 - Una solución que escriba sin parar puede llenar el disco (cada archivo hasta 256 MiB) hasta que se agote el límite de tiempo.
 - En macOS, un proceso que se desligue a propósito con `setsid` puede sobrevivir.
 

@@ -39,12 +39,16 @@ from pathlib import Path
 
 from modelduel.node import (
     HEAP_OOM_TEXT,
+    REPORTER_FILE,
+    RESULTS_FILE,
     NodeError,
     check_node,
     find_node,
     heap_message,
     node_env,
     node_test_args,
+    parse_node_results,
+    reporter_source,
 )
 from modelduel.sandbox import (
     CONTAINER_FAILURE_CODES,
@@ -522,7 +526,7 @@ def run_tests(
             # «module», solution.ts y test_task.ts son módulos ES igual que los .mjs.
             (workdir / "package.json").write_text('{"type": "module"}\n', encoding="utf-8")
             returncode, duration = _run_node(
-                sandbox, lang.name, root, workdir, tmpdir, junit, output_path, limits, timeout
+                sandbox, lang.name, root, workdir, tmpdir, output_path, limits, timeout
             )
         else:
             conftest = task.path / "conftest.py"
@@ -566,7 +570,10 @@ def run_tests(
                     isolate_network=sandbox.isolate_network,
                 )
         output = _truncate(_clean_output(_read_capped(output_path), root))
-        counts = parse_junit(junit) if junit.is_file() else None
+        if lang.node:
+            counts = parse_node_results(root / RESULTS_FILE)
+        else:
+            counts = parse_junit(junit) if junit.is_file() else None
     except _SetupFailed as exc:
         # No es culpa del modelo y afectaría a todos los intentos: se para el duelo (así no se
         # sigue pagando llamadas a las APIs cuyo código no se va a ejecutar).
@@ -605,19 +612,23 @@ def _run_node(
     root: Path,
     workdir: Path,
     tmpdir: Path,
-    junit: Path,
     output_path: Path,
     limits: str,
     timeout: float,
 ) -> tuple[int | None, float]:
-    """Ejecuta los tests ``node:test`` de una tarea JS/TS con el aislamiento de ``sandbox``."""
+    """Ejecuta los tests ``node:test`` de una tarea JS/TS con el aislamiento de ``sandbox``.
+
+    El recuento lo deja el reporter de ``node.reporter_source`` en ``root / RESULTS_FILE``.
+    """
     test_file = LANGUAGES_TEST_FILE[language]
+    reporter = root / REPORTER_FILE
     if sandbox.is_container:
+        reporter.write_text(reporter_source(f"{CONTAINER_ROOT}/{RESULTS_FILE}"), encoding="utf-8")
         args = node_test_args(
             node_image_version(sandbox.node_image),
             language,
             root=CONTAINER_ROOT,
-            junit=f"{CONTAINER_ROOT}/junit.xml",
+            reporter=f"file://{CONTAINER_ROOT}/{REPORTER_FILE}",
             test_file=test_file,
         )
         return _execute_container(
@@ -633,11 +644,12 @@ def _run_node(
     # trabajo y el archivo de tests.
     real_root = root.resolve()
     real_work = workdir.resolve()
+    reporter.write_text(reporter_source(str(real_root / RESULTS_FILE)), encoding="utf-8")
     args = node_test_args(
         info.version,
         language,
         root=str(real_root),
-        junit=str(junit.resolve()),
+        reporter=(real_root / REPORTER_FILE).as_uri(),
         test_file=str(real_work / test_file),
     )
     if os.name == "nt":  # pragma: no cover - solo Windows: el Job Object limita a node
@@ -662,7 +674,7 @@ def _classify_node(
 ) -> TestRun:
     """Como ``_classify``, para la salida de ``node:test`` (sin errores de recogida de pytest).
 
-    Node no escribe el XML si la solución no se puede cargar (error de sintaxis, falta un
+    Node no escribe el recuento si la solución no se puede cargar (error de sintaxis, falta un
     ``export``…): con un código de salida distinto de 0 y sin XML es un error de importación. Si
     Node informa de menos tests de los que tiene la tarea (la solución terminó el proceso a
     mitad, p. ej.), los que faltan cuentan como fallidos: nunca puede salir «resuelta».
@@ -808,7 +820,6 @@ def _probe_node(
         root,
         work,
         root / "tmp",
-        root / "junit.xml",
         output_path,
         json.dumps(resource_limits(timeout)),
         timeout,

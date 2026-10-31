@@ -15,22 +15,53 @@ comprueba los tipos. Antes de la 22.18 (y en la 23 antes de la 23.6) hay que ped
 from __future__ import annotations
 
 import functools
+import json
 import re
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from pathlib import Path
 
 Version = tuple[int, int, int]
 
 NODE_URL = "https://nodejs.org/es/download"
-# El reporter junit y --disable-warning llegaron a la rama 20 en la 20.11.
+# --disable-warning llegó a la rama 20 en la 20.11.
 MIN_NODE: Version = (20, 11, 0)
 MIN_NODE_TS: Version = (22, 6, 0)
 # Montículo máximo de V8 (MiB): por debajo del límite de espacio de direcciones del runner, para
 # que una solución que agota la memoria termine con un mensaje claro de Node.
 NODE_HEAP_MB = 2048
 HEAP_OOM_TEXT = "JavaScript heap out of memory"
+# Reporter propio de node:test: cuenta los resultados y los escribe con writeFileSync al terminar.
+# Los reporteros de archivo de Node (junit con --test-reporter-destination) cierran el archivo con
+# fsync, que el modelo de permisos prohíbe en las versiones recientes.
+REPORTER_FILE = "modelduel-reporter.mjs"
+RESULTS_FILE = "resultados-node.json"
+_REPORTER_SOURCE = """\
+import { writeFileSync } from "node:fs";
+
+// Generado por modelduel: cuenta los tests hoja (no las suites ni los padres de subtests).
+export default async function* modelduelReporter(source) {
+  const counts = { passed: 0, failed: 0, skipped: 0 };
+  const children = [];
+  for await (const event of source) {
+    if (event.type !== "test:pass" && event.type !== "test:fail") continue;
+    const data = event.data ?? {};
+    const level = data.nesting ?? 0;
+    const hadChildren = (children[level + 1] ?? 0) > 0;
+    children[level + 1] = 0;
+    children[level] = (children[level] ?? 0) + 1;
+    if (data.details?.type === "suite") continue;
+    const failure = data.details?.error?.failureType;
+    if (hadChildren && (event.type === "test:pass" || failure === "subtestsFailed")) continue;
+    if ((data.skip ?? false) !== false || (data.todo ?? false) !== false) counts.skipped++;
+    else if (event.type === "test:pass") counts.passed++;
+    else counts.failed++;
+  }
+  writeFileSync(__OUT__, JSON.stringify(counts));
+}
+"""
 
 
 class NodeError(Exception):
@@ -137,22 +168,54 @@ def check_node(languages: Iterable[str], info: NodeInfo | None) -> NodeInfo | No
     return info
 
 
+def reporter_source(results_path: str) -> str:
+    """Código del reporter que deja el recuento en ``results_path`` (ruta tal y como la ve node)."""
+    return _REPORTER_SOURCE.replace("__OUT__", json.dumps(results_path))
+
+
+def parse_node_results(path: Path) -> dict | None:
+    """Recuento del reporter (``None`` si falta o no es válido), como el de ``parse_junit``."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    keys = ("passed", "failed", "skipped")
+    if not isinstance(data, dict) or not all(
+        isinstance(data.get(k), int) and not isinstance(data.get(k), bool) and data[k] >= 0
+        for k in keys
+    ):
+        return None
+    counts = {k: data[k] for k in keys}
+    counts["errors"] = 0
+    counts["total"] = sum(counts.values())
+    counts["collection_error"] = False
+    return counts
+
+
+def wasm_trap_flag_supported(version: Version) -> bool:
+    """``--disable-wasm-trap-handler`` existe desde la 20.15 (rama 20) y la 22.2."""
+    return version >= (22, 2, 0) or (20, 15, 0) <= version < (21, 0, 0)
+
+
 def node_test_args(
     version: Version,
     language: str,
     *,
     root: str,
-    junit: str,
+    reporter: str,
     test_file: str,
     heap_mb: int | None = None,
 ) -> list[str]:
-    """Argumentos de ``node`` para ejecutar ``test_file`` con ``node:test`` y salida JUnit.
+    """Argumentos de ``node`` para ejecutar ``test_file`` con ``node:test``.
 
     El archivo de tests se ejecuta directamente (no con ``node --test``, que lanzaría un proceso
-    hijo por archivo y obligaría a permitirlos): los tests se registran con ``node:test`` igual y
-    los reporteros escriben el XML (``junit``) y un resumen legible en la salida. Con el modelo de
-    permisos de Node solo se puede leer y escribir dentro de ``root`` y no se pueden lanzar
-    procesos, *workers*, WASI ni complementos nativos.
+    hijo por archivo y obligaría a permitirlos): los tests se registran con ``node:test`` igual, el
+    reportero ``spec`` deja un resumen legible en la salida y ``reporter`` (URL ``file://`` del
+    módulo de ``reporter_source``) escribe el recuento. Con el modelo de permisos de Node solo se
+    puede leer y escribir dentro de ``root`` y no se pueden lanzar procesos, *workers*, WASI ni
+    complementos nativos. Sin el manejador de trampas de WebAssembly, V8 no reserva decenas de GiB
+    de memoria virtual por instancia, así que WebAssembly (y el borrado de tipos de TypeScript, que
+    lo usa) funciona dentro del límite de espacio de direcciones del runner.
     """
     args = [
         permission_flag(version),
@@ -160,10 +223,14 @@ def node_test_args(
         f"--allow-fs-write={root}",
         "--disable-warning=ExperimentalWarning",
         f"--max-old-space-size={heap_mb or NODE_HEAP_MB}",
+    ]
+    if wasm_trap_flag_supported(version):
+        args.append("--disable-wasm-trap-handler")
+    args += [
         "--test-reporter=spec",
         "--test-reporter-destination=stdout",
-        "--test-reporter=junit",
-        f"--test-reporter-destination={junit}",
+        f"--test-reporter={reporter}",
+        "--test-reporter-destination=stdout",
     ]
     if language == "typescript" and needs_strip_flag(version):
         args.append("--experimental-strip-types")
