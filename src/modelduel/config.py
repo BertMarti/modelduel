@@ -248,7 +248,8 @@ def render_config(specs: list[str], providers: list[str]) -> str:
         "# Las claves de las APIs NUNCA van aquí: se leen de variables de entorno.",
         "# Comprueba que todo está listo con: modelduel doctor",
         "",
-        "# Carpeta de tareas (cada tarea: task.md con el enunciado y test_task.py con los tests).",
+        "# Carpeta de tareas (cada tarea: task.md con el enunciado y test_task.py con los tests;",
+        "# en JavaScript o TypeScript, experimental: test_task.mjs o test_task.ts y Node).",
         'tareas = "tasks"',
         "",
         "# Contendientes: de 2 a 6, como proveedor:modelo.",
@@ -290,8 +291,18 @@ def render_config(specs: list[str], providers: list[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def init_project(target: Path, providers: list[str]) -> list[str]:
-    """Crea ``target`` con ``tasks/``, ``replays/`` y ``modelduel.toml``; nunca sobrescribe."""
+# Tarea de ejemplo de ``examples/tasks-js`` que añade ``init --js`` / ``init --ts``.
+INIT_NODE_TASKS = {"javascript": "format_bytes", "typescript": "group_by"}
+
+
+def init_project(
+    target: Path, providers: list[str], languages: list[str] | None = None
+) -> list[str]:
+    """Crea ``target`` con ``tasks/``, ``replays/`` y ``modelduel.toml``; nunca sobrescribe.
+
+    ``languages`` (``javascript`` y/o ``typescript``) añade también la tarea de ejemplo de ese
+    lenguaje (experimental: se ejecuta con Node).
+    """
     providers = list(dict.fromkeys(providers))
     specs = init_specs(providers)
     config_path = target / CONFIG_NAME
@@ -309,6 +320,9 @@ def init_project(target: Path, providers: list[str]) -> list[str]:
     try:
         target.mkdir(parents=True, exist_ok=True)
         shutil.copytree(examples / "tasks", target / "tasks", ignore=ignore)
+        for language in languages or []:
+            name = INIT_NODE_TASKS[language]
+            shutil.copytree(examples / "tasks-js" / name, target / "tasks" / name, ignore=ignore)
         shutil.copytree(examples / "replays", target / "replays", ignore=ignore)
         config_path.write_text(render_config(specs, providers), encoding="utf-8")
     except OSError as exc:

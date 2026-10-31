@@ -23,6 +23,7 @@ from modelduel.report.html import (
     fmt_tokens,
     plural,
     svg_ratio_bar,
+    task_meta,
 )
 from modelduel.results import rank_sides, sides_of
 
@@ -213,7 +214,7 @@ def build_matrix(results: dict, summary: dict, runs: int) -> str:
     )
     body = []
     for task in results["tasks"]:
-        diff = f"<span>{e(task.get('difficulty'))}</span>" if task.get("difficulty") else ""
+        diff = task_meta(task)
         cells = [f'<th scope="row" class="task">{e(task["title"])}{diff}</th>']
         for side in sides:
             attempts = task["results"].get(side, [])

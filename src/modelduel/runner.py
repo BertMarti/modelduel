@@ -12,6 +12,10 @@ En Linux, por defecto, el supervisor corta además la red con un espacio de nomb
 (``sandbox.network_isolation_available``). Aun así puede leer y escribir rutas absolutas del disco:
 para código no confiable, usa ``--sandbox docker|podman`` (``sandbox.py``), que ejecuta los tests
 en un contenedor sin red, sin privilegios y de solo lectura.
+
+Las tareas de JavaScript y TypeScript (experimental, ``node.py``) pasan por este mismo camino: el
+arranque aplica los mismos límites y después se convierte (``execv``) en ``node``, que corre bajo
+el mismo supervisor, con la misma red cortada o en el mismo contenedor (imagen de Node).
 """
 
 from __future__ import annotations
@@ -33,6 +37,19 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from modelduel.node import (
+    HEAP_OOM_TEXT,
+    REPORTER_FILE,
+    RESULTS_FILE,
+    NodeError,
+    check_node,
+    find_node,
+    heap_message,
+    node_env,
+    node_test_args,
+    parse_node_results,
+    reporter_source,
+)
 from modelduel.sandbox import (
     CONTAINER_FAILURE_CODES,
     CONTAINER_GRACE_S,
@@ -44,9 +61,12 @@ from modelduel.sandbox import (
     container_command,
     container_name,
     network_isolation_available,
+    node_image_version,
     remove_container,
 )
-from modelduel.tasks import TEST_FILE, Task
+from modelduel.tasks import LANGUAGES, TEST_FILE, Task
+
+LANGUAGES_TEST_FILE = {name: lang.test_file for name, lang in LANGUAGES.items()}
 
 DEFAULT_TIMEOUT = 20.0
 MAX_OUTPUT_CHARS = 12_000
@@ -60,6 +80,19 @@ Instrucciones de formato:
 - El bloque debe contener la implementación completa y autocontenida (solo biblioteca estándar).
 - No incluyas tests ni código que se ejecute al importar el módulo.
 - Respeta exactamente el nombre y la firma de la función pedida."""
+
+_NODE_INSTRUCTIONS = """\
+---
+Instrucciones de formato:
+- Responde con UN ÚNICO bloque de código {label} delimitado por ```{fence} y ```.
+- El bloque debe ser un módulo ES completo y autocontenido: exporta la función pedida con
+  `export function` (solo la biblioteca estándar de Node, sin paquetes de npm ni `require`).{extra}
+- No incluyas tests ni código que se ejecute al importar el módulo.
+- Respeta exactamente el nombre y la firma de la función pedida."""
+_TS_EXTRA = (
+    "\n- Usa solo anotaciones de tipo que se puedan borrar (Node las quita sin compilar): nada de"
+    " `enum`, `namespace` ni propiedades de parámetro en los constructores."
+)
 
 # Una variable cuyo nombre contenga alguna de estas piezas no llega a la solución.
 _SECRET_HINTS = (
@@ -135,7 +168,7 @@ WINDOWS_ACTIVE_PROCESS_LIMIT = 128
 
 # Arranque del subproceso: aplica los límites y ejecuta pytest en el mismo proceso. Así no hace
 # falta ``preexec_fn`` (inseguro con hilos, y modelduel tiene el de la señal de vida).
-_BOOTSTRAP = """\
+_APPLY_LIMITS = """\
 import json, sys
 try:
     import resource
@@ -158,9 +191,23 @@ if resource is not None:
         except (ValueError, OSError):
             pass  # p. ej. RLIMIT_AS en macOS: se sigue con el resto de límites
 del sys.argv[1]
+"""
+_BOOTSTRAP = (
+    _APPLY_LIMITS
+    + """\
 import pytest
 raise SystemExit(pytest.main(sys.argv[1:]))
 """
+)
+# Lo mismo para las tareas de Node: tras aplicar los límites, el proceso se convierte en
+# ``node`` (``execv`` conserva los ``setrlimit``, el grupo, el supervisor y el espacio de red).
+_EXEC_BOOTSTRAP = (
+    _APPLY_LIMITS
+    + """\
+import os
+os.execv(sys.argv[1], sys.argv[1:])
+"""
+)
 
 
 # Supervisor intermedio (solo Linux). Una solución que llame a ``setsid()`` o haga un doble fork
@@ -333,7 +380,32 @@ class TestRun:
 
 
 def build_prompt(task: Task) -> str:
-    return f"{task.statement}\n\n{PROMPT_INSTRUCTIONS}\n"
+    lang = task.lang
+    if not lang.node:
+        return f"{task.statement}\n\n{PROMPT_INSTRUCTIONS}\n"
+    extra = _TS_EXTRA if lang.name == "typescript" else ""
+    instructions = _NODE_INSTRUCTIONS.format(label=lang.label, fence=lang.fence, extra=extra)
+    return f"{task.statement}\n\n{instructions}\n"
+
+
+def task_languages(tasks: list[Task]) -> set[str]:
+    return {task.language for task in tasks}
+
+
+def ensure_runtimes(tasks: list[Task], sandbox: Sandbox | None = None) -> None:
+    """pytest para las tareas de Python y Node para las de JS/TS; ``RunnerError`` si falta algo.
+
+    En un contenedor, Node viene en su imagen: solo hace falta en local.
+    """
+    languages = task_languages(tasks) or {"python"}
+    if "python" in languages:
+        ensure_pytest_available()
+    if sandbox is not None and sandbox.is_container:
+        return
+    try:
+        check_node(languages, find_node())
+    except NodeError as exc:
+        raise RunnerError(str(exc)) from None
 
 
 def ensure_pytest_available() -> None:
@@ -366,6 +438,11 @@ def isolation_summary() -> list[str]:
         )
     if network_isolation_available() and supervisor_supported():
         items.append("red cortada por defecto (espacio de nombres de red de Linux, sin root)")
+    if find_node() is not None:
+        items.append(
+            "tareas en JavaScript/TypeScript (experimental): lo mismo y, además, el modelo de "
+            "permisos de Node (solo su carpeta; sin procesos hijos, workers ni complementos)"
+        )
     items.append("para código no fiable: --sandbox docker o podman (contenedor sin red ni root)")
     return items
 
@@ -432,54 +509,71 @@ def run_tests(
             message="La respuesta no contiene ningún bloque de código.",
         )
 
+    lang = task.lang
     root = Path(tempfile.mkdtemp(prefix="modelduel-"))
     try:
         workdir = root / "work"
         tmpdir = root / "tmp"
         workdir.mkdir()
         tmpdir.mkdir()
-        (workdir / "solution.py").write_text(code, encoding="utf-8", errors="replace")
-        shutil.copyfile(task.test_path, workdir / TEST_FILE)
-        conftest = task.path / "conftest.py"
-        if conftest.is_file():
-            shutil.copyfile(conftest, workdir / "conftest.py")
-        # Un pytest.ini vacío aísla la ejecución de cualquier configuración del usuario.
-        (workdir / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+        (workdir / lang.solution_file).write_text(code, encoding="utf-8", errors="replace")
+        shutil.copyfile(task.test_path, workdir / lang.test_file)
         junit = root / "junit.xml"
         output_path = root / "output.log"
-        pytest_args = ["-q", "--tb=short", "-p", "no:cacheprovider"]
         limits = json.dumps(resource_limits(timeout))
-        if sandbox.is_container:
-            python_args = [
-                "-c",
-                _BOOTSTRAP,
-                limits,
-                *pytest_args,
-                f"--junitxml={CONTAINER_ROOT}/junit.xml",
-                TEST_FILE,
-            ]
-            returncode, duration = _execute_container(
-                sandbox, root, python_args, output_path, timeout
+        if lang.node:
+            # Sin un package.json propio, Node buscaría el de las carpetas superiores; con
+            # «module», solution.ts y test_task.ts son módulos ES igual que los .mjs.
+            (workdir / "package.json").write_text('{"type": "module"}\n', encoding="utf-8")
+            returncode, duration = _run_node(
+                sandbox, lang.name, root, workdir, tmpdir, output_path, limits, timeout
             )
         else:
-            cmd = [
-                sys.executable,
-                "-c",
-                _BOOTSTRAP,
-                limits,
-                *pytest_args,
-                f"--junitxml={junit}",
-                TEST_FILE,
-            ]
-            env = safe_env(home=tmpdir)
-            # Los temporales de la solución y de pytest se quedan dentro de la ejecución.
-            for name in ("TMP", "TEMP", "TMPDIR"):
-                env[name] = str(tmpdir)
-            returncode, duration = _execute(
-                cmd, workdir, env, output_path, timeout, isolate_network=sandbox.isolate_network
-            )
+            conftest = task.path / "conftest.py"
+            if conftest.is_file():
+                shutil.copyfile(conftest, workdir / "conftest.py")
+            # Un pytest.ini vacío aísla la ejecución de cualquier configuración del usuario.
+            (workdir / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+            pytest_args = ["-q", "--tb=short", "-p", "no:cacheprovider"]
+            if sandbox.is_container:
+                python_args = [
+                    "-c",
+                    _BOOTSTRAP,
+                    limits,
+                    *pytest_args,
+                    f"--junitxml={CONTAINER_ROOT}/junit.xml",
+                    TEST_FILE,
+                ]
+                returncode, duration = _execute_container(
+                    sandbox, root, python_args, output_path, timeout
+                )
+            else:
+                cmd = [
+                    sys.executable,
+                    "-c",
+                    _BOOTSTRAP,
+                    limits,
+                    *pytest_args,
+                    f"--junitxml={junit}",
+                    TEST_FILE,
+                ]
+                env = safe_env(home=tmpdir)
+                # Los temporales de la solución y de pytest se quedan dentro de la ejecución.
+                for name in ("TMP", "TEMP", "TMPDIR"):
+                    env[name] = str(tmpdir)
+                returncode, duration = _execute(
+                    cmd,
+                    workdir,
+                    env,
+                    output_path,
+                    timeout,
+                    isolate_network=sandbox.isolate_network,
+                )
         output = _truncate(_clean_output(_read_capped(output_path), root))
-        counts = parse_junit(junit) if junit.is_file() else None
+        if lang.node:
+            counts = parse_node_results(root / RESULTS_FILE)
+        else:
+            counts = parse_junit(junit) if junit.is_file() else None
     except _SetupFailed as exc:
         # No es culpa del modelo y afectaría a todos los intentos: se para el duelo (así no se
         # sigue pagando llamadas a las APIs cuyo código no se va a ejecutar).
@@ -498,7 +592,10 @@ def run_tests(
                 " Revisa la salida y `modelduel doctor`."
             ),
         )
-    result = _classify(returncode, counts, output, duration, expected, timeout)
+    if lang.node:
+        result = _classify_node(returncode, counts, output, duration, expected, timeout)
+    else:
+        result = _classify(returncode, counts, output, duration, expected, timeout)
     if sandbox.is_container and returncode in (-9, 137) and counts is None:  # SIGKILL
         result.message = (
             "El contenedor terminó los tests a la fuerza: ¿superó la memoria "
@@ -509,31 +606,175 @@ def run_tests(
     return result
 
 
-def check_sandbox(sandbox: Sandbox, timeout: float = 60.0) -> None:
+def _run_node(
+    sandbox: Sandbox,
+    language: str,
+    root: Path,
+    workdir: Path,
+    tmpdir: Path,
+    output_path: Path,
+    limits: str,
+    timeout: float,
+) -> tuple[int | None, float]:
+    """Ejecuta los tests ``node:test`` de una tarea JS/TS con el aislamiento de ``sandbox``.
+
+    El recuento lo deja el reporter de ``node.reporter_source`` en ``root / RESULTS_FILE``.
+    """
+    test_file = LANGUAGES_TEST_FILE[language]
+    reporter = root / REPORTER_FILE
+    if sandbox.is_container:
+        reporter.write_text(reporter_source(f"{CONTAINER_ROOT}/{RESULTS_FILE}"), encoding="utf-8")
+        args = node_test_args(
+            node_image_version(sandbox.node_image),
+            language,
+            root=CONTAINER_ROOT,
+            reporter=f"file://{CONTAINER_ROOT}/{REPORTER_FILE}",
+            test_file=test_file,
+        )
+        return _execute_container(
+            sandbox, root, args, output_path, timeout, program="node", limits=json.loads(limits)
+        )
+    try:
+        info = check_node({language}, find_node())
+    except NodeError as exc:
+        raise _SetupFailed(str(exc)) from None
+    assert info is not None  # check_node lo garantiza para JS/TS
+    # El modelo de permisos de Node compara rutas reales (p. ej. /var -> /private/var en macOS o
+    # los nombres cortos RUNNER~1 de Windows): todo con la ruta resuelta, también la carpeta de
+    # trabajo y el archivo de tests.
+    real_root = root.resolve()
+    real_work = workdir.resolve()
+    reporter.write_text(reporter_source(str(real_root / RESULTS_FILE)), encoding="utf-8")
+    args = node_test_args(
+        info.version,
+        language,
+        root=str(real_root),
+        reporter=(real_root / REPORTER_FILE).as_uri(),
+        test_file=str(real_work / test_file),
+    )
+    if os.name == "nt":  # pragma: no cover - solo Windows: el Job Object limita a node
+        cmd = [info.path, *args]
+    else:
+        cmd = [sys.executable, "-c", _EXEC_BOOTSTRAP, limits, info.path, *args]
+    env = node_env(safe_env(home=tmpdir.resolve()))
+    for name in ("TMP", "TEMP", "TMPDIR"):
+        env[name] = str(tmpdir.resolve())
+    return _execute(
+        cmd, real_work, env, output_path, timeout, isolate_network=sandbox.isolate_network
+    )
+
+
+def _classify_node(
+    returncode: int | None,
+    counts: dict | None,
+    output: str,
+    duration: float,
+    expected: int,
+    timeout: float,
+) -> TestRun:
+    """Como ``_classify``, para la salida de ``node:test`` (sin errores de recogida de pytest).
+
+    Node no escribe el recuento si la solución no se puede cargar (error de sintaxis, falta un
+    ``export``…): con un código de salida distinto de 0 y sin XML es un error de importación. Si
+    Node informa de menos tests de los que tiene la tarea (la solución terminó el proceso a
+    mitad, p. ej.), los que faltan cuentan como fallidos: nunca puede salir «resuelta».
+    """
+    if returncode is None or returncode < 0:
+        result = _classify(returncode, counts, output, duration, expected, timeout)
+        if HEAP_OOM_TEXT in output:
+            result.message = heap_message()
+        return result
+    if HEAP_OOM_TEXT in output:
+        # En Windows V8 no muere por una señal: sale con un código positivo.
+        return TestRun(
+            status="error",
+            total=expected,
+            duration_s=duration,
+            output=output,
+            message=heap_message(),
+        )
+    if counts is None or counts["total"] == 0:
+        if returncode == 0:
+            return TestRun(
+                status="error",
+                total=expected,
+                duration_s=duration,
+                output=output,
+                message=(
+                    "Node terminó sin informar de ningún test: ¿la solución termina el proceso "
+                    "(process.exit)?"
+                ),
+            )
+        return TestRun(
+            status="import_error",
+            total=expected,
+            errors=1,
+            duration_s=duration,
+            output=output,
+            message=(
+                "No se pudo cargar la solución (error de sintaxis, falta el `export` de la "
+                "función o falla al importarse)."
+            ),
+        )
+    missing = max(expected - counts["total"], 0)
+    if returncode != 0 and counts["passed"] == counts["total"] and not missing:
+        # Todos los tests pasaron pero Node acabó mal (un error sin capturar después de los tests,
+        # o la solución cambió el código de salida): no cuenta como resuelta.
+        return TestRun(
+            status="error",
+            passed=counts["passed"],
+            total=counts["total"],
+            duration_s=duration,
+            output=output,
+            message=(
+                f"Los tests pasaron, pero Node terminó con código {returncode} (¿un error sin "
+                "capturar de la solución o un cambio del código de salida?)."
+            ),
+        )
+    result = TestRun(
+        status="ok",
+        passed=counts["passed"],
+        failed=counts["failed"] + missing,
+        errors=counts["errors"],
+        skipped=counts["skipped"],
+        total=counts["total"] + missing,
+        duration_s=duration,
+        output=output,
+    )
+    if missing:
+        result.message = (
+            f"Node solo informó de {counts['total']} de {expected} tests: los que faltan cuentan "
+            "como fallidos (¿la solución terminó el proceso a mitad?)."
+        )
+    return result
+
+
+def check_sandbox(
+    sandbox: Sandbox,
+    timeout: float = 60.0,
+    languages: tuple[str, ...] | list[str] | set[str] = ("python",),
+) -> None:
     """Ejecución de prueba con el aislamiento elegido, antes de la primera llamada a una API.
 
-    Si el contenedor no arranca o la red no se puede cortar, ``RunnerError`` (la orden termina
-    con código 2) en vez de un duelo entero de intentos fallidos y pagados.
+    Si el contenedor no arranca, la red no se puede cortar o Node no arranca con sus límites y
+    permisos, ``RunnerError`` (la orden termina con código 2) en vez de un duelo entero de
+    intentos fallidos y pagados. ``languages`` dice qué hay que probar: Python y/o Node.
     """
-    if not (sandbox.is_container or sandbox.isolate_network):
+    node_langs = {"javascript", "typescript"} & set(languages)
+    probe_python = "python" in languages and (sandbox.is_container or sandbox.isolate_network)
+    if not (probe_python or node_langs):
         return
+    language = "typescript" if "typescript" in node_langs else "javascript"
     root = Path(tempfile.mkdtemp(prefix="modelduel-prueba-"))
     try:
         (root / "work").mkdir()
         (root / "tmp").mkdir()
         output_path = root / "output.log"
-        if sandbox.is_container:
-            code, _ = _execute_container(sandbox, root, ["-c", "pass"], output_path, timeout)
-        else:
-            env = safe_env(home=root / "tmp")
-            code, _ = _execute(
-                [sys.executable, "-c", "pass"],
-                root / "work",
-                env,
-                output_path,
-                timeout,
-                isolate_network=True,
-            )
+        code: int | None = 0
+        if probe_python:
+            code = _probe_python(sandbox, root, output_path, timeout)
+        if code == 0 and node_langs:
+            code = _probe_node(sandbox, language, root, output_path, timeout)
         detail = _truncate(_clean_output(_read_capped(output_path), root), 400)
     except _SetupFailed as exc:
         raise RunnerError(str(exc)) from None
@@ -547,6 +788,45 @@ def check_sandbox(sandbox: Sandbox, timeout: float = 60.0) -> None:
         )
 
 
+def _probe_python(sandbox: Sandbox, root: Path, output_path: Path, timeout: float) -> int | None:
+    if sandbox.is_container:
+        code, _ = _execute_container(sandbox, root, ["-c", "pass"], output_path, timeout)
+        return code
+    env = safe_env(home=root / "tmp")
+    code, _ = _execute(
+        [sys.executable, "-c", "pass"],
+        root / "work",
+        env,
+        output_path,
+        timeout,
+        isolate_network=True,
+    )
+    return code
+
+
+def _probe_node(
+    sandbox: Sandbox, language: str, root: Path, output_path: Path, timeout: float
+) -> int | None:
+    """Node arranca con los mismos límites, permisos y aislamiento que tendrán los tests."""
+    work = root / "work"
+    (work / "package.json").write_text('{"type": "module"}\n', encoding="utf-8")
+    test_file = LANGUAGES_TEST_FILE[language]
+    (work / test_file).write_text(
+        'import { test } from "node:test";\ntest("arranque", () => {});\n', encoding="utf-8"
+    )
+    code, _ = _run_node(
+        sandbox,
+        language,
+        root,
+        work,
+        root / "tmp",
+        output_path,
+        json.dumps(resource_limits(timeout)),
+        timeout,
+    )
+    return code
+
+
 def file_size_message() -> str:
     return (
         f"La solución escribió más de {FILE_SIZE_LIMIT_BYTES // (1024 * 1024)} MiB de salida "
@@ -555,8 +835,9 @@ def file_size_message() -> str:
 
 
 def _hit_file_size_limit(output: str) -> bool:
-    """``True`` si la salida muestra el ``OSError`` de ``RLIMIT_FSIZE`` (CPython ignora SIGXFSZ)."""
-    return "[Errno 27]" in output or "File too large" in output
+    """``True`` si la salida muestra el error de ``RLIMIT_FSIZE`` (CPython y Node ignoran SIGXFSZ:
+    Python lanza ``OSError [Errno 27]`` y Node, ``EFBIG``)."""
+    return "[Errno 27]" in output or "File too large" in output or "EFBIG" in output
 
 
 def _classify(
@@ -678,7 +959,13 @@ class _SetupFailed(Exception):
 
 
 def _execute_container(
-    sandbox: Sandbox, root: Path, python_args: list[str], output_path: Path, timeout: float
+    sandbox: Sandbox,
+    root: Path,
+    python_args: list[str],
+    output_path: Path,
+    timeout: float,
+    program: str = "python",
+    limits: dict[str, int] | None = None,
 ) -> tuple[int | None, float]:
     """Ejecuta los tests en un contenedor desechable; ``None`` si se agota el tiempo.
 
@@ -688,7 +975,15 @@ def _execute_container(
     tiempo, ``rm -f`` para el contenedor y todo lo que haya dentro.
     """
     name = container_name()
-    cmd = container_command(sandbox, name=name, root=root, python_args=python_args, timeout=timeout)
+    cmd = container_command(
+        sandbox,
+        name=name,
+        root=root,
+        python_args=python_args,
+        timeout=timeout,
+        program=program,
+        limits=limits,
+    )
     start = time.perf_counter()
     finished = False
     with open(output_path, "wb") as out:

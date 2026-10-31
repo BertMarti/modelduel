@@ -43,6 +43,13 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
 - Documentación fiel: qué mide el marcador y qué no (soluciones que engañan a los tests), qué proveedores se han usado contra la API real y novedades de la 1.0 en la portada.
 - Clasificación de lo pendiente: nada de lo de abajo es un fallo medio o alto de lo que se promete; son límites documentados (README, USO «Límites conocidos», SECURITY) o mejoras.
 
+## Hecho en la fase 6 (31/10/2026, v1.1.0)
+- **Tareas en JavaScript y TypeScript (experimental)** (antes en «Ideas»): `language` en `meta.toml`, `test_task.mjs` / `test_task.ts` con `node:test`, por el mismo runner endurecido (límites, supervisor, red cortada, contenedor con la imagen oficial de Node) y con el modelo de permisos de Node; dos tareas de ejemplo (`format_bytes`, `group_by`), `init --js` / `--ts`, Node en `doctor`, lenguaje en los informes, pruebas con soluciones maliciosas y CI con Node 20 y 22.
+
+## Después de la 1.1
+- **JS/TS fuera de lo experimental:** probar en macOS (sin subreaper) y con Node anterior a la 20.15 (sin `--disable-wasm-trap-handler`, WebAssembly no cabe en el límite de memoria); valorar comprobar los tipos de TypeScript (hoy solo se borran: haría falta `tsc`, que es una dependencia de npm) y `--sandbox-image` también para la imagen de Node.
+- **Imagen de Node fijada** (`NODE_IMAGE` en `sandbox.py`): actualizarla a mano como la de Python (Dependabot no la ve).
+
 ## Después de la 1.0
 - **Resultados reales:** Poblar la carpeta `results/` con duelos reales entre modelos actuales para que la clasificación pública sea útil (necesita claves y gasto: decisión de Alberto).
 - **Disco (baja; documentado):** `RLIMIT_FSIZE` limita cada archivo, no el total, y el contenedor monta la carpeta de la ejecución sin tope; valorar copiar los archivos a un tmpfs del contenedor (`docker create` + `docker cp`) o un volumen con cuota.
@@ -53,7 +60,6 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
 - **Actualizar la imagen fijada** cuando salga un parche de Python (Dependabot no ve la constante de `sandbox.py`; cómo hacerlo en `docs/DESARROLLO.md`).
 
 ## Ideas
-- **Tareas multi-lenguaje:** Soporte experimental para tareas en JavaScript/TypeScript usando `node --test`.
 - **Estimación de costes ampliada:** Añadir soporte para más monedas y actualización automática de precios vía API.
 - **Histórico de resultados:** Gráficas de evolución de rendimiento de modelos a lo largo del tiempo en la clasificación pública.
 - **Grafo interactivo:** Visualización de la liga de contendientes mediante un grafo de enfrentamientos directos (SVG interactivo).

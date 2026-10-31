@@ -17,6 +17,7 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
    - [OpenRouter](#openrouter)
    - [Ollama (modelos en tu ordenador)](#ollama-modelos-en-tu-ordenador)
 5. [Crear tu propia tarea paso a paso](#crear-tu-propia-tarea-paso-a-paso)
+   - [Tareas en JavaScript o TypeScript (experimental)](#tareas-en-javascript-o-typescript-experimental)
 6. [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos)
 7. [Leer el informe](#leer-el-informe)
 8. [Compartir el informe en Markdown](#compartir-el-informe-en-markdown)
@@ -34,7 +35,7 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
 
 modelduel es una herramienta de terminal que **enfrenta a dos modelos de inteligencia artificial (o a una liga de hasta seis) con el mismo problema de programación**:
 
-1. Envía el mismo enunciado a cada modelo y les pide una función en Python.
+1. Envía el mismo enunciado a cada modelo y les pide una función en Python o, de forma experimental, un módulo JavaScript/TypeScript.
 2. Guarda la respuesta de cada uno y le pasa **tus tests** (los mismos para todos).
 3. Te da un informe con quién acierta más, cuánto tarda, cuántos tokens gasta y cuánto cuesta.
 
@@ -42,7 +43,7 @@ modelduel es una herramienta de terminal que **enfrenta a dos modelos de intelig
 
 Ten en cuenta dos límites:
 
-- Solo evalúa **funciones de Python** que se pueden comprobar con tests automáticos.
+- Evalúa funciones de Python y, de forma experimental, tareas JavaScript/TypeScript que se pueden comprobar con tests automáticos.
 - **Una sola ejecución es una señal débil**: los modelos no son deterministas. Repite el duelo (`--runs`) y usa tareas de tu propio trabajo.
 
 > **Aviso importante:** el código que escriben los modelos **se ejecuta en tu ordenador**. Lee la sección de [seguridad](#seguridad-qué-aísla-y-qué-no) antes de usar tareas o modelos que no controles.
@@ -68,7 +69,9 @@ Cada vez que abras una terminal nueva, vuelve a activar el entorno con la segund
 
 `[pytest]` instala también pytest; es lo mismo que `pip install modelduel pytest`. Escribe `modelduel` seguido de la versión instalada si todo va bien. Así tienes la orden `modelduel` **con las tareas y respuestas de ejemplo incluidas** (ver `modelduel demo` en la sección siguiente).
 
-El paquete está en <https://pypi.org/project/modelduel/>. Si ya tenías una versión anterior, actualízala con `pip install -U "modelduel[pytest]"`: `init`, `doctor` y `--sandbox` necesitan la 1.0.0 o posterior.
+El paquete está en <https://pypi.org/project/modelduel/>. Si ya tenías una versión anterior, actualízala con `pip install -U "modelduel[pytest]"`: `init`, `doctor` y `--sandbox` necesitan la 1.0.0 o posterior, y las tareas en JavaScript y TypeScript, la 1.1.0.
+
+> **Mientras la 1.1.0 no esté en PyPI:** si `pip install -U` te deja en la 1.0.0, instala la versión en desarrollo (abajo) para probar las tareas en JavaScript y TypeScript.
 
 ### Desde GitHub (versión en desarrollo)
 
@@ -135,7 +138,7 @@ modelduel run examples/tasks --model replay:alfa --model replay:beta --model rep
 (En Windows, la misma orden; las barras de las rutas también funcionan.) Verás algo así:
 
 ```text
-modelduel 1.0.0 · 8 tareas · 1 ejecución por tarea
+modelduel 1.1.0 · 8 tareas · 1 ejecución por tarea
   A  replay:alfa
   B  replay:beta
   C  replay:gamma
@@ -194,9 +197,10 @@ Las tareas de ejemplo son `slugify`, `merge_intervals`, `parse_duration`, `flatt
 ```bash
 modelduel init mi-duelo                                        # sin claves: respuestas grabadas
 modelduel init mi-duelo --proveedor gemini --proveedor openai  # con modelos reales
+modelduel init mi-duelo --js --ts                              # añade ejemplos JavaScript y TypeScript
 ```
 
-Crea `mi-duelo/tasks/` (ocho tareas de ejemplo), `mi-duelo/replays/` (respuestas grabadas) y `mi-duelo/modelduel.toml`. Los proveedores posibles son `gemini`, `openai`, `openrouter`, `ollama` y `omniroute` (puedes repetir `--proveedor`). Para cada uno, la terminal muestra las variables que tienes que definir (con la orden para Linux/macOS y para PowerShell), dónde conseguir la clave y dónde ver la lista de modelos. En `modelduel.toml` los modelos aparecen como `gemini:CAMBIA-ESTO`: cámbialo por el nombre exacto del modelo antes de lanzar el duelo (si se te olvida, `modelduel run` te lo recuerda).
+Crea `mi-duelo/tasks/` (ocho tareas de ejemplo; `--js` añade `format_bytes` y `--ts` añade `group_by`), `mi-duelo/replays/` (respuestas grabadas) y `mi-duelo/modelduel.toml`. Los proveedores posibles son `gemini`, `openai`, `openrouter`, `ollama` y `omniroute` (puedes repetir `--proveedor`). Para cada uno, la terminal muestra las variables que tienes que definir (con la orden para Linux/macOS y para PowerShell), dónde conseguir la clave y dónde ver la lista de modelos. En `modelduel.toml` los modelos aparecen como `gemini:CAMBIA-ESTO`: cámbialo por el nombre exacto del modelo antes de lanzar el duelo (si se te olvida, `modelduel run` te lo recuerda). `--js` y `--ts` se pueden combinar.
 
 `init` nunca sobrescribe: si la carpeta ya tiene `modelduel.toml`, `tasks/` o `replays/`, se para. Tampoco deja mezclar `openai`, `openrouter` y `ollama`, porque los tres usan las mismas variables (`OPENAI_BASE_URL` y `OPENAI_API_KEY`); para enfrentar modelos de varias empresas, usa OpenRouter u OmniRoute.
 
@@ -223,7 +227,7 @@ modelduel doctor          # sin red
 modelduel doctor --red    # también pide a cada proveedor su lista de modelos
 ```
 
-Revisa la versión de Python, que pytest esté instalado en el mismo entorno (si no, da la orden exacta para instalarlo), que estén los ejemplos, qué protección aplica tu sistema al ejecutar el código de los modelos, las variables de entorno y, si hay un `modelduel.toml` en la carpeta, que sea válido, que cada modelo tenga su clave y que haya tareas. En «Aislamiento disponible» indica si hay Docker o Podman, si la red se puede cortar y cuál es la opción recomendada. Salida acortada:
+Revisa la versión de Python, que pytest esté instalado en el mismo entorno (si no, da la orden exacta para instalarlo), que estén los ejemplos, qué protección aplica tu sistema al ejecutar el código de los modelos, las variables de entorno y, si hay un `modelduel.toml` en la carpeta, que sea válido, que cada modelo tenga su clave y que haya tareas. También dice qué Node.js hay, con una línea como `Node.js vX.Y.Z: tareas en JavaScript (experimental); TypeScript necesita 22.6 o más nuevo`; si no hay Node en el `PATH` lo indica como información y solo lo marca como problema (✗) si tu `modelduel.toml` apunta a tareas JavaScript o TypeScript (salvo con `aislamiento = "docker"` o `"podman"`, que traen su propio Node). En «Aislamiento disponible» indica si hay Docker o Podman, si la red se puede cortar y cuál es la opción recomendada. Salida acortada:
 
 ```text
 Instalación
@@ -490,6 +494,44 @@ modelduel list-tasks mis-tareas
 ```text
 es_palindromo   7 tests  Detectar palíndromos  [fácil]
 ```
+
+### Tareas en JavaScript o TypeScript (experimental)
+
+Una tarea JavaScript/TypeScript tiene la misma carpeta que una tarea Python: `task.md`, un `meta.toml` opcional y un archivo de tests. Usa `test_task.mjs` para JavaScript o `test_task.ts` para TypeScript:
+
+```text
+mis-tareas/
+└── formatear_bytes/
+    ├── task.md
+    ├── test_task.mjs
+    └── meta.toml
+```
+
+`test_task.mjs` es un módulo ES ejecutado por el Node nativo:
+
+```javascript
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { formatBytes } from "./solution.mjs";
+
+test("formatea bytes", () => {
+  assert.equal(formatBytes(1536), "1,5 KiB");
+});
+```
+
+En TypeScript cambia las extensiones a `.ts` y escribe anotaciones de tipo que Node pueda borrar al cargar; importa la solución con `./solution.ts`. No se ejecuta `tsc`: Node borra los tipos, pero no los comprueba. En `meta.toml` declara el lenguaje:
+
+```toml
+language = "javascript"
+```
+
+También valen `js` y `ts`; `python` es el valor por defecto. Si no declaras `language`, modelduel lo deduce del único archivo de tests. Si hay `test_task.mjs` y `test_task.ts`, debes declararlo. Escribe una llamada `test("…", …)` o `it("…", …)` de primer nivel por caso: modelduel cuenta esas llamadas, no cuenta `t.test` ni bucles, y si Node informa de menos tests que los contados, los que faltan cuentan como fallidos.
+
+El enunciado recibe la instrucción de responder con un único bloque de código `javascript` o `typescript` que sea un módulo ES con `export function`; no debe usar paquetes de npm ni `require`. En TypeScript solo se admiten anotaciones que se puedan borrar, no `enum`, `namespace` ni propiedades de parámetro. Necesitas Node.js 20.11 o más nuevo para JavaScript y 22.6 o más nuevo para TypeScript. Python y pytest siguen siendo necesarios para modelduel.
+
+Puedes listar el lenguaje con `modelduel list-tasks mis-tareas`. Para probar sin gastar, crea tus propios `replays/bueno/formatear_bytes.md` y `replays/flojo/formatear_bytes.md` con un bloque de respuesta `javascript` (o `typescript`), igual que en el [Paso 5](#paso-5-probarla-sin-gastar-nada), y ejecuta `modelduel run mis-tareas --replays replays --a replay:bueno --b replay:flojo --out resultados`.
+
+En `modelduel run` verás una línea que indica cuántas tareas usan Node y su versión. El informe HTML identifica el lenguaje junto a la dificultad y en el detalle llama «Salida de node:test» al bloque de salida; el informe Markdown añade `(JavaScript)` o `(TypeScript)` al título.
 
 ### Paso 5. Probarla sin gastar nada
 
@@ -817,7 +859,7 @@ La carpeta de salida se comprueba **antes** de llamar a las APIs, para no perder
 | `podman` | Lo mismo, usando Podman. |
 | `ninguno` | No usa el aislamiento del contenedor ni corta la red. Solo tiene sentido si una tarea necesita red. |
 
-Para `docker` necesitas Docker instalado y que tu usuario pueda usarlo: compruébalo con `docker info`. Para `podman`, necesitas Podman instalado. La primera vez que uses un contenedor se descarga la imagen oficial de Python, de unos 50 MB, antes de empezar el duelo. Si Docker o Podman no están instalados, modelduel muestra un error en español con un enlace para instalarlos.
+Para `docker` necesitas Docker instalado y que tu usuario pueda usarlo: compruébalo con `docker info`. Para `podman`, necesitas Podman instalado. La primera vez que uses un contenedor se descarga la imagen oficial de Python, de unos 50 MB (y, si hay tareas JavaScript o TypeScript, la oficial de Node, `node:22.23.4-slim`), antes de empezar el duelo. Dentro del contenedor se aplican además los mismos límites de CPU, memoria, archivos y descriptores que sin él. Si Docker o Podman no están instalados, modelduel muestra un error en español con un enlace para instalarlos.
 
 Puedes elegirlo en la orden:
 
@@ -872,13 +914,16 @@ Los modelos escriben código y modelduel **lo ejecuta en tu ordenador**. Qué ha
 - Le quita al subproceso las **variables de entorno con aspecto de secreto** (las que contienen `KEY`, `TOKEN`, `SECRET`, `PASS`, `AUTH`, `CREDENTIAL`, `SESSION`, `PROXY` y similares, además de `SSH_AUTH_SOCK`, `DATABASE_URL`, `KUBECONFIG`…), de modo que no ve tus claves de API.
 - En Linux y macOS aplica **límites del sistema**: CPU, archivos de 256 MiB como máximo, 256 descriptores y, en Linux, 4 GiB de memoria.
 - Al terminar mata **todos los procesos** que haya lanzado la solución. En Linux lo hace un supervisor que también recoge los que intentan escapar con `setsid` o un doble fork.
-- Las claves no aparecen nunca en el informe, en los errores ni en la URL de las peticiones.
+- Las claves no aparecen nunca en el informe, en los errores ni en la URL de las peticiones. Para Node también se quitan `NODE_OPTIONS` y `NODE_PATH` del entorno del anfitrión.
+- En tareas JavaScript/TypeScript, Node solo puede leer y escribir dentro de la carpeta de ejecución y no puede lanzar procesos hijos, workers ni complementos nativos. El montículo de V8 está limitado a 2048 MiB.
+- En Windows, el Job Object aplica los límites y mata el árbol de procesos al terminar.
 
-Con `--sandbox docker` o `--sandbox podman`, cada ejecución usa un contenedor desechable sin red ni privilegios, con el sistema de archivos de solo lectura salvo su carpeta temporal, 1 GiB de memoria, 1 CPU y 128 procesos como máximo. Es la opción recomendada para código no fiable. `modelduel doctor` indica si está disponible.
+Con `--sandbox docker` o `--sandbox podman`, cada ejecución usa un contenedor desechable sin red ni privilegios, con el sistema de archivos de solo lectura salvo su carpeta temporal, 1 GiB de memoria, 1 CPU y 128 procesos como máximo. Para JS/TS usa la imagen oficial `node:22.23.4-slim` fijada por digest. Es la opción recomendada para código no fiable. `modelduel doctor` indica si está disponible.
 
 Qué **no** hace el modo sin contenedor, y conviene tener presente:
 
-- **No es un aislamiento real.** El código del modelo puede leer y escribir en el resto de tu disco mediante rutas absolutas y usar la red con tus permisos de usuario.
+- **No es un aislamiento real.** El código del modelo puede leer y escribir en el resto de tu disco mediante rutas absolutas y usar la red con tus permisos de usuario (en JavaScript/TypeScript, el modelo de permisos de Node se lo impide salvo que consiga saltárselo).
+- El modelo de permisos de Node es una **red de seguridad**, no una barrera frente a código malicioso. Las tareas JS/TS son experimentales: TypeScript depende del borrado de tipos experimental de Node 22, los tipos no se comprueban, con Node anterior a la 20.15 WebAssembly puede fallar con el límite de memoria y no se ha probado en macOS.
 - Una solución que escriba sin parar puede llenar el disco (cada archivo hasta 256 MiB) hasta que se agote el límite de tiempo.
 - En macOS, un proceso que se desligue a propósito con `setsid` puede sobrevivir.
 
@@ -895,6 +940,7 @@ Recomendaciones: usa tus propias tareas o tareas de confianza, no ejecutes duelo
 - Un `Retry-After` de entre 30 y 120 s se respeta entero en cada reintento: con `--retries 3`, un proveedor saturado puede costar varios minutos por intento. Baja `--retries` si prefieres rendirte antes.
 - El proveedor `gemini` se ha usado contra la API real; `openai` y `omniroute` se prueban con un servidor simulado que imita la API de OpenAI (la misma que usan OpenRouter, Ollama y OmniRoute). Si algo falla con un proveedor real, `modelduel doctor --red` comprueba la conexión sin gastar tokens.
 - El marcador mide lo que comprueban tus tests. El código del modelo se ejecuta en el mismo proceso que pytest, así que una solución escrita para engañar (por ejemplo, devolver un objeto que dice ser igual a cualquier cosa, o tocar pytest o su informe) podría aprobar. El informe enseña el código de cada modelo: revísalo si un resultado te sorprende, y escribe tests que comprueben también el tipo del resultado (`assert type(r) is int`).
+- En JavaScript/TypeScript la solución también corre en el mismo proceso que `node:test` y podría falsear el marcador. El aislamiento protege la máquina, no la honradez del resultado; para código no fiable, usa `--sandbox docker` o `--sandbox podman`.
 
 ---
 
@@ -941,8 +987,11 @@ El modelo no tiene precio en la tabla (añádelo con `--prices`) o el proveedor 
 **¿Puedo comparar más de dos modelos?**
 Sí, hasta seis: repite `--model`. Ver [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos).
 
+**Me dice que falta Node (o que TypeScript necesita Node 22.6).**
+Las tareas JavaScript necesitan Node.js 20.11 o más nuevo y las TypeScript Node.js 22.6 o más nuevo. Instálalo desde <https://nodejs.org/es/download>, comprueba `node --version` y vuelve a ejecutar `modelduel doctor`. Con `--sandbox docker` o `--sandbox podman` no hace falta Node en tu máquina: se usa la imagen oficial de Node.
+
 **¿Puedo usar tareas en otro lenguaje que no sea Python?**
-No: solo funciones de Python comprobadas con pytest.
+Sí, experimentalmente: JavaScript con `test_task.mjs` o TypeScript con `test_task.ts`, usando Node y `node:test`. Consulta [Tareas en JavaScript o TypeScript](#tareas-en-javascript-o-typescript-experimental).
 
 **¿Dónde se guardan mis resultados?**
 En la carpeta que pases a `--out`: `results.json` (datos) e `index.html` (informe). Si repites un duelo completo en la misma carpeta, se sobrescriben; usa una carpeta distinta por duelo. Si se cortó a medias, continúalo con `--resume`.
