@@ -19,6 +19,15 @@ Crea la carpeta `examples/tasks/<id>/` con:
   order = 4              # posición en la lista
   ```
 
+### Tarea en JavaScript o TypeScript (experimental)
+Va en `examples/tasks-js/<id>/` (no en `examples/tasks/`: la demo de la web y muchos tests cuentan
+las 8 de Python). Lleva `task.md`, `meta.toml` con `language = "javascript"` o `"typescript"` y
+`test_task.mjs` o `test_task.ts` con `node:test` + `node:assert/strict`, importando de
+`./solution.mjs` / `./solution.ts`. Un `test("…", …)` de primer nivel por caso (así se cuentan); en
+TS, solo tipos borrables. Compara propiedades y no prototipos si una solución válida puede devolver
+objetos sin prototipo (`Object.groupBy`). En la Pi (Node 20) la de TS no se puede ejecutar: la
+prueba el CI con Node 22.
+
 ## 2. Respuestas grabadas (replays)
 Crea o edita los archivos en `examples/replays/<contendiente>/<id>.md` (donde contendiente es `alfa`, `beta` o `gamma`):
 

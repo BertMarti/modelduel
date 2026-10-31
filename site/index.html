@@ -165,7 +165,7 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
 </nav>
 
 <header class="hero">
-  <div class="eyebrow">v1.0 · CLI · Python 3.12+ · sin dependencias</div>
+  <div class="eyebrow">v1.1 · CLI · Python 3.12+ · sin dependencias</div>
   <h1><span class="a">modelo</span> <span class="vs">vs</span> <span class="b">modelo</span></h1>
   <p class="lede">Dos modelos, una tarea, los mismos tests. <strong>modelduel</strong> pide el código a dos modelos de IA (o a una liga de hasta seis), ejecuta tus tests sobre cada respuesta y te da un informe con quién acierta, cuánto tarda y cuánto cuesta. <em>Tu propia comparativa, sin fiarte de rankings ajenos.</em></p>
   <div class="cta">
@@ -195,8 +195,8 @@ footer { padding: 34px 0 60px; border-top: 1px solid var(--line); font: 13px/1.8
 <section aria-labelledby="que">
   <h2 id="que">Qué hace</h2>
   <div class="steps">
-    <div><h3>Pregunta</h3><p>Envía el mismo enunciado a cada modelo y les pide un único bloque de código Python.</p></div>
-    <div><h3>Ejecuta</h3><p>Guarda cada respuesta como <code>solution.py</code> en un directorio temporal y pasa los tests de la tarea con pytest y un límite de tiempo.</p></div>
+    <div><h3>Pregunta</h3><p>Envía el mismo enunciado a cada modelo y les pide un único bloque de código Python, JavaScript o TypeScript.</p></div>
+    <div><h3>Ejecuta</h3><p>Guarda cada respuesta como <code>solution.py</code> (o <code>solution.mjs</code> / <code>.ts</code>) en un directorio temporal y pasa los tests de la tarea con pytest (o <code>node:test</code>) y un límite de tiempo.</p></div>
     <div><h3>Compara</h3><p>Genera <code>results.json</code> y un informe HTML con marcador, tiempos, tokens, coste estimado y el código de cada modelo.</p></div>
   </div>
 </section>
@@ -216,18 +216,14 @@ modelduel run --resume    # continúa un duelo cortado
 # Todo en la orden, sin archivo de configuración (o repite --model para una liga de 2 a 6)
 modelduel run tasks --a gemini:&lt;modelo&gt; --b openai:&lt;modelo&gt; --runs 3 --out runs/duelo</code></pre>
   <p>Las claves van en variables de entorno (<code>export GEMINI_API_KEY="…"</code>), nunca en un archivo. <code>modelduel init</code> te dice cuáles necesitas y dónde conseguirlas.</p>
-  <p>El paquete está en <a href="https://pypi.org/project/modelduel/">PyPI</a>; si <code>modelduel --version</code> dice una versión anterior a la 1.0.0, actualízalo con <code>pip install -U "modelduel[pytest]"</code>. Para la versión en desarrollo: <code>pip install git+https://github.com/BertMarti/modelduel pytest</code>.</p>
+  <p>El paquete está en <a href="https://pypi.org/project/modelduel/">PyPI</a>; si <code>modelduel --version</code> dice una versión anterior a la 1.1.0, actualízalo con <code>pip install -U "modelduel[pytest]"</code> (si todavía te deja en la 1.0.0, la 1.1.0 aún no ha llegado a PyPI: usa la versión en desarrollo para probar las tareas en JavaScript y TypeScript). Para la versión en desarrollo: <code>pip install git+https://github.com/BertMarti/modelduel pytest</code>.</p>
 </section>
 
 <section aria-labelledby="novedades">
-  <h2 id="novedades">Novedades de la 1.0</h2>
+  <h2 id="novedades">Novedades de la 1.1</h2>
   <ul>
-    <li><strong>Configurar en un minuto</strong>: <code>modelduel init</code> prepara una carpeta con tareas y un <code>modelduel.toml</code> explicado, <code>modelduel doctor</code> te dice qué falta y <code>modelduel run</code> ya no necesita argumentos.</li>
-    <li><strong>Sandbox con contenedor</strong>: <code>--sandbox docker</code> o <code>--sandbox podman</code> ejecuta cada tarea sin red ni privilegios, con límites de memoria, CPU y procesos.</li>
-    <li><strong>Red cortada por defecto en Linux</strong>, sin instalar nada (avisa si el sistema no lo permite); el código de los modelos corre con límites de recursos y sin tus claves en el entorno.</li>
-    <li><strong>Generar y reproducir</strong>: <code>--solo-generar</code> guarda las respuestas sin ejecutar tests y <code>--replay</code> las ejecuta después, incluso en otra máquina o contenedor.</li>
-    <li><strong>Ocho tareas de ejemplo</strong>: programación, JSON, CSV, texto y algoritmos.</li>
-    <li>Ya estaban: informe en HTML y Markdown, duelo en directo, <a href="leaderboard/">clasificación pública</a>, liga de 2 a 6 modelos, reintentos y <code>--resume</code>.</li>
+    <li><strong>Tareas en JavaScript y TypeScript (experimental)</strong>: necesitan Node.js, usan <code>node:test</code> y permisos para limitar el acceso; para código no fiable se recomienda <code>--sandbox docker</code>.</li>
+    <li><strong>De la 1.0:</strong> configuración con <code>init</code> y <code>doctor</code>, sandbox con contenedor, red cortada en Linux, generación y reproducción offline, ocho tareas de ejemplo, informes HTML y Markdown, duelo en directo, <a href="leaderboard/">clasificación pública</a>, ligas, reintentos y <code>--resume</code>.</li>
   </ul>
   <p>Todos los cambios, en el <a href="https://github.com/BertMarti/modelduel/blob/main/CHANGELOG.md">registro de cambios</a>; el uso paso a paso, en la <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md">guía de uso</a>.</p>
 </section>
@@ -247,6 +243,7 @@ from solution import invertir_palabras
 def test_basico():
     assert invertir_palabras("hola mundo") == "mundo hola"</code></pre>
   <p>Consejo: incluye casos límite. Son los que separan a un modelo que entiende el enunciado de uno que solo se parece a la respuesta correcta.</p>
+  <p>¿JavaScript o TypeScript? Usa <code>test_task.mjs</code> o <code>test_task.ts</code> con <code>node:test</code> y <code>language = "javascript"</code> en <code>meta.toml</code> (experimental; consulta la <a href="https://github.com/BertMarti/modelduel/blob/main/docs/USO.md#tareas-en-javascript-o-typescript-experimental">guía de uso</a>).</p>
 </section>
 
 <section aria-labelledby="proveedores">

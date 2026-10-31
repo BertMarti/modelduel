@@ -10,6 +10,7 @@ src/modelduel/
 ├── config.py           # modelduel.toml e init (catálogo de proveedores)
 ├── doctor.py           # comprobaciones de modelduel doctor
 ├── tasks.py            # carga de tareas y recuento de tests
+├── node.py             # Node.js, permisos y versiones para tareas JS/TS
 ├── extract.py          # extracción del bloque de código
 ├── runner.py           # prompt y ejecución de pytest en temporal (local o contenedor)
 ├── sandbox.py          # --sandbox: contenedor Docker/Podman y red cortada en Linux
@@ -24,6 +25,7 @@ src/modelduel/
 └── report/             # HTML de duelo/liga y Markdown
 docs/USO.md             # guía para personas usuarias
 examples/tasks/         # tareas originales de ejemplo
+examples/tasks-js/      # tareas experimentales de JavaScript y TypeScript
 examples/replays/       # respuestas grabadas
 site/                   # web estática y demo pregrabada
 tests/                  # pruebas sin llamadas de red
@@ -68,7 +70,7 @@ El timeout HTTP de los proveedores reales es de 90 segundos por defecto y se cam
 
 ## Formato de una tarea
 
-Una tarea es una carpeta con dos archivos obligatorios y metadatos opcionales:
+Una tarea Python es una carpeta con dos archivos obligatorios y metadatos opcionales:
 
 ```text
 mi-tarea/
@@ -89,6 +91,8 @@ def test_acentos():
 
 El prompt añade la instrucción de responder con un único bloque de código Python. Los tests no se envían al modelo. La carpeta temporal solo recibe `test_task.py` y, si existe, `conftest.py`.
 
+Las tareas JavaScript y TypeScript usan la misma estructura, pero el archivo de tests es `test_task.mjs` o `test_task.ts` y la solución se importa con su extensión (`./solution.mjs` o `./solution.ts`) desde un módulo ES. `meta.toml` puede declarar `language = "javascript"`, `"js"`, `"typescript"` o `"ts"`; si no aparece, se deduce del único archivo de tests. Con dos archivos hay que declararlo. Los tests usan `node:test` y `node:assert/strict`; `tasks.py` cuenta las llamadas `test(`/`it(` de primer nivel, no `t.test` ni bucles. El prompt pide un único bloque `javascript` o `typescript`, con `export function`, sin `require` ni paquetes npm; en TypeScript solo se admiten anotaciones borrables.
+
 ## Proveedores y costes
 
 `replay` lee respuestas grabadas con front-matter opcional (`input_tokens`, `output_tokens`, `latency_s`). `gemini` usa `generateContent`; `openai` usa Chat Completions compatible; `omniroute` es el preset local de OpenAI.
@@ -104,6 +108,8 @@ Sin tokens o sin precio, el informe muestra «sin datos». Las tarifas incluidas
 ## Seguridad de ejecución
 
 El runner usa un temporal propio (también como `HOME`), un subproceso limitado y un entorno depurado de secretos (`is_sensitive_var` en `runner.py`). Los límites (`resource_limits`) se aplican en el propio subproceso, sin `preexec_fn`, que no es seguro con el hilo de la señal de vida. En Linux y macOS aplica límites de CPU (el duro un segundo por encima del blando, para que llegue SIGXCPU y no SIGKILL), tamaño de archivo (256 MiB; CPython ignora SIGXFSZ y `write()` lanza `OSError [Errno 27]`, que el runner traduce a un mensaje), descriptores y volcados; el de memoria (4 GiB de espacio de direcciones, no de memoria residente) solo lo aplica Linux; en Windows usa Job Object y en POSIX un grupo de procesos para matar el árbol al terminar. En Linux, además, pytest corre bajo un supervisor intermedio (`_SUPERVISOR`) que se declara *subreaper* con `prctl(PR_SET_CHILD_SUBREAPER)`: los procesos que se desligan con `setsid()`/doble fork siguen colgando de él y, al terminar, los mata todos recorriendo `/proc` (pruebas en `tests/test_sandbox.py`, incluido un control que demuestra que sin supervisor el nieto escaparía). Si la solución mata al supervisor, el padre busca la marca `MODELDUEL_RUN` en `/proc/*/environ`.
+
+Para JavaScript y TypeScript, `_EXEC_BOOTSTRAP` aplica los mismos `setrlimit` y hace `os.execv` a Node bajo el mismo supervisor, grupo de procesos y red. Node se ejecuta directamente sobre el archivo de tests, no con `node --test` (que lanzaría un hijo por archivo y obligaría a permitir procesos), con `--permission` (`--experimental-permission` antes de 22.13), `--allow-fs-read` y `--allow-fs-write` limitados a la carpeta de la ejecución, `--max-old-space-size=2048`, reporter `spec` para la salida y reporter `junit` para el XML que lee el runner. En TypeScript, con Node anterior a 22.18 se añade `--experimental-strip-types`; la carpeta de trabajo lleva `package.json` con `{ "type": "module" }`. En contenedor se usa `NODE_IMAGE` de `sandbox.py`, una imagen oficial de Node fijada por digest: se actualiza igual que `DEFAULT_IMAGE`, eligiendo una etiqueta, obteniendo su digest y cambiando la constante y su prueba.
 
 ### Aislamiento (`sandbox.py`, desde v0.9.0)
 
@@ -152,6 +158,7 @@ El proyecto lo ha desarrollado un equipo de agentes de IA, cada uno en su rama y
 - **v0.8.0 (24/10/2026):** mejoras nocturnas de seguridad, interfaz y documentación con Claude Code como jefe y GPT-5.6 Luna y modelos gratuitos de OpenCode como delegados.
 - **v0.9.0 (26/10/2026):** aislamiento (`--sandbox`, red cortada, memoria en Windows), solo generar/reproducir y cinco tareas nuevas; Claude Code como jefe, GPT-5.6 Luna como delegado.
 - **v1.0.0 (26/10/2026):** primera versión estable; reúne lo preparado como 0.8.0 y 0.9.0 (que no llegaron a PyPI), con repaso de calidad, documentación fiel y el workflow de publicación pasando también la suite. Claude Code como jefe.
+- **v1.1.0 (31/10/2026):** tareas experimentales de JavaScript y TypeScript con Node y el mismo runner endurecido.
 
 ## Versiones
 

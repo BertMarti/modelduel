@@ -44,7 +44,7 @@ modelduel envía el mismo enunciado a dos modelos de IA, o a una liga de hasta s
 
 Los rankings públicos miden tareas que no son las tuyas. modelduel convierte tu caso real en una comparativa reproducible: mismo enunciado, mismos tests y criterios visibles. También sirve para saber si un modelo pequeño, barato o local te basta.
 
-Solo evalúa funciones de Python comprobables con tests automáticos. Una sola ejecución es una señal débil: los modelos no son deterministas, así que conviene repetir el duelo con `--runs` y usar varias tareas propias.
+Evalúa funciones de Python y, de forma experimental, tareas en JavaScript o TypeScript comprobables con tests automáticos. Una sola ejecución es una señal débil: los modelos no son deterministas, así que conviene repetir el duelo con `--runs` y usar varias tareas propias.
 
 ## Cómo se usa
 
@@ -86,9 +86,19 @@ Solo evalúa funciones de Python comprobables con tests automáticos. Una sola e
 
 6. **Lanza el duelo** con `modelduel run` y abre `resultados/index.html` en el navegador. Es un informe autocontenido, sin JavaScript y con versión para imprimir. Para compartirlo en GitHub, pon `formato = "html,md"` en `modelduel.toml` y tendrás también `informe.md`.
 
-7. **Usa tus propias tareas:** cambia el enunciado (`task.md`) y los tests (`test_task.py`) de las carpetas de `mi-duelo/tasks` y vuelve a lanzar `modelduel run`. Para que el resultado sea fiable, sube `ejecuciones` a 3 o más.
+7. **Usa tus propias tareas:** cambia el enunciado (`task.md`) y los tests (`test_task.py`, `test_task.mjs` o `test_task.ts`) de las carpetas de `mi-duelo/tasks` y vuelve a lanzar `modelduel run`. Para que el resultado sea fiable, sube `ejecuciones` a 3 o más.
 
 ¿Prefieres no usar archivo de configuración? Todo se puede pasar en la orden: `modelduel run CARPETA_DE_TAREAS --a gemini:<modelo> --b openai:<modelo> --runs 3 --out resultados`.
+
+### Tareas en JavaScript y TypeScript (experimental)
+
+Las tareas experimentales de JavaScript y TypeScript usan Node.js y el ejecutor nativo `node:test`. Necesitas Node 20.11 o más nuevo para JavaScript y Node 22.6 o más nuevo para TypeScript. Desde un clon, puedes probarlas sin claves ni coste con:
+
+```bash
+modelduel run examples/tasks-js --model replay:alfa --model replay:beta --model replay:gamma --out runs/js
+```
+
+También puedes añadirlas al crear un proyecto con `modelduel init mi-duelo --js --ts`. La ejecución aplica permisos de Node, pero para código no fiable la opción recomendada sigue siendo `--sandbox docker` o `--sandbox podman`. Consulta la [guía de uso](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md#tareas-en-javascript-o-typescript-experimental) para crear tus propias tareas.
 
 ### Ejecutar el código con más aislamiento
 
@@ -151,7 +161,9 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 
 **¿Puedo generar en un ordenador y ejecutar en otro?** Sí. Ejecuta `modelduel run --solo-generar --out respuestas-del-duelo` para guardar `respuestas.json` y una copia de las tareas en `tareas/`. Lleva esa carpeta a otra máquina y ejecuta `modelduel run --replay respuestas-del-duelo --sandbox docker`; no necesita claves y avisa si una tarea ha cambiado.
 
-**¿Puedo usar mis propias tareas?** Sí. `modelduel init` crea una carpeta con ocho tareas de ejemplo que puedes copiar y cambiar. Cada tarea pide una función concreta en `task.md` y la comprueba desde `test_task.py`.
+**¿Puedo usar mis propias tareas?** Sí. `modelduel init` crea una carpeta con ocho tareas de ejemplo que puedes copiar y cambiar. Cada tarea pide una función concreta en `task.md` y la comprueba desde `test_task.py`, `test_task.mjs` o `test_task.ts`.
+
+**¿Puedo comparar modelos en JavaScript o TypeScript?** Sí, de forma experimental: usa tareas con `test_task.mjs` o `test_task.ts`, Node.js y la guía de [tareas en JavaScript y TypeScript](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md#tareas-en-javascript-o-typescript-experimental).
 
 **¿Puede un modelo hacer trampas?** Solo si tus tests lo permiten: el código del modelo se ejecuta junto a pytest, y una solución escrita para engañar (por ejemplo, un objeto que dice ser igual a cualquier cosa) podría aprobar. El informe enseña el código de cada modelo; si un resultado te sorprende, revísalo y haz tests que comprueben también el tipo del resultado.
 

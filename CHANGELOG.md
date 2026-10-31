@@ -6,9 +6,27 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [1.1.0] - 2026-10-31
+
+### Añadido
+
+- **Tareas en JavaScript y TypeScript (experimental)**: una tarea puede declarar `language = "javascript"` o `language = "typescript"` en `meta.toml` (o deducirlo de su archivo de tests) y llevar `test_task.mjs` o `test_task.ts` escrito con el ejecutor nativo de Node (`node:test` y `node:assert/strict`). El modelo recibe la instrucción de responder con un módulo ES (`export function`, sin npm ni `require`; en TypeScript, solo tipos que se puedan borrar). Hace falta Node.js 20.11 o más nuevo (22.6 para TypeScript, que Node carga borrando los tipos, sin comprobarlos).
+- Dos tareas de ejemplo con respuestas grabadas en `examples/tasks-js/`: `format_bytes` (JavaScript) y `group_by` (TypeScript). Pruébalas con `modelduel run examples/tasks-js --model replay:alfa --model replay:beta --model replay:gamma`.
+- `modelduel init --js` y `--ts` añaden la tarea de ejemplo de ese lenguaje a la carpeta nueva.
+- `modelduel doctor` dice qué Node hay y qué tareas puede ejecutar (y marca con ✗ un `modelduel.toml` con tareas JS/TS sin el Node necesario); `modelduel run` muestra cuántas tareas van con Node y con qué versión; `list-tasks` marca su lenguaje.
+- El informe HTML enseña el lenguaje de cada tarea junto a su dificultad y en el detalle («Salida de node:test»); el Markdown lo añade al título de las tareas que no son de Python; `results.json` guarda `language` en cada tarea (los anteriores se leen como Python).
+
+### Seguridad
+
+- Las tareas de Node pasan por **el mismo runner endurecido** que las de Python: carpeta temporal propia, entorno sin claves (y sin `NODE_OPTIONS` ni `NODE_PATH` del anfitrión), límite de tiempo, límites `setrlimit` (el arranque los aplica y después se convierte en `node`), supervisor que mata a los procesos que se desligan, red cortada por defecto en Linux, Job Object en Windows y, con `--sandbox docker|podman`, el mismo contenedor con la imagen oficial `node:22.23.4-slim` fijada por digest. Antes de la primera llamada a una API se prueba que Node arranca con esos límites; si falta Node, no se gasta nada.
+- Además, Node corre con su **modelo de permisos**: solo puede leer y escribir en la carpeta de la ejecución y no puede lanzar procesos hijos, *workers* ni complementos nativos; el montículo de V8 se limita a 2048 MiB con un mensaje claro si se agota. Pruebas con soluciones maliciosas: bucle infinito, 80 intentos de lanzar procesos y *workers*, lectura y escritura fuera de la carpeta, archivo demasiado grande, memoria agotada, `process.exit` a mitad (los tests que faltan cuentan como fallidos) y red.
+- Es **experimental** porque no todo se puede garantizar igual que en Python: Node dice que su modelo de permisos no es una barrera frente a código malicioso (para código que no es tuyo, `--sandbox docker`), TypeScript depende del borrado de tipos de Node, WebAssembly puede fallar con el límite de memoria y no se ha probado en macOS.
+
 ### Cambiado
 
 - La 1.0.0 ya está en PyPI: `pip install "modelduel[pytest]"` vuelve a ser el único camino de instalación también en la guía de uso, la portada y CONTRIBUTING (se retiran las notas para instalar desde GitHub mientras no estaba publicada; el README ya iba limpio en la 1.0.0).
+- `modelduel run` solo exige pytest si hay tareas de Python.
+- CI: las pruebas corren con Node 22 (y con Node 20 en Python 3.13), un duelo con las tareas JS/TS y, en Ubuntu, el mismo duelo dentro de Docker.
 
 ## [1.0.0] - 2026-10-26
 
@@ -188,7 +206,8 @@ Primera versión (MVP).
 - Revisión QA: árbol de procesos muerto al terminar, salida acotada, UTF-8 y BOM, tareas sin tests o con errores de sintaxis, errores de red y respuestas vacías de los proveedores, accesibilidad AA y cobertura mínima del 90 % (PR [#2](https://github.com/BertMarti/modelduel/pull/2)).
 - Guía de uso (`docs/USO.md`) y `CONTRIBUTING.md` (PR [#3](https://github.com/BertMarti/modelduel/pull/3)).
 
-[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v1.0.0...HEAD
+[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/BertMarti/modelduel/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/BertMarti/modelduel/compare/v0.7.0...v1.0.0
 [0.7.0]: https://github.com/BertMarti/modelduel/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/BertMarti/modelduel/compare/v0.5.0...v0.6.0
