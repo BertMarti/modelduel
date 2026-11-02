@@ -165,7 +165,7 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 
 **¿Puedo comparar modelos en JavaScript o TypeScript?** Sí, de forma experimental: usa tareas con `test_task.mjs` o `test_task.ts`, Node.js y la guía de [tareas en JavaScript y TypeScript](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md#tareas-en-javascript-o-typescript-experimental).
 
-**¿Puede un modelo hacer trampas?** Solo si tus tests lo permiten: el código del modelo se ejecuta junto a pytest, y una solución escrita para engañar (por ejemplo, un objeto que dice ser igual a cualquier cosa) podría aprobar. El informe enseña el código de cada modelo; si un resultado te sorprende, revísalo y haz tests que comprueben también el tipo del resultado.
+**¿Puede un modelo hacer trampas?** Solo si tus tests lo permiten: el código del modelo se ejecuta junto a pytest (o a `node:test` en las tareas JavaScript/TypeScript, cuyo recuento también podría falsear), y una solución escrita para engañar (por ejemplo, un objeto que dice ser igual a cualquier cosa) podría aprobar. El informe enseña el código de cada modelo; si un resultado te sorprende, revísalo y haz tests que comprueben también el tipo del resultado.
 
 **¿Qué significa «una sola ejecución es una señal débil»?** Un modelo puede responder de forma distinta a la misma tarea. Usa `--runs 3` o más y varias tareas antes de sacar conclusiones.
 

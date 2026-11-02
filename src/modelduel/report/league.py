@@ -22,6 +22,7 @@ from modelduel.report.html import (
     fmt_seconds,
     fmt_tokens,
     plural,
+    shows_language,
     svg_ratio_bar,
     task_meta,
 )
@@ -214,7 +215,7 @@ def build_matrix(results: dict, summary: dict, runs: int) -> str:
     )
     body = []
     for task in results["tasks"]:
-        diff = task_meta(task)
+        diff = task_meta(task, shows_language(results["tasks"]))
         cells = [f'<th scope="row" class="task">{e(task["title"])}{diff}</th>']
         for side in sides:
             attempts = task["results"].get(side, [])

@@ -48,6 +48,7 @@ Hoja de ruta priorizada y realista para el desarrollo de modelduel.
 
 ## Después de la 1.1
 - **JS/TS fuera de lo experimental:** probar en macOS (sin subreaper) y con Node anterior a la 20.15 (sin `--disable-wasm-trap-handler`, WebAssembly no cabe en el límite de memoria); valorar comprobar los tipos de TypeScript (hoy solo se borran: haría falta `tsc`, que es una dependencia de npm) y `--sandbox-image` también para la imagen de Node.
+- **Entorno por lista blanca (baja):** `safe_env` quita lo que *parece* un secreto (pistas en el nombre y una lista fija) y deja pasar el resto, p. ej. `ANTHROPIC_BASE_URL` o el `PATH` del anfitrión. Valorar una lista blanca (`PATH` mínimo, idioma, `SYSTEMROOT` en Windows…) para Python y Node, con cuidado de no romper pytest instalado con `--user`.
 - **Imagen de Node fijada** (`NODE_IMAGE` en `sandbox.py`): actualizarla a mano como la de Python (Dependabot no la ve).
 
 ## Después de la 1.0

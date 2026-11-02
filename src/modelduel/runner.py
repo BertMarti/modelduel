@@ -39,16 +39,20 @@ from pathlib import Path
 
 from modelduel.node import (
     HEAP_OOM_TEXT,
+    MEMORY_ERROR_TEXTS,
     REPORTER_FILE,
     RESULTS_FILE,
+    TS_UNSUPPORTED_TEXT,
     NodeError,
     check_node,
     find_node,
     heap_message,
+    memory_message,
     node_env,
     node_test_args,
     parse_node_results,
     reporter_source,
+    ts_syntax_message,
 )
 from modelduel.sandbox import (
     CONTAINER_FAILURE_CODES,
@@ -601,7 +605,8 @@ def run_tests(
             "El contenedor terminó los tests a la fuerza: ¿superó la memoria "
             f"({CONTAINER_MEMORY_TEXT}) o el número de procesos?"
         )
-    if _hit_file_size_limit(output):
+    if returncode not in (None, 0) and _hit_file_size_limit(output):
+        # Solo si el proceso acabó mal: el mismo texto impreso por la solución no cuenta.
         result.message = file_size_message()
     return result
 
@@ -681,17 +686,18 @@ def _classify_node(
     """
     if returncode is None or returncode < 0:
         result = _classify(returncode, counts, output, duration, expected, timeout)
-        if HEAP_OOM_TEXT in output:
+        if returncode is not None and HEAP_OOM_TEXT in output:
             result.message = heap_message()
         return result
-    if HEAP_OOM_TEXT in output:
-        # En Windows V8 no muere por una señal: sale con un código positivo.
+    if returncode != 0 and any(text in output for text in MEMORY_ERROR_TEXTS):
+        # En Windows V8 no muere por una señal: sale con un código positivo. Solo con código de
+        # salida distinto de 0: el mismo texto impreso por la solución no cambia nada.
         return TestRun(
             status="error",
             total=expected,
             duration_s=duration,
             output=output,
-            message=heap_message(),
+            message=heap_message() if HEAP_OOM_TEXT in output else memory_message(),
         )
     if counts is None or counts["total"] == 0:
         if returncode == 0:
@@ -712,7 +718,9 @@ def _classify_node(
             duration_s=duration,
             output=output,
             message=(
-                "No se pudo cargar la solución (error de sintaxis, falta el `export` de la "
+                ts_syntax_message()
+                if TS_UNSUPPORTED_TEXT in output
+                else "No se pudo cargar la solución (error de sintaxis, falta el `export` de la "
                 "función o falla al importarse)."
             ),
         )

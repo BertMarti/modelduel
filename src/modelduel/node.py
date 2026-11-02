@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import functools
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -33,6 +34,14 @@ MIN_NODE_TS: Version = (22, 6, 0)
 # que una solución que agota la memoria termine con un mensaje claro de Node.
 NODE_HEAP_MB = 2048
 HEAP_OOM_TEXT = "JavaScript heap out of memory"
+# Otras formas de quedarse sin memoria (ArrayBuffer o reservas de Node fuera del montículo de V8).
+MEMORY_ERROR_TEXTS = (
+    HEAP_OOM_TEXT,
+    "Array buffer allocation failed",
+    "ERR_MEMORY_ALLOCATION_FAILED",
+)
+# TypeScript con sintaxis que Node no sabe borrar (enum, namespace, propiedades de parámetro…).
+TS_UNSUPPORTED_TEXT = "ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX"
 # Reporter propio de node:test: cuenta los resultados y los escribe con writeFileSync al terminar.
 # Los reporteros de archivo de Node (junit con --test-reporter-destination) cierran el archivo con
 # fsync, que el modelo de permisos prohíbe en las versiones recientes.
@@ -109,6 +118,8 @@ def probe_node(
     try:
         done = run(
             [path, "--version"],
+            # Sin NODE_OPTIONS del usuario: una opción que no exista haría fallar hasta esto.
+            env=node_env(dict(os.environ)),
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
@@ -242,6 +253,20 @@ def heap_message() -> str:
     return (
         f"La solución agotó la memoria de Node (montículo de {NODE_HEAP_MB} MiB) y el proceso "
         "terminó."
+    )
+
+
+def memory_message() -> str:
+    return (
+        "La solución se quedó sin memoria (límite del runner o montículo de Node de "
+        f"{NODE_HEAP_MB} MiB) y el proceso terminó."
+    )
+
+
+def ts_syntax_message() -> str:
+    return (
+        "TypeScript: solo se admiten tipos que Node pueda borrar (sin enum, namespace ni "
+        "propiedades de parámetro en los constructores)."
     )
 
 

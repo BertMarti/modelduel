@@ -120,6 +120,7 @@ def svg_ratio_bar(ratio: float, side: str, label: str) -> str:
 def task_chart(tasks: list[dict]) -> str:
     """Una fila por tarea con dos barras finas (A arriba, B abajo) de tests superados."""
     rows = []
+    show = shows_language(tasks)
     for task in tasks:
         lines = []
         for side in VERSUS:
@@ -132,7 +133,7 @@ def task_chart(tasks: list[dict]) -> str:
                 f'<div class="bar-line">{svg_ratio_bar(ratio, side, label)}'
                 f'<span class="{side}">{passed}/{total}</span></div>'
             )
-        diff = task_meta(task)
+        diff = task_meta(task, show)
         rows.append(
             f'<div class="bar-row"><div class="bar-title">{e(task["title"])}{diff}</div>'
             + "".join(lines)
@@ -309,7 +310,7 @@ def build_table_rows(results: dict) -> str:
     }
     for task in results["tasks"]:
         t = {side: _side_task_totals(task["results"][side], currencies[side]) for side in VERSUS}
-        diff = task_meta(task)
+        diff = task_meta(task, shows_language(results["tasks"]))
         cells = [f'<th scope="row" class="task">{e(task["title"])}{diff}</th>']
         for side in VERSUS:
             status = (
@@ -327,6 +328,7 @@ def build_details(results: dict) -> str:
     runs = results.get("runs", 1)
     sides = sides_of(results)
     duo_class = "duo" if len(sides) <= 2 else "duo league"
+    show = shows_language(results["tasks"])
     blocks = []
     for task in results["tasks"]:
         summary_bits = []
@@ -350,8 +352,8 @@ def build_details(results: dict) -> str:
         blocks.append(
             "<details>"
             f"<summary><span>{e(task['title'])}</span>"
-            f'<span class="muted">{e(task["id"])} · {e(language_of(task.get("language")).label)}'
-            '</span><span class="spacer"></span>' + " ".join(summary_bits) + "</summary>"
+            f'<span class="muted">{e(task["id"])}{lang_suffix(task, show)}</span>'
+            '<span class="spacer"></span>' + " ".join(summary_bits) + "</summary>"
             '<div class="detail-body">'
             f'<div class="statement">{e(task.get("statement", ""))}</div>'
             f'<div class="{duo_class}">{"".join(columns)}</div>'
@@ -360,14 +362,22 @@ def build_details(results: dict) -> str:
     return "\n".join(blocks)
 
 
-def task_meta(task: dict) -> str:
-    """``<span>`` con la dificultad y el lenguaje de una tarea («media · JavaScript»).
+def lang_suffix(task: dict, show: bool) -> str:
+    return f" · {e(language_of(task.get('language')).label)}" if show else ""
 
-    Un ``results.json`` anterior a la 1.1.0 no tiene ``language``: son tareas de Python.
-    """
+
+def shows_language(tasks: list[dict]) -> bool:
+    """El lenguaje solo se enseña si alguna tarea no es de Python (así un informe solo de Python
+    queda como antes de la 1.1.0). Un ``results.json`` antiguo no tiene ``language``: Python."""
+    return any(language_of(task.get("language")).node for task in tasks)
+
+
+def task_meta(task: dict, show_language: bool = False) -> str:
+    """``<span>`` con la dificultad y, si ``show_language``, el lenguaje («media · JavaScript»)."""
     bits = [str(task["difficulty"])] if task.get("difficulty") else []
-    bits.append(language_of(task.get("language")).label)
-    return f"<span>{e(' · '.join(bits))}</span>"
+    if show_language:
+        bits.append(language_of(task.get("language")).label)
+    return f"<span>{e(' · '.join(bits))}</span>" if bits else ""
 
 
 def _attempt_html(attempt: dict, runs: int, language: str | None = None) -> str:

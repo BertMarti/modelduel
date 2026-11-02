@@ -609,6 +609,7 @@ def test_typescript_con_enum_no_carga(make_js_task):
     code = "enum E { A }\nexport function add(a: number, b: number): number { return a + b; }\n"
     result = run_tests(code, task, timeout=30)
     assert result.status == "import_error"
+    assert result.message == node.ts_syntax_message(), result.output
 
 
 # ---------------------------------------------------------------- de principio a fin
@@ -870,11 +871,72 @@ def test_informes_muestran_el_lenguaje():
     from modelduel.report.html import task_meta
     from modelduel.report.markdown import render_markdown
 
-    assert task_meta({"difficulty": "fácil", "language": "javascript"}) == (
+    assert task_meta({"difficulty": "fácil", "language": "javascript"}, True) == (
         "<span>fácil · JavaScript</span>"
     )
     # Un results.json anterior a la 1.1.0 no tiene «language»: es Python.
-    assert task_meta({}) == "<span>Python</span>"
+    assert task_meta({}, True) == "<span>Python</span>"
+    assert task_meta({"difficulty": "fácil"}) == "<span>fácil</span>" and task_meta({}) == ""
     results = json.loads((ROOT / "results").glob("*.json").__next__().read_text("utf-8"))
     results["tasks"][0]["language"] = "typescript"
     assert "(TypeScript)" in render_markdown(results)
+
+
+# ---------------------------------------------------------------- revisión final (Fable)
+
+
+@needs_node
+def test_node_options_del_usuario_no_esconden_node(monkeypatch):
+    monkeypatch.setenv("NODE_OPTIONS", "--opcion-inexistente")
+    info = probe_node()
+    assert info is not None and info.version >= MIN_NODE
+
+
+def test_probe_node_no_pasa_node_options(monkeypatch):
+    monkeypatch.setenv("NODE_OPTIONS", "--opcion-inexistente")
+    seen = {}
+
+    class Done:
+        returncode = 0
+        stdout = "v22.23.4"
+
+    def run(cmd, **kwargs):
+        seen.update(kwargs)
+        return Done()
+
+    assert probe_node(which=lambda _n: "/usr/bin/node", run=run) is not None
+    assert "NODE_OPTIONS" not in seen["env"]
+
+
+def test_clasificacion_de_errores_de_node_sin_recuento():
+    memory = runner._classify_node(
+        1, None, "RangeError: Array buffer allocation failed", 0.1, 3, 10
+    )
+    assert memory.status == "error" and memory.message == node.memory_message()
+    oom = runner._classify_node(134, None, "FATAL ERROR: " + node.HEAP_OOM_TEXT, 0.1, 3, 10)
+    assert oom.message == node.heap_message()
+    ts = runner._classify_node(
+        1, None, "SyntaxError [ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX]: enum", 0.1, 3, 10
+    )
+    assert ts.status == "import_error" and ts.message == node.ts_syntax_message()
+
+
+@needs_node
+def test_textos_impresos_por_la_solucion_no_cambian_el_resultado(make_js_task):
+    code = (
+        'console.log("EFBIG [Errno 27] File too large JavaScript heap out of memory");\n'
+        'console.log("RangeError: Array buffer allocation failed");\n' + GOOD_JS
+    )
+    result = run_tests(code, make_js_task(), timeout=20)
+    assert result.solved and result.message == "", result.message
+
+
+def test_un_informe_solo_de_python_no_muestra_el_lenguaje():
+    from modelduel.report.html import build_details, build_table_rows, task_chart
+
+    results = json.loads((ROOT / "results" / "2026-10-01-duelo-alfa-beta.json").read_text("utf-8"))
+    html = task_chart(results["tasks"]) + build_table_rows(results) + build_details(results)
+    assert "· Python" not in html and "language-python" in html
+    results["tasks"][0]["language"] = "javascript"
+    html = task_chart(results["tasks"]) + build_table_rows(results) + build_details(results)
+    assert "· JavaScript" in html and "· Python" in html

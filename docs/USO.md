@@ -531,7 +531,7 @@ El enunciado recibe la instrucción de responder con un único bloque de código
 
 Puedes listar el lenguaje con `modelduel list-tasks mis-tareas`. Para probar sin gastar, crea tus propios `replays/bueno/formatear_bytes.md` y `replays/flojo/formatear_bytes.md` con un bloque de respuesta `javascript` (o `typescript`), igual que en el [Paso 5](#paso-5-probarla-sin-gastar-nada), y ejecuta `modelduel run mis-tareas --replays replays --a replay:bueno --b replay:flojo --out resultados`.
 
-En `modelduel run` verás una línea que indica cuántas tareas usan Node y su versión. El informe HTML identifica el lenguaje junto a la dificultad y en el detalle llama «Salida de node:test» al bloque de salida; el informe Markdown añade `(JavaScript)` o `(TypeScript)` al título.
+En `modelduel run` verás una línea que indica cuántas tareas usan Node y su versión. Si hay alguna tarea que no es de Python, el informe HTML identifica el lenguaje junto a la dificultad y en el detalle; además llama «Salida de node:test» al bloque de salida; el informe Markdown añade `(JavaScript)` o `(TypeScript)` al título.
 
 ### Paso 5. Probarla sin gastar nada
 
