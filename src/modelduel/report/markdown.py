@@ -20,6 +20,7 @@ from modelduel.report.html import (
     plural,
 )
 from modelduel.results import costs_comparable, decide, rank_sides, sides_of, summarize
+from modelduel.tasks import language_of
 
 SITE_URL = "https://bertmarti.github.io/modelduel/"
 
@@ -130,6 +131,9 @@ def _task_table(results: dict, sides: list[str]) -> list[str]:
     rows = []
     for task in results["tasks"]:
         title = md_text(task.get("title") or task.get("id"))
+        lang = language_of(task.get("language"))
+        if lang.node:
+            title += f" ({lang.label})"
         rows.append([title] + [_task_cell(task["results"][side]) for side in sides])
     return _table(["Tarea"] + [s.upper() for s in sides], rows)
 

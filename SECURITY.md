@@ -34,6 +34,13 @@ contenedor desechable sin red, sin privilegios, de solo lectura y con techos de 
 procesos. También puedes generar con `--solo-generar` y ejecutar los tests en otra máquina con
 `--replay`.
 
+Las **tareas en JavaScript y TypeScript** (experimental, desde la 1.1.0) pasan por el mismo runner
+y los mismos límites (también el contenedor, con la imagen oficial de Node fijada por digest).
+Además, Node corre con su modelo de permisos: solo puede leer y escribir en la carpeta de la
+ejecución y no puede lanzar procesos hijos, *workers* ni complementos nativos. Node advierte de que
+ese modelo es una red de seguridad y no una barrera frente a código malicioso, así que no cambia la
+recomendación: para código que no es tuyo, `--sandbox docker`.
+
 Sí son vulnerabilidades, por ejemplo:
 
 - Que una clave de API (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `OMNIROUTE_API_KEY`) acabe en
@@ -46,11 +53,14 @@ Sí son vulnerabilidades, por ejemplo:
 - Que con `--sandbox docker|podman` el código llegue a la red, escriba fuera de su carpeta
   temporal y `/tmp`, reciba variables de tu entorno o se ejecute como root; o que en Linux, con la
   red cortada por defecto, llegue a otra interfaz que no sea `lo`.
+- Que el código de una tarea JavaScript o TypeScript se ejecute sin los límites del runner (fuera
+  del supervisor, con tus claves en el entorno o, con `--sandbox`, fuera del contenedor).
 - Que un `respuestas.json` manipulado haga que `--replay` ejecute algo fuera del runner (el código
   de las respuestas y los tests copiados SÍ se ejecutan, como en cualquier duelo: reprodúcelos con
   `--sandbox docker` si no son tuyos).
 
-No lo son: que sin contenedor el código generado lea archivos con rutas absolutas, o use la red
+No lo son: que sin contenedor el código generado lea archivos con rutas absolutas (en JavaScript
+y TypeScript, saltándose el modelo de permisos de Node), o use la red
 en macOS, en Windows, con `--sandbox ninguno` o en un Linux que no permite espacios de nombres
 (está documentado arriba y `modelduel doctor` lo dice).
 

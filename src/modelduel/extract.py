@@ -1,4 +1,4 @@
-"""Extracción del bloque de código Python de la respuesta de un modelo."""
+"""Extracción del bloque de código (Python, JavaScript o TypeScript) de una respuesta."""
 
 from __future__ import annotations
 
@@ -13,6 +13,15 @@ _FENCE_RE = re.compile(
 )
 
 PYTHON_LANGS = {"python", "py", "python3", "py3"}
+JS_LANGS = {"javascript", "js", "mjs", "node", "nodejs", "ecmascript"}
+TS_LANGS = {"typescript", "ts", "mts"}
+# Etiquetas preferidas por lenguaje de la tarea, en orden (una respuesta TS en un bloque
+# ```js sigue siendo la solución si no hay otro mejor).
+PREFERRED_LANGS = {
+    "python": (PYTHON_LANGS,),
+    "javascript": (JS_LANGS,),
+    "typescript": (TS_LANGS, JS_LANGS),
+}
 
 
 def find_code_blocks(text: str) -> list[tuple[str, str]]:
@@ -28,8 +37,9 @@ def find_code_blocks(text: str) -> list[tuple[str, str]]:
     return blocks
 
 
-def extract_code(text: str) -> str | None:
-    """Primer bloque ``python``; si no hay, el único bloque; si no, el primero sin lenguaje.
+def extract_code(text: str, language: str = "python") -> str | None:
+    """Primer bloque del lenguaje de la tarea (``python`` por defecto); si no hay, el único
+    bloque; si no, el primero sin lenguaje.
 
     Devuelve ``None`` si la respuesta no contiene ningún bloque de código utilizable.
     """
@@ -37,11 +47,11 @@ def extract_code(text: str) -> str | None:
         return None
     blocks = [(lang, body) for lang, body in find_code_blocks(text) if body.strip()]
     code: str | None = None
-    for lang, body in blocks:
-        if lang in PYTHON_LANGS:
-            code = body
+    for wanted in PREFERRED_LANGS.get(language, (PYTHON_LANGS,)):
+        code = next((body for lang, body in blocks if lang in wanted), None)
+        if code is not None:
             break
-    else:
+    if code is None:
         if len(blocks) == 1:
             code = blocks[0][1]
         else:

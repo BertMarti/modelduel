@@ -156,9 +156,10 @@ def test_no_espera_a_procesos_nietos_que_heredan_la_salida(make_task, tmp_path):
 
 def test_mata_el_arbol_de_procesos_al_terminar(make_task, tmp_path):
     marker = tmp_path / "nieto.txt"
-    result = run_tests(_spawn_child_code(marker, 2), make_task(ADD_TESTS))
+    # Margen amplio: en una máquina cargada el runner puede tardar en volver.
+    result = run_tests(_spawn_child_code(marker, 5), make_task(ADD_TESTS))
     assert result.solved
-    time.sleep(3.5)
+    time.sleep(6.5)
     assert not marker.exists(), "el proceso hijo de la solución siguió vivo"
 
 

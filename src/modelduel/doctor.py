@@ -27,6 +27,15 @@ from modelduel.config import (
     safe_url,
 )
 from modelduel.demo import examples_dir
+from modelduel.node import (
+    MIN_NODE,
+    MIN_NODE_TS,
+    NODE_URL,
+    NodeError,
+    NodeInfo,
+    check_node,
+    find_node,
+)
 from modelduel.providers import ProviderError, parse_spec
 from modelduel.providers.base import USER_AGENT, http_timeout, redact
 from modelduel.providers.gemini import DEFAULT_BASE_URL as GEMINI_URL
@@ -75,7 +84,38 @@ def _export(name: str, value: str = "PEGA_AQUI_TU_CLAVE") -> str:
 # ---------------------------------------------------------------- comprobaciones
 
 
-def install_checks() -> list[Check]:
+def _v(version: tuple[int, int, int]) -> str:
+    return ".".join(map(str, version[:2]))
+
+
+def node_check(info: NodeInfo | None, group: str = "Instalación") -> Check:
+    """Node.js: solo hace falta para las tareas en JavaScript o TypeScript (experimental)."""
+    if info is None:
+        return Check(
+            INFO,
+            "Node.js no está en el PATH: solo hace falta para tareas en JavaScript o TypeScript "
+            f"(experimental; {NODE_URL})",
+            group,
+        )
+    if info.version < MIN_NODE:
+        return Check(
+            WARN,
+            f"Node.js {info.text}: las tareas en JavaScript necesitan {_v(MIN_NODE)} o más nuevo "
+            f"({NODE_URL})",
+            group,
+        )
+    if info.version < MIN_NODE_TS:
+        return Check(
+            OK,
+            f"Node.js {info.text}: tareas en JavaScript (experimental); TypeScript necesita "
+            f"{_v(MIN_NODE_TS)} o más nuevo",
+            group,
+        )
+    text = f"Node.js {info.text}: tareas en JavaScript y TypeScript (experimental)"
+    return Check(OK, text, group)
+
+
+def install_checks(node_info: Callable[[], NodeInfo | None] = find_node) -> list[Check]:
     group = "Instalación"
     python = sys.version.split()[0]
     checks = [
@@ -99,6 +139,7 @@ def install_checks() -> list[Check]:
         except importlib.metadata.PackageNotFoundError:
             version = "(versión desconocida)"
         checks.append(Check(OK, f"pytest {version}", group))
+    checks.append(node_check(node_info(), group))
     try:
         examples_dir()
         checks.append(
@@ -223,7 +264,11 @@ def requirement_check(spec: str, env: Mapping[str, str]) -> Check:
     return Check(OK, f"{spec}: listo", group)
 
 
-def config_checks(path: Path | None, env: Mapping[str, str]) -> tuple[list[Check], Config | None]:
+def config_checks(
+    path: Path | None,
+    env: Mapping[str, str],
+    node_info: Callable[[], NodeInfo | None] = find_node,
+) -> tuple[list[Check], Config | None]:
     group = "Configuración"
     if path is None:
         return [
@@ -239,7 +284,18 @@ def config_checks(path: Path | None, env: Mapping[str, str]) -> tuple[list[Check
         checks.append(Check(FAIL, problem, group) if problem else requirement_check(spec, env))
     try:
         tasks = discover_tasks(config.tasks)
-        checks.append(Check(OK, f"{len(tasks)} tareas en {config.tasks}", group))
+        node_tasks = [task for task in tasks if task.lang.node]
+        extra = ""
+        if node_tasks:
+            extra = f" ({len(node_tasks)} en JavaScript/TypeScript, experimental)"
+        checks.append(Check(OK, f"{len(tasks)} tareas en {config.tasks}{extra}", group))
+        if node_tasks and config.sandbox in ("docker", "podman"):
+            checks.append(Check(INFO, "Node viene en la imagen del contenedor", group))
+        elif node_tasks:
+            try:
+                check_node({task.language for task in node_tasks}, node_info())
+            except NodeError as exc:
+                checks.append(Check(FAIL, str(exc), group))
     except TaskError as exc:
         checks.append(Check(FAIL, str(exc), group))
     except OSError as exc:

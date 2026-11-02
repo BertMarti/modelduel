@@ -26,6 +26,7 @@ from modelduel.doctor import collect_checks, render
 from modelduel.duel import run_duel
 from modelduel.heartbeat import Heartbeat
 from modelduel.leaderboard import build_leaderboard
+from modelduel.node import find_node
 from modelduel.offline import (
     RESPONSES_TASKS_DIR,
     check_bundle,
@@ -54,8 +55,9 @@ from modelduel.runner import (
     DEFAULT_TIMEOUT,
     RunnerError,
     check_sandbox,
-    ensure_pytest_available,
+    ensure_runtimes,
     supervisor_supported,
+    task_languages,
 )
 from modelduel.sandbox import (
     SANDBOX_CHOICES,
@@ -65,7 +67,7 @@ from modelduel.sandbox import (
     prepare_container,
     resolve_sandbox,
 )
-from modelduel.tasks import TaskError, discover_tasks, is_task_dir
+from modelduel.tasks import LANGUAGES, TaskError, discover_tasks, is_task_dir
 
 # Códigos de salida: 0 duelo completado (aunque los modelos fallen tests), 1 no se pudieron
 # escribir los resultados, 2 error de uso o de configuración, 130 interrumpido con Ctrl+C.
@@ -229,6 +231,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="NOMBRE",
         help="proveedor real (se puede repetir: gemini, openai, openrouter, ollama u omniroute)",
+    )
+    init.add_argument(
+        "--js",
+        action="store_true",
+        help="añade una tarea de ejemplo en JavaScript (experimental; necesita Node 20.11+)",
+    )
+    init.add_argument(
+        "--ts",
+        action="store_true",
+        help="añade una tarea de ejemplo en TypeScript (experimental; necesita Node 22.6+)",
     )
 
     doctor = sub.add_parser("doctor", help="comprueba la instalación y la configuración")
@@ -436,15 +448,35 @@ def _check_numbers(args: argparse.Namespace) -> None:
         raise TaskError("--retries debe ser 0 o más.")
 
 
-def _resolve_sandbox(args: argparse.Namespace) -> Sandbox:
+def _resolve_sandbox(args: argparse.Namespace, tasks: list | None = None) -> Sandbox:
     """``--sandbox`` (o «aislamiento» de modelduel.toml) listo para usar, con su aviso."""
+    languages = task_languages(tasks) if tasks else {"python"}
     sandbox = resolve_sandbox(getattr(args, "sandbox", None), getattr(args, "sandbox_image", None))
+    # pytest y/o Node (en local) antes que nada: el error dice qué instalar.
+    ensure_runtimes(tasks or [], sandbox)
     if sandbox.is_container:
-        sandbox = prepare_container(sandbox, notify=lambda msg: print(f"  {msg}", flush=True))
+        sandbox = prepare_container(
+            sandbox, notify=lambda msg: print(f"  {msg}", flush=True), languages=languages
+        )
     elif sandbox.isolate_network and not supervisor_supported():
         sandbox = Sandbox()
-    check_sandbox(sandbox)  # antes de gastar nada: si el aislamiento falla, se para aquí
+    # Antes de gastar nada: si el aislamiento (o Node con sus límites) falla, se para aquí.
+    check_sandbox(sandbox, languages=languages)
     return sandbox
+
+
+def _language_lines(tasks: list) -> list[str]:
+    """Aviso de las tareas en JavaScript/TypeScript (experimental) y el Node que se usará."""
+    counts: dict[str, int] = {}
+    for task in tasks:
+        if task.lang.node:
+            counts[task.lang.label] = counts.get(task.lang.label, 0) + 1
+    if not counts:
+        return []
+    which = ", ".join(f"{n} en {label}" for label, n in counts.items())
+    node = find_node()
+    where = f"Node {node.text}" if node else "Node"
+    return [f"  Tareas con Node (experimental): {which}; tests con node:test ({where})."]
 
 
 def _sandbox_lines(sandbox: Sandbox, choice: str | None) -> list[str]:
@@ -467,8 +499,7 @@ def _duel_and_report(
     intro: str | None = None,
 ) -> int:
     """Lo común de un duelo normal y de uno reproducido: ejecutar, guardar e informar."""
-    ensure_pytest_available()
-    sandbox = _resolve_sandbox(args)
+    sandbox = _resolve_sandbox(args, tasks)
     # Antes de gastar llamadas a las APIs: la carpeta de salida tiene que poder crearse.
     _prepare_out(args.out)
     results_path = args.out / "results.json"
@@ -494,6 +525,8 @@ def _duel_and_report(
     if intro:
         print(f"  {intro}")
     for line in _sandbox_lines(sandbox, getattr(args, "sandbox", None)):
+        print(line)
+    for line in _language_lines(tasks):
         print(line)
     if args.resume:
         total = len(tasks) * args.runs * len(providers)
@@ -673,11 +706,19 @@ def cmd_init(args: argparse.Namespace) -> int:
     """``modelduel init``: carpeta con tareas de ejemplo, respuestas grabadas y configuración."""
     folder: Path = args.folder
     providers = list(dict.fromkeys(args.proveedor))
-    specs = init_project(folder, providers)
+    wanted = (("javascript", args.js), ("typescript", args.ts))
+    languages = [name for name, chosen in wanted if chosen]
+    specs = init_project(folder, providers, languages=languages)
     print(f"Listo: {folder}/")
     print(f"  modelduel.toml  configuración ({', '.join(specs)})")
     count = sum(path.is_dir() for path in (folder / "tasks").iterdir())
     print(f"  tasks/          {count} tareas de ejemplo (enunciado + tests): cámbialas por tuyas")
+    for name in languages:
+        lang = LANGUAGES[name]
+        print(
+            f"                  incluye una en {lang.label} (experimental: tests con node:test, "
+            f"necesita Node {'22.6' if name == 'typescript' else '20.11'} o más nuevo)"
+        )
     print("  replays/        respuestas grabadas para probar sin claves")
     if providers:
         print()
@@ -853,6 +894,8 @@ def cmd_list_tasks(args: argparse.Namespace) -> int:
     width = max(len(t.id) for t in tasks)
     for task in tasks:
         extra = f"  [{task.difficulty}]" if task.difficulty else ""
+        if task.lang.node:
+            extra += f"  ({task.lang.label})"
         print(f"{task.id:<{width}}  {task.expected_tests:>2} tests  {task.title}{extra}")
     return 0
 

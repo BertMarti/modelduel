@@ -220,6 +220,15 @@ def test_escribir_por_encima_del_limite_de_archivo_lo_explica(make_task, monkeyp
     assert "1 MiB" in result.message
 
 
+def test_imprimir_el_texto_del_limite_de_archivo_no_cambia_el_resultado(make_task):
+    # Revisión final: el mensaje de archivo grande solo si el proceso acabó mal.
+    from tests.conftest import ADD_TESTS
+
+    code = "print('OSError: [Errno 27] File too large')\ndef add(a, b):\n    return a + b\n"
+    result = run_tests(code, make_task(ADD_TESTS))
+    assert result.solved and result.message == "", result.message
+
+
 @posix_only
 def test_imprimir_70_mib_al_importar_no_es_un_error(make_task):
     # Regresión de la revisión: con 64 MiB esta solución pasaba de «ok» a «import_error».

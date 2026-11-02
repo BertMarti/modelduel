@@ -52,7 +52,7 @@ def generated(tasks_dir, tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr(runner, "run_tests", forbidden)
     monkeypatch.setattr("modelduel.duel.run_tests", forbidden)
-    monkeypatch.setattr("modelduel.cli.ensure_pytest_available", forbidden)
+    monkeypatch.setattr("modelduel.cli.ensure_runtimes", forbidden)
     out = tmp_path / "gen"
     assert _generate(tasks_dir, out) == 0
     printed = capsys.readouterr().out

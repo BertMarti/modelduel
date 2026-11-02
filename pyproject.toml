@@ -11,7 +11,7 @@ requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Alberto Martínez" }]
-keywords = ["llm", "benchmark", "evaluation", "cli", "ai", "coding", "pytest"]
+keywords = ["llm", "benchmark", "evaluation", "cli", "ai", "coding", "pytest", "javascript", "typescript", "node"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",

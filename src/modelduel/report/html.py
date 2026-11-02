@@ -10,6 +10,7 @@ from string import Template
 from modelduel import __version__
 from modelduel.report.csp import apply_style_hashes
 from modelduel.results import costs_comparable, decide, sides_of
+from modelduel.tasks import language_of
 
 STATUS_LABELS = {
     "ok": "tests ejecutados",
@@ -119,6 +120,7 @@ def svg_ratio_bar(ratio: float, side: str, label: str) -> str:
 def task_chart(tasks: list[dict]) -> str:
     """Una fila por tarea con dos barras finas (A arriba, B abajo) de tests superados."""
     rows = []
+    show = shows_language(tasks)
     for task in tasks:
         lines = []
         for side in VERSUS:
@@ -131,7 +133,7 @@ def task_chart(tasks: list[dict]) -> str:
                 f'<div class="bar-line">{svg_ratio_bar(ratio, side, label)}'
                 f'<span class="{side}">{passed}/{total}</span></div>'
             )
-        diff = f"<span>{e(task.get('difficulty'))}</span>" if task.get("difficulty") else ""
+        diff = task_meta(task, show)
         rows.append(
             f'<div class="bar-row"><div class="bar-title">{e(task["title"])}{diff}</div>'
             + "".join(lines)
@@ -308,7 +310,7 @@ def build_table_rows(results: dict) -> str:
     }
     for task in results["tasks"]:
         t = {side: _side_task_totals(task["results"][side], currencies[side]) for side in VERSUS}
-        diff = f"<span>{e(task.get('difficulty'))}</span>" if task.get("difficulty") else ""
+        diff = task_meta(task, shows_language(results["tasks"]))
         cells = [f'<th scope="row" class="task">{e(task["title"])}{diff}</th>']
         for side in VERSUS:
             status = (
@@ -326,6 +328,7 @@ def build_details(results: dict) -> str:
     runs = results.get("runs", 1)
     sides = sides_of(results)
     duo_class = "duo" if len(sides) <= 2 else "duo league"
+    show = shows_language(results["tasks"])
     blocks = []
     for task in results["tasks"]:
         summary_bits = []
@@ -337,7 +340,10 @@ def build_details(results: dict) -> str:
         columns = []
         for side in sides:
             spec = results["contenders"][side]["spec"]
-            attempts_html = [_attempt_html(attempt, runs) for attempt in task["results"][side]]
+            attempts_html = [
+                _attempt_html(attempt, runs, task.get("language"))
+                for attempt in task["results"][side]
+            ]
             columns.append(
                 f'<div><div class="side-head {side}">{side.upper()} · {e(spec)}</div>'
                 + "".join(attempts_html)
@@ -346,9 +352,8 @@ def build_details(results: dict) -> str:
         blocks.append(
             "<details>"
             f"<summary><span>{e(task['title'])}</span>"
-            f'<span class="muted">{e(task["id"])}</span><span class="spacer"></span>'
-            + " ".join(summary_bits)
-            + "</summary>"
+            f'<span class="muted">{e(task["id"])}{lang_suffix(task, show)}</span>'
+            '<span class="spacer"></span>' + " ".join(summary_bits) + "</summary>"
             '<div class="detail-body">'
             f'<div class="statement">{e(task.get("statement", ""))}</div>'
             f'<div class="{duo_class}">{"".join(columns)}</div>'
@@ -357,7 +362,25 @@ def build_details(results: dict) -> str:
     return "\n".join(blocks)
 
 
-def _attempt_html(attempt: dict, runs: int) -> str:
+def lang_suffix(task: dict, show: bool) -> str:
+    return f" · {e(language_of(task.get('language')).label)}" if show else ""
+
+
+def shows_language(tasks: list[dict]) -> bool:
+    """El lenguaje solo se enseña si alguna tarea no es de Python (así un informe solo de Python
+    queda como antes de la 1.1.0). Un ``results.json`` antiguo no tiene ``language``: Python."""
+    return any(language_of(task.get("language")).node for task in tasks)
+
+
+def task_meta(task: dict, show_language: bool = False) -> str:
+    """``<span>`` con la dificultad y, si ``show_language``, el lenguaje («media · JavaScript»)."""
+    bits = [str(task["difficulty"])] if task.get("difficulty") else []
+    if show_language:
+        bits.append(language_of(task.get("language")).label)
+    return f"<span>{e(' · '.join(bits))}</span>" if bits else ""
+
+
+def _attempt_html(attempt: dict, runs: int, language: str | None = None) -> str:
     head = []
     if runs > 1:
         head.append(f"<strong>Ejecución {e(attempt.get('run', '?'))}</strong>")
@@ -374,12 +397,14 @@ def _attempt_html(attempt: dict, runs: int) -> str:
     if attempt.get("message"):
         parts.append(f'<p class="msg">{e(attempt["message"])}</p>')
     if attempt.get("code"):
-        parts.append(f'<pre><code class="language-python">{e(attempt["code"])}</code></pre>')
+        lang = language_of(language)
+        parts.append(f'<pre><code class="language-{lang.name}">{e(attempt["code"])}</code></pre>')
     elif attempt.get("response"):
         parts.append(f"<pre>{e(attempt['response'])}</pre>")
     if attempt.get("output"):
+        runner_name = "node:test" if language_of(language).node else "pytest"
         parts.append(
-            '<details class="out"><summary>Salida de pytest</summary>'
+            f'<details class="out"><summary>Salida de {runner_name}</summary>'
             f"<pre>{e(attempt['output'])}</pre></details>"
         )
     parts.append("</div>")
