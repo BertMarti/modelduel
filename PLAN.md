@@ -1,66 +1,30 @@
 # PLAN.md · modelduel
 
-Hoja de ruta priorizada y realista para el desarrollo de modelduel.
+Hoja de ruta priorizada y realista para el desarrollo de modelduel. Lo hecho en cada versión, con detalle, está en `CHANGELOG.md`; aquí queda solo el resumen.
 
-## Hecho hoy (24/10/2026, v0.8.0)
-- **Seguridad en el runner:**
-  - Implementación de límites `setrlimit` en POSIX: 4 GiB de espacio de direcciones (solo Linux), CPU (con margen y SIGXCPU), archivos de máx. 256 MiB, 256 descriptores de archivos y desactivación de volcados de memoria (core).
-  - Redirección de `HOME` y variables `XDG_*` a un directorio temporal de ejecución para evitar fugas de configuración personal.
-  - Filtrado estricto de variables de entorno sensibles (claves, tokens, cookies, DSN, etc.) antes de ejecutar el código del modelo.
-  - Mensajes de error específicos cuando el proceso es terminado por señales del sistema (SIGXCPU, SIGXFSZ, etc.).
-- **Interfaz y Accesibilidad:**
-  - Política de Seguridad de Contenido (CSP) estricta en informes, clasificación y portada para prohibir la ejecución de JavaScript no autorizado.
-  - Navegación móvil de la portada en dos filas con zona táctil; en los informes y la clasificación, columna «Pos.» estrecha y pie de tabla dentro de la pantalla.
-- **Calidad y CI/CD:**
-  - Tipado estático con `mypy` sin errores y comprobación integrada en el CI.
-  - El CI prueba también Python 3.13 (antes un test no se recogía en 3.13).
-  - Auditoría de seguridad automatizada con `gitleaks` (secretos) y `pip-audit` (dependencias vulnerables).
-  - Configuración de Dependabot para actualizaciones automáticas de dependencias de desarrollo y acciones de GitHub.
-  - Nueva política de seguridad en `SECURITY.md`.
-  - Permisos por job en los flujos de trabajo de GitHub Actions (`deploy.yml`) siguiendo el principio de mínimo privilegio.
-- **Documentación:**
-  - README renovado con banner, capturas de pantalla y secciones claras para usuarios.
-  - Nueva guía técnica `docs/DESARROLLO.md`.
+## Hecho en la fase 7 (02/11/2026, v1.2.0)
+- **Grafo de enfrentamientos directos** (antes en «Ideas»): sección «Enfrentamientos directos» en el informe de duelo, en el de liga y en la clasificación pública. Grafo SVG (un nodo por modelo, una flecha por pareja del que gana más tareas al que gana menos, con el marcador y los empates), resaltado y panel de detalle al pasar el ratón, enfocar con el teclado o tocar, solo con CSS (los informes siguen sin JavaScript y con la misma CSP), leyenda y matriz de enfrentamientos en tabla como alternativa accesible. De 2 a 8 modelos con grafo; con más (solo posible en la clasificación), solo la tabla. Código en `report/h2h.py`, pruebas en `tests/test_h2h.py`.
+- **Mantenimiento:** imagen de Python del contenedor a `python:3.13.18-slim` (por digest); `pip-audit` limpio; Dependabot sin PRs ni alertas abiertas; este PLAN resumido y sin puntos repetidos.
 
-## Hecho en la fase 2 (24/10/2026, tarde)
-- `modelduel init`, `modelduel.toml` (leído por `run`) y `modelduel doctor [--red]`; `modelduel` sin orden muestra los primeros pasos; errores de claves con la orden para definirlas.
-- Supervisor «subreaper» en Linux: los procesos con `setsid`/doble fork ya no sobreviven (pendiente de ayer).
-- CSP sin `'unsafe-inline'` en `style-src` (hash de cada `<style>`).
-- README: prueba en una orden con entorno virtual, flujo `init` → `doctor` → `run` y orden `docker run` para código no fiable.
+## Hecho antes (resumen)
+- **v0.8.0 (24/10):** límites `setrlimit`, entorno sin secretos y `HOME` temporal en el runner; CSP estricta en informes, clasificación y portada; mypy, Python 3.13, gitleaks y pip-audit en el CI; Dependabot; `SECURITY.md`; README para usuarios y `docs/DESARROLLO.md`.
+- **Fase 2 (24/10):** `modelduel init`, `modelduel.toml`, `modelduel doctor [--red]`; supervisor «subreaper» en Linux; CSP sin `'unsafe-inline'` (hash de cada `<style>`).
+- **v0.9.0 (26/10):** `--sandbox docker|podman`, red cortada por defecto en Linux, límite de memoria en Windows, `--solo-generar` / `--replay`, ocho tareas de ejemplo.
+- **v1.0.0 (26/10):** primera versión estable; `release.yml` pasa la suite y exige el CHANGELOG; documentado qué mide el marcador y qué no.
+- **v1.1.0 (31/10):** tareas en JavaScript y TypeScript (experimental) por el mismo runner endurecido, con el modelo de permisos de Node.
 
-## Hecho en la fase 3 (26/10/2026, v0.9.0)
-- **Aislamiento en contenedores:** `--sandbox docker|podman` (imagen oficial fijada por digest, sin red ni privilegios, solo lectura, techos de memoria, CPU y procesos) y clave `aislamiento` en `modelduel.toml`.
-- **Aislamiento de red en Linux:** red cortada por defecto con espacios de nombres de usuario y red (sin root); aviso si el sistema no lo permite.
-- **Límite de memoria en Windows:** `JOB_OBJECT_LIMIT_PROCESS_MEMORY` (1 GiB por proceso) en el Job Object, probado en el CI de Windows.
-- **Modo «solo generar»:** `--solo-generar` y `--replay CARPETA`.
-- **Más tareas de ejemplo:** `flatten_json`, `csv_totals`, `wrap_text`, `grid_path` y `topo_order` (8 en total).
-- `modelduel doctor` informa del aislamiento disponible y recomienda el mejor.
-
-## Hecho en la fase 5 (26/10/2026, v1.0.0)
-- Versión **1.0.0** (estado «estable» en PyPI y Python 3.13 en los clasificadores); el CHANGELOG resume qué trae frente a la 0.7.0 publicada (la 0.8.0 y la 0.9.0 no llegaron a PyPI).
-- `release.yml` pasa la suite y exige la entrada del CHANGELOG antes de publicar; sigue publicando solo al crear una Release, con Trusted Publishing y el environment `pypi` (solo etiquetas `v*`).
-- Repaso de calidad como usuario nuevo (`init` → `doctor` → `run` → `--solo-generar` → `--replay` y errores habituales): sin fallos medios ni altos; «No existe …» en español para `report` y `--prices` con archivos que faltan.
-- Documentación fiel: qué mide el marcador y qué no (soluciones que engañan a los tests), qué proveedores se han usado contra la API real y novedades de la 1.0 en la portada.
-- Clasificación de lo pendiente: nada de lo de abajo es un fallo medio o alto de lo que se promete; son límites documentados (README, USO «Límites conocidos», SECURITY) o mejoras.
-
-## Hecho en la fase 6 (31/10/2026, v1.1.0)
-- **Tareas en JavaScript y TypeScript (experimental)** (antes en «Ideas»): `language` en `meta.toml`, `test_task.mjs` / `test_task.ts` con `node:test`, por el mismo runner endurecido (límites, supervisor, red cortada, contenedor con la imagen oficial de Node) y con el modelo de permisos de Node; dos tareas de ejemplo (`format_bytes`, `group_by`), `init --js` / `--ts`, Node en `doctor`, lenguaje en los informes, pruebas con soluciones maliciosas y CI con Node 20 y 22.
-
-## Después de la 1.1
-- **JS/TS fuera de lo experimental:** probar en macOS (sin subreaper) y con Node anterior a la 20.15 (sin `--disable-wasm-trap-handler`, WebAssembly no cabe en el límite de memoria); valorar comprobar los tipos de TypeScript (hoy solo se borran: haría falta `tsc`, que es una dependencia de npm) y `--sandbox-image` también para la imagen de Node.
-- **Entorno por lista blanca (baja):** `safe_env` quita lo que *parece* un secreto (pistas en el nombre y una lista fija) y deja pasar el resto, p. ej. `ANTHROPIC_BASE_URL` o el `PATH` del anfitrión. Valorar una lista blanca (`PATH` mínimo, idioma, `SYSTEMROOT` en Windows…) para Python y Node, con cuidado de no romper pytest instalado con `--user`.
-- **Imagen de Node fijada** (`NODE_IMAGE` en `sandbox.py`): actualizarla a mano como la de Python (Dependabot no la ve).
-
-## Después de la 1.0
-- **Resultados reales:** Poblar la carpeta `results/` con duelos reales entre modelos actuales para que la clasificación pública sea útil (necesita claves y gasto: decisión de Alberto).
-- **Disco (baja; documentado):** `RLIMIT_FSIZE` limita cada archivo, no el total, y el contenedor monta la carpeta de la ejecución sin tope; valorar copiar los archivos a un tmpfs del contenedor (`docker create` + `docker cp`) o un volumen con cuota.
-- **Procesos que se desligan en macOS (baja; documentado):** no hay subreaper; valorar recorrer los procesos con la marca `MODELDUEL_RUN` (`ps -E`) también allí.
-- **Contenedor sin el pytest del anfitrión:** opción de imagen propia con pytest (publicada en GHCR) para no depender de montar los paquetes del entorno local.
-- **Resultados falsificables (límite de diseño; documentado en README, USO y SECURITY desde la 1.0):** el código de la solución corre en el mismo proceso que pytest y puede escribir un `junit.xml` falso (o tocar pytest) para «aprobar»; en el contenedor, `/sandbox` (donde va el XML) es escribible. El aislamiento protege la máquina, no la honradez del marcador: valorar sacar el XML por otra vía (p. ej. un descriptor heredado solo por pytest) y comprobar que el número de tests coincide con el recogido antes de importar la solución.
-- **Probar `openai:` y `omniroute:` con una API real** (Gemini ya se usó de verdad; necesita claves y algo de gasto: decisión de Alberto).
-- **Actualizar la imagen fijada** cuando salga un parche de Python (Dependabot no ve la constante de `sandbox.py`; cómo hacerlo en `docs/DESARROLLO.md`).
+## Siguiente (por prioridad)
+1. **Resultados reales** en `results/` para que la clasificación pública (y su grafo) sea útil: duelos entre modelos actuales. Necesita claves y algo de gasto: decisión de Alberto.
+2. **Probar `openai:` y `omniroute:` con una API real** (Gemini ya se usó de verdad). También necesita claves.
+3. **JS/TS fuera de lo experimental:** probar en macOS (sin subreaper) y con Node anterior a la 20.15 (sin `--disable-wasm-trap-handler`, WebAssembly no cabe en el límite de memoria); valorar comprobar los tipos de TypeScript (haría falta `tsc`, una dependencia de npm) y `--sandbox-image` también para la imagen de Node.
+4. **Resultados falsificables (límite de diseño; documentado en README, USO y SECURITY):** la solución corre en el mismo proceso que pytest o `node:test` y podría escribir un recuento falso; el aislamiento protege la máquina, no la honradez del marcador. Valorar sacar el recuento por otra vía (p. ej. un descriptor heredado solo por el ejecutor de tests) y comprobar que el número de tests coincide con el recogido antes de importar la solución.
+5. **Entorno por lista blanca (baja):** `safe_env` quita lo que *parece* un secreto y deja pasar el resto (p. ej. `ANTHROPIC_BASE_URL` o el `PATH` del anfitrión). Valorar una lista blanca (`PATH` mínimo, idioma, `SYSTEMROOT` en Windows…) para Python y Node, sin romper pytest instalado con `--user`.
+6. **Disco (baja; documentado):** `RLIMIT_FSIZE` limita cada archivo, no el total, y el contenedor monta la carpeta de la ejecución sin tope; valorar copiar los archivos a un tmpfs del contenedor (`docker create` + `docker cp`) o un volumen con cuota.
+7. **Procesos que se desligan en macOS (baja; documentado):** no hay subreaper; valorar recorrer los procesos con la marca `MODELDUEL_RUN` (`ps -E`) también allí.
+8. **Contenedor sin el pytest del anfitrión:** imagen propia con pytest (publicada en GHCR) para no depender de montar los paquetes del entorno local.
+9. **Imágenes fijadas** (`DEFAULT_IMAGE` y `NODE_IMAGE` en `sandbox.py`): Dependabot no ve esas constantes; actualizarlas a mano cuando salga un parche (cómo, en `docs/DESARROLLO.md`).
 
 ## Ideas
-- **Estimación de costes ampliada:** Añadir soporte para más monedas y actualización automática de precios vía API.
-- **Histórico de resultados:** Gráficas de evolución de rendimiento de modelos a lo largo del tiempo en la clasificación pública.
-- **Grafo interactivo:** Visualización de la liga de contendientes mediante un grafo de enfrentamientos directos (SVG interactivo).
+- **Enfrentamientos directos en el informe Markdown:** la matriz como tabla de `informe.md` (con el mismo escapado de `md_text`).
+- **Estimación de costes ampliada:** más monedas y precios actualizados desde una fuente pública.
+- **Histórico de resultados:** gráficas de la evolución de cada modelo en la clasificación pública.

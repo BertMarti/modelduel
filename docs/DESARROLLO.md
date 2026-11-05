@@ -22,7 +22,7 @@ src/modelduel/
 ├── pricing.py          # tarifas y fórmula de coste
 ├── providers/          # replay, gemini, openai y omniroute
 ├── leaderboard.py      # clasificación pública y página estática
-└── report/             # HTML de duelo/liga y Markdown
+└── report/             # HTML de duelo/liga, enfrentamientos directos (h2h.py) y Markdown
 docs/USO.md             # guía para personas usuarias
 examples/tasks/         # tareas originales de ejemplo
 examples/tasks-js/      # tareas experimentales de JavaScript y TypeScript
@@ -127,7 +127,7 @@ docker run --rm --name modelduel-<aleatorio> --pull never --network none \
   --env HOME=/tmp --env TMPDIR=/tmp --env PYTHONPATH=/deps --env PYTHONDONTWRITEBYTECODE=1 \
   --env PYTHONIOENCODING=utf-8 --env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
   --workdir /sandbox/work --entrypoint timeout \
-  python:3.13.17-slim@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962 \
+  python:3.13.18-slim@sha256:d0a9e379c0c588befb0e427db17ca9731751d281f32c6cb1a90a1277b680bdad \
   -s KILL 20 python -c <_BOOTSTRAP: setrlimit + pytest.main> <límites> \
   -q --tb=short -p no:cacheprovider --junitxml=/sandbox/junit.xml test_task.py
 ```
@@ -148,6 +148,13 @@ Lo que queda sin cubrir sin contenedor: la solución puede leer y escribir rutas
 
 `modelduel leaderboard results --out site/leaderboard` agrega `results.json` y genera una página estática junto con un informe por duelo. Los resultados incompletos o ilegibles se rechazan. La clasificación usa proporciones para que un modelo no gane solo por participar en más duelos.
 
+## Enfrentamientos directos (`report/h2h.py`, desde v1.2.0)
+
+- **Cálculo:** `task_score(intentos, runs)` da `(resuelta, tests superados)` (resuelta = todas las ejecuciones en verde; `None` si faltan intentos) y las tuplas se comparan en ese orden. `head_to_head(results)` crea un nodo por lado (`A`…`F`) y una `Pair` por pareja con ganadas, perdidas, empates, tareas sin datos (`unknown`, no cuentan) y el detalle por tarea (`Meeting`). `aggregate_head_to_head` suma los duelos de la clasificación por `proveedor:modelo` en el orden de `rank_models` (`leaderboard.head_to_head_models`); una pareja con el mismo modelo en los dos lados no cuenta.
+- **HTML:** `render_h2h` escribe la leyenda, el grafo SVG (dos en fila; de 3 en adelante un polígono; con 4 o más el lienzo mide 760 y los nombres van por fuera, a los lados), el panel de detalle (`aria-hidden`: lo mismo está en los `aria-label` y en la tabla) y la matriz en tabla. Con más de `MAX_GRAPH_NODES` (8) solo la tabla.
+- **Interacción sin JavaScript:** nodos y aristas son `<g tabindex="0" role="img" aria-label>`; `h2h_css(n)` genera, solo con índices, las reglas `:has(… :is(:hover,:focus))` que muestran el panel de cada nodo y pareja y resaltan sus aristas. Se concatena al CSS de la página (un único `<style>`, autorizado por hash en la CSP). El atenuado usa variables (`--h2h-dim`, anulada con `initial` en lo activo), nunca `opacity`.
+- **Pruebas:** `tests/test_h2h.py` (matriz a mano con los `results/` del repositorio, `--runs`, flecha hacia el que pierde, 2/3/6/8/9 nodos, datos hostiles y CSP).
+
 ## Cómo se ha construido
 
 El proyecto lo ha desarrollado un equipo de agentes de IA, cada uno en su rama y con pull requests, con supervisión humana:
@@ -159,6 +166,7 @@ El proyecto lo ha desarrollado un equipo de agentes de IA, cada uno en su rama y
 - **v0.9.0 (26/10/2026):** aislamiento (`--sandbox`, red cortada, memoria en Windows), solo generar/reproducir y cinco tareas nuevas; Claude Code como jefe, GPT-5.6 Luna como delegado.
 - **v1.0.0 (26/10/2026):** primera versión estable; reúne lo preparado como 0.8.0 y 0.9.0 (que no llegaron a PyPI), con repaso de calidad, documentación fiel y el workflow de publicación pasando también la suite. Claude Code como jefe.
 - **v1.1.0 (31/10/2026):** tareas experimentales de JavaScript y TypeScript con Node y el mismo runner endurecido.
+- **v1.2.0 (02/11/2026):** grafo de enfrentamientos directos en informes y clasificación (interacción solo con CSS); Claude Code como jefe (diseño, código final y pruebas), con una primera versión de GPT-5.6 Luna.
 
 ## Versiones
 

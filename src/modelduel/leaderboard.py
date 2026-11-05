@@ -15,6 +15,13 @@ from urllib.parse import quote
 from modelduel import __version__
 from modelduel.report import write_report
 from modelduel.report.csp import apply_style_hashes
+from modelduel.report.h2h import (
+    H2H_RULE,
+    HeadToHead,
+    aggregate_head_to_head,
+    h2h_css,
+    render_h2h,
+)
 from modelduel.report.html import (
     e,
     fmt_cost,
@@ -119,6 +126,15 @@ def rank_models(models: dict[str, dict]) -> list[tuple[int, dict]]:
     return [(position, models[spec]) for position, spec in rank_sides(rates)]
 
 
+def head_to_head_models(duels: list[Duel], ranking: list[tuple[int, dict]]) -> HeadToHead:
+    """Enfrentamientos directos de todos los duelos publicados, en el orden de la clasificación."""
+    return aggregate_head_to_head(
+        ((duel.id, duel.results) for duel in duels),
+        [model["spec"] for _position, model in ranking],
+        [str(position) for position, _model in ranking],
+    )
+
+
 # ---------------------------------------------------------------- página
 
 
@@ -204,7 +220,7 @@ def render_leaderboard(duels: list[Duel]) -> str:
     package = resources.files("modelduel.report")
     template = Template(package.joinpath("leaderboard.html").read_text("utf-8"))
     page = template.substitute(
-        css=package.joinpath("style.css").read_text("utf-8"),
+        css=package.joinpath("style.css").read_text("utf-8") + h2h_css(len(ranking)),
         version=e(__version__),
         lede=e(
             f"{plural(len(models), 'modelo', 'modelos')} · {plural(len(duels), 'duelo', 'duelos')} "
@@ -212,6 +228,14 @@ def render_leaderboard(duels: list[Duel]) -> str:
         ),
         podium=e(podium),
         ranking_rows=build_ranking(models),
+        h2h=render_h2h(
+            head_to_head_models(duels, ranking),
+            intro=(
+                "Quién gana a quién, tarea a tarea, sumando todos los duelos publicados en los "
+                f"que coincidieron dos modelos. {H2H_RULE} El número de cada nodo es su posición "
+                "en la clasificación."
+            ),
+        ),
         history_rows=build_history(duels),
         price_note=e(
             "Los costes de esta página son precios ficticios de demostración, no reales."

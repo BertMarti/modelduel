@@ -8,6 +8,7 @@ from string import Template
 
 from modelduel import __version__
 from modelduel.report.csp import apply_style_hashes
+from modelduel.report.h2h import H2H_RULE, h2h_css, head_to_head, render_h2h
 from modelduel.report.html import (
     STATUS_LABELS,
     _short_label,
@@ -268,7 +269,7 @@ def render_league(results: dict, summary: dict) -> str:
     package = resources.files("modelduel.report")
     template = Template(package.joinpath("league.html").read_text("utf-8"))
     page = template.substitute(
-        css=package.joinpath("style.css").read_text("utf-8"),
+        css=package.joinpath("style.css").read_text("utf-8") + h2h_css(len(sides)),
         version=e(results.get("version", __version__)),
         page_title=e(" vs ".join(labels) + " · liga · modelduel"),
         date_human=e(fmt_date(results.get("created_at", ""))),
@@ -287,6 +288,13 @@ def render_league(results: dict, summary: dict) -> str:
         ranking_rows=build_ranking(results, summary),
         metrics=build_metrics(results, summary, runs),
         warning=build_incomplete(results) + build_warning(runs),
+        h2h=render_h2h(
+            head_to_head(results),
+            intro=(
+                f"Quién gana a quién, tarea a tarea, en cada pareja de los {len(sides)} "
+                f"contendientes. {H2H_RULE}"
+            ),
+        ),
         matrix_caption=e(
             "Tests superados por tarea" + (f", sumando {runs} ejecuciones." if runs > 1 else ".")
         ),

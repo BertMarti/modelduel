@@ -6,8 +6,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [1.2.0] - 2026-11-02
+
+### Añadido
+
+- **Enfrentamientos directos** en el informe HTML (duelo y liga) y en la clasificación pública: un grafo con un nodo por modelo y una flecha por pareja que dice quién gana a quién tarea a tarea (gana la tarea quien la resuelve y, si la resuelven los dos o ninguno, quien supera más tests). Cada flecha va del que gana más tareas al que gana menos y lleva el marcador («3–1») y los empates; la línea discontinua es un empate. Al pasar el ratón por un modelo o una flecha, al recorrerlos con el tabulador o al tocarlos en el móvil, se resaltan sus enfrentamientos y un panel enseña el detalle (rivales, tareas y tests de cada uno).
+- Debajo, la **matriz de enfrentamientos**: una tabla con lo mismo (ganadas–perdidas de cada fila frente a cada columna, ▲ / ▼ / = y empates, y el balance de cada modelo), pensada para lectores de pantalla, para imprimir y para cuando hay muchos modelos: en la clasificación, con más de 8 modelos solo se muestra la tabla.
+- En la clasificación pública el grafo suma todos los duelos publicados en los que coincidieron dos modelos, con su posición en la clasificación en cada nodo.
+
 ### Cambiado
 
+- El informe sigue siendo un único archivo que se abre sin conexión y **sin JavaScript**: el grafo es SVG dentro de la página y la interacción es solo CSS, con la misma CSP estricta (sin scripts y con los estilos autorizados por su hash).
+- La imagen del contenedor de `--sandbox docker|podman` para las tareas de Python pasa a `python:3.13.18-slim` (fijada por digest).
 - La 1.1.0 ya está en PyPI: se retiran de la guía de uso y de la portada las notas para instalar desde GitHub mientras no estaba publicada (el README ya iba limpio en la 1.1.0).
 
 ## [1.1.0] - 2026-10-31
@@ -211,7 +221,8 @@ Primera versión (MVP).
 - Revisión QA: árbol de procesos muerto al terminar, salida acotada, UTF-8 y BOM, tareas sin tests o con errores de sintaxis, errores de red y respuestas vacías de los proveedores, accesibilidad AA y cobertura mínima del 90 % (PR [#2](https://github.com/BertMarti/modelduel/pull/2)).
 - Guía de uso (`docs/USO.md`) y `CONTRIBUTING.md` (PR [#3](https://github.com/BertMarti/modelduel/pull/3)).
 
-[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v1.1.0...HEAD
+[Sin publicar]: https://github.com/BertMarti/modelduel/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/BertMarti/modelduel/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/BertMarti/modelduel/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/BertMarti/modelduel/compare/v0.7.0...v1.0.0
 [0.7.0]: https://github.com/BertMarti/modelduel/compare/v0.6.0...v0.7.0

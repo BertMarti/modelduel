@@ -38,7 +38,9 @@ Después abre `modelduel-demo/index.html` en el navegador. El entorno virtual (`
 
 ## Qué es
 
-modelduel envía el mismo enunciado a dos modelos de IA, o a una liga de hasta seis, recoge su código Python y ejecuta tus tests sobre cada respuesta. Después genera un informe con tareas resueltas, tests superados, tiempo, tokens y coste estimado.
+modelduel envía el mismo enunciado a dos modelos de IA, o a una liga de hasta seis, recoge su código Python y ejecuta tus tests sobre cada respuesta. Después genera un informe con tareas resueltas, tests superados, tiempo, tokens y coste estimado, y un grafo de **enfrentamientos directos** que enseña quién gana a quién, tarea a tarea.
+
+![Enfrentamientos directos de una liga de tres modelos: grafo y matriz](https://raw.githubusercontent.com/BertMarti/modelduel/main/docs/img/captura-enfrentamientos.png)
 
 ## Para qué sirve
 
@@ -166,6 +168,8 @@ Primero cuentan las tareas resueltas, después los tests superados y, si todos l
 **¿Puedo comparar modelos en JavaScript o TypeScript?** Sí, de forma experimental: usa tareas con `test_task.mjs` o `test_task.ts`, Node.js y la guía de [tareas en JavaScript y TypeScript](https://github.com/BertMarti/modelduel/blob/main/docs/USO.md#tareas-en-javascript-o-typescript-experimental).
 
 **¿Puede un modelo hacer trampas?** Solo si tus tests lo permiten: el código del modelo se ejecuta junto a pytest (o a `node:test` en las tareas JavaScript/TypeScript, cuyo recuento también podría falsear), y una solución escrita para engañar (por ejemplo, un objeto que dice ser igual a cualquier cosa) podría aprobar. El informe enseña el código de cada modelo; si un resultado te sorprende, revísalo y haz tests que comprueben también el tipo del resultado.
+
+**¿Qué son los enfrentamientos directos?** Una forma de comparar a los modelos de dos en dos: en cada tarea gana quien la resuelve y, si la resuelven los dos o ninguno, quien supera más tests. En el grafo, cada flecha va del que gana más tareas al que gana menos, con el marcador (`3–1`); pasa el ratón, usa el tabulador o toca un modelo o una flecha para ver el detalle. Debajo está la misma información en una tabla. Funciona sin JavaScript y sin conexión, también en la [clasificación pública](https://bertmarti.github.io/modelduel/leaderboard/).
 
 **¿Qué significa «una sola ejecución es una señal débil»?** Un modelo puede responder de forma distinta a la misma tarea. Usa `--runs 3` o más y varias tareas antes de sacar conclusiones.
 

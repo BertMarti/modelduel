@@ -294,7 +294,12 @@ def test_la_pagina_es_accesible_y_legible_en_movil_e_impresion(folder):
     assert 'name="viewport"' in html and "<title>" in html
     assert 'class="skip"' in html and 'id="contenido"' in html
     assert html.count("<svg") == html.count("<title>") - 1  # el <title> de la página + uno por SVG
-    assert html.count('role="img"') == html.count("<svg")
+    # Las barras son role="img"; el grafo de enfrentamientos (v1.2.0) es un grupo de nodos y
+    # flechas con role="img" cada uno (lo prueba tests/test_h2h.py).
+    start = html.index('<svg class="h2h-graph')
+    end = html.index("</svg>", start)
+    bars = html[:start] + html[end:]
+    assert bars.count('role="img"') == bars.count("<svg") > 0
     assert 'scope="row"' in html and 'role="region"' in html
     assert "@media (max-width: 720px)" in html and "@media print" in html
 

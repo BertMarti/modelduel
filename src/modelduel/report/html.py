@@ -9,6 +9,7 @@ from string import Template
 
 from modelduel import __version__
 from modelduel.report.csp import apply_style_hashes
+from modelduel.report.h2h import H2H_RULE, h2h_css, head_to_head, render_h2h
 from modelduel.results import costs_comparable, decide, sides_of
 from modelduel.tasks import language_of
 
@@ -492,7 +493,8 @@ def render_versus(results: dict, summary: dict) -> str:
         resources.files("modelduel.report").joinpath("template.html").read_text("utf-8")
     )
     page = template.substitute(
-        css=resources.files("modelduel.report").joinpath("style.css").read_text("utf-8"),
+        css=resources.files("modelduel.report").joinpath("style.css").read_text("utf-8")
+        + h2h_css(2),
         version=e(results.get("version", __version__)),
         page_title=e(f"{_short_label(spec_a)} vs {_short_label(spec_b)} · modelduel"),
         date_human=e(fmt_date(results.get("created_at", ""))),
@@ -513,6 +515,10 @@ def render_versus(results: dict, summary: dict) -> str:
         verdict=_verdict(summary, runs),
         metrics=build_metrics(summary, runs),
         warning=build_incomplete(results) + build_warning(runs),
+        h2h=render_h2h(
+            head_to_head(results),
+            intro=f"Quién gana a quién, tarea a tarea. {H2H_RULE}",
+        ),
         chart=task_chart(results["tasks"]),
         table_caption=e(
             "Totales por tarea"
