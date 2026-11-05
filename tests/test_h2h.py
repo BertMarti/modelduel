@@ -188,6 +188,17 @@ def test_agregado_ignora_el_mismo_spec_en_los_dos_lados_y_usa_nombres_completos_
         [("gemelos", twin), ("otro", other)], ["replay:x", "openai:x"], ["1", "2"]
     )
     assert h2h.versus(0, 1) == (1, 0, 0)
+    # Repetido en una liga con un tercero: la pareja x-y cuenta una sola vez (revisión cruzada).
+    trio = make_results(
+        [("t", {"a": [attempt(True, 8)], "b": [attempt(True, 8)], "c": [attempt(False, 1)]})],
+        n=3,
+    )
+    trio["contenders"] = {"a": {"spec": "p:x"}, "b": {"spec": "p:x"}, "c": {"spec": "p:y"}}
+    assert aggregate_head_to_head([("l", trio)], ["p:x", "p:y"], ["1", "2"]).versus(0, 1) == (
+        1,
+        0,
+        0,
+    )
     assert [node.label for node in h2h.nodes] == ["replay:x", "openai:x"]
     # Nodos en otro orden que los lados del duelo: el balance sigue siendo el de cada modelo.
     flipped = aggregate_head_to_head([("otro", other)], ["openai:x", "replay:x"], ["1", "2"])

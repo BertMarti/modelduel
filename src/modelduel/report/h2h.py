@@ -201,7 +201,7 @@ def aggregate_head_to_head(
     """Suma de todos los duelos publicados (clasificación): un nodo por ``spec``.
 
     ``specs`` da el orden de los nodos (el de la clasificación) y ``badges`` su etiqueta (la
-    posición). Una pareja con el mismo ``spec`` en los dos lados de un duelo no cuenta.
+    posición). Si un duelo repite un ``spec`` en dos lados, solo cuenta el primero.
     """
     shorts = [short_label(spec) for spec in specs]
     unique = len(set(shorts)) == len(shorts)  # replay:alfa y openai:alfa → nombre completo
@@ -213,7 +213,13 @@ def aggregate_head_to_head(
     pairs = _empty_pairs(len(nodes))
     for duel_id, results in duels:
         runs = int(results.get("runs", 1))
-        spec_of = {side: results["contenders"][side]["spec"] for side in sides_of(results)}
+        # Un mismo spec en dos lados (results.json a mano; la CLI no lo deja) cuenta una vez:
+        # solo su primer lado, para no sumar dos veces sus tareas contra un tercero.
+        spec_of: dict[str, str] = {}
+        for side in sides_of(results):
+            spec = results["contenders"][side]["spec"]
+            if spec not in spec_of.values():
+                spec_of[side] = spec
         for left, right in combinations(spec_of, 2):
             i, j = index.get(spec_of[left]), index.get(spec_of[right])
             if i is None or j is None or i == j:

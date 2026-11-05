@@ -295,7 +295,6 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--line);
   details::details-content { content-visibility: visible; display: block; }
   .bar-line svg, .metric svg, .lg-row svg, .ranking svg, .matrix svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .h2h-graph { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  .h2h-graph .h2h-edge { --h2h-lbl: visible; }
   .h2h-panel { display: none; }
   .h2h-stage { grid-template-columns: 1fr; }
   .table-wrap { overflow: visible; }
