@@ -20,6 +20,7 @@ Esta guía es para quien quiere **usar** modelduel, no para quien quiere modific
    - [Tareas en JavaScript o TypeScript (experimental)](#tareas-en-javascript-o-typescript-experimental)
 6. [Una liga de tres a seis modelos](#una-liga-de-tres-a-seis-modelos)
 7. [Leer el informe](#leer-el-informe)
+   - [Enfrentamientos directos](#enfrentamientos-directos)
 8. [Compartir el informe en Markdown](#compartir-el-informe-en-markdown)
 9. [Clasificación pública](#clasificación-pública)
 10. [Opciones: `--runs`, `--timeout`, `--retries`, `--resume`, `--format` y `--prices`](#opciones---runs---timeout---retries---resume---format-y---prices)
@@ -69,7 +70,7 @@ Cada vez que abras una terminal nueva, vuelve a activar el entorno con la segund
 
 `[pytest]` instala también pytest; es lo mismo que `pip install modelduel pytest`. Escribe `modelduel` seguido de la versión instalada si todo va bien. Así tienes la orden `modelduel` **con las tareas y respuestas de ejemplo incluidas** (ver `modelduel demo` en la sección siguiente).
 
-El paquete está en <https://pypi.org/project/modelduel/>. Si ya tenías una versión anterior, actualízala con `pip install -U "modelduel[pytest]"`: `init`, `doctor` y `--sandbox` necesitan la 1.0.0 o posterior, y las tareas en JavaScript y TypeScript, la 1.1.0.
+El paquete está en <https://pypi.org/project/modelduel/>. Si ya tenías una versión anterior, actualízala con `pip install -U "modelduel[pytest]"`: `init`, `doctor` y `--sandbox` necesitan la 1.0.0 o posterior, las tareas en JavaScript y TypeScript, la 1.1.0, y los enfrentamientos directos del informe, la 1.2.0.
 
 ### Desde GitHub (versión en desarrollo)
 
@@ -136,7 +137,7 @@ modelduel run examples/tasks --model replay:alfa --model replay:beta --model rep
 (En Windows, la misma orden; las barras de las rutas también funcionan.) Verás algo así:
 
 ```text
-modelduel 1.1.0 · 8 tareas · 1 ejecución por tarea
+modelduel 1.2.0 · 8 tareas · 1 ejecución por tarea
   A  replay:alfa
   B  replay:beta
   C  replay:gamma
@@ -636,7 +637,7 @@ Los empates completos **comparten posición**. En la demo:
 
 `alfa` va primero porque resuelve más tareas (6 de 8). `beta` y `gamma` empatan en tareas (4 de 8) y `beta` queda delante por superar más tests (61 frente a 53), aunque sea mucho más caro: el coste solo cuenta si también empatan en tests. Con pocas tareas, una sola respuesta cambia el orden: léelo con cautela.
 
-Con tres o más contendientes, el informe HTML añade, debajo de la clasificación, una **comparativa** con una barra fina por contendiente y métrica, una **matriz por tarea** (tests superados y un estado escrito —«resuelta», «no resuelta», «sin hacer»…, para no depender del color) y el desplegable de código y salida de cada intento. En móvil, las tablas se desplazan en horizontal dentro de su propio marco (también con el teclado).
+Con tres o más contendientes, el informe HTML añade, debajo de la clasificación, una **comparativa** con una barra fina por contendiente y métrica, los **enfrentamientos directos** (quién gana a quién en cada pareja; ver [Enfrentamientos directos](#enfrentamientos-directos)), una **matriz por tarea** (tests superados y un estado escrito —«resuelta», «no resuelta», «sin hacer»…, para no depender del color) y el desplegable de código y salida de cada intento. En móvil, las tablas se desplazan en horizontal dentro de su propio marco (también con el teclado).
 
 ---
 
@@ -654,9 +655,10 @@ Con tres o más contendientes, el informe HTML añade, debajo de la clasificaci�
    - **Tokens:** entrada y salida. Son las unidades en las que cobran los proveedores. Menos es mejor. (En Gemini, los tokens de razonamiento se cuentan como salida porque se facturan así.)
    - **Coste estimado:** calculado con la tabla de precios (ver `--prices`). Si el modelo no tiene precio o el proveedor no devolvió tokens, pone **«sin datos»**: nunca se inventa. Si los dos modelos tienen monedas distintas, avisa de que no son comparables.
    - «▲ mejor» y «▼ peor» (glifo y texto, nunca solo color) marcan quién gana y quién pierde en cada fila; si hay empate no se marca ninguno.
-4. **Tests superados por tarea:** barras finas, una por contendiente y tarea.
-5. **Tabla por tarea:** los mismos números desglosados.
-6. **Código y salida de los tests:** un desplegable por tarea con el enunciado y, para cada intento, el estado, el código que escribió el modelo y la salida de pytest. **Léelo siempre**: dos modelos con la misma nota pueden haber escrito código muy distinto.
+4. **Enfrentamientos directos:** quién gana cada tarea y el marcador de la pareja (ver abajo).
+5. **Tests superados por tarea:** barras finas, una por contendiente y tarea.
+6. **Tabla por tarea:** los mismos números desglosados.
+7. **Código y salida de los tests:** un desplegable por tarea con el enunciado y, para cada intento, el estado, el código que escribió el modelo y la salida de pytest. **Léelo siempre**: dos modelos con la misma nota pueden haber escrito código muy distinto.
 
 Cada intento tiene un estado, que se ve en el informe y en `results.json`:
 
@@ -670,6 +672,16 @@ Cada intento tiene un estado, que se ve en el informe y en `results.json`:
 | error del proveedor | La llamada a la API falló (clave, red, cuota…). Ese intento cuenta como no resuelto y sin tests superados. |
 
 Un «error del proveedor» no detiene el duelo: se anota y se sigue con el resto.
+
+### Enfrentamientos directos
+
+Desde la 1.2.0, el informe (duelo y liga) y la [clasificación pública](#clasificación-pública) tienen un apartado **«Enfrentamientos directos»**: compara a los modelos **de dos en dos, tarea a tarea**. En cada tarea gana quien la **resuelve** (todos sus tests en todas las ejecuciones) y, si la resuelven los dos o ninguno, quien supera **más tests**; si quedan igual, es un empate. Una tarea en la que a alguno le falten intentos (un duelo cortado) no cuenta.
+
+- **El grafo:** un círculo por modelo (con su letra, o con su posición en la clasificación) y una flecha por pareja. La flecha va **del que gana más tareas al que gana menos** y lleva el marcador de la pareja (`3–1`) y, si los hay, los empates; una **línea discontinua** es un empate en tareas ganadas. Bajo cada modelo, su balance con todos los rivales: `G` ganadas, `P` perdidas y `E` empatadas.
+- **El detalle:** pasa el ratón por un modelo o una flecha, recórrelos con el **tabulador** o **tócalos** en el móvil: se resaltan sus enfrentamientos y el panel de al lado (debajo, en el móvil) enseña los rivales o las tareas de esa pareja con los tests de cada uno. Con cuatro modelos o más, el marcador de cada flecha solo aparece al resaltarla, para que no se tapen en el centro. Todo funciona sin JavaScript y sin conexión.
+- **La matriz de enfrentamientos:** debajo del grafo, la misma información en una tabla. Cada celda dice cuántas tareas gana el modelo de la fila frente al de la columna y cuántas pierde (`2–1`), con `▲` si gana la pareja, `▼` si la pierde o `=` si empatan, y los empates. Es la vista para lectores de pantalla, para imprimir y para cuando hay muchos modelos: en la clasificación, con más de 8 modelos solo se muestra la tabla.
+
+Es otra forma de mirar los mismos resultados: la clasificación ordena por el total de tareas y tests, y un modelo puede ir primero y aun así perder el enfrentamiento directo con otro (por ejemplo, si gana a todos por poco y pierde con uno por mucho).
 
 ---
 
@@ -703,7 +715,7 @@ El repositorio publica en <https://bertmarti.github.io/modelduel/leaderboard/> u
 modelduel leaderboard results --out runs/clasificacion
 ```
 
-Crea `runs/clasificacion/index.html` (la clasificación y el histórico) y un informe por duelo en `runs/clasificacion/duelos/<id>/index.html`. Sirve para cualquier carpeta con `results.json` de modelduel, también la tuya.
+Crea `runs/clasificacion/index.html` (la clasificación, los [enfrentamientos directos](#enfrentamientos-directos) de todos los duelos publicados y el histórico) y un informe por duelo en `runs/clasificacion/duelos/<id>/index.html`. Sirve para cualquier carpeta con `results.json` de modelduel, también la tuya.
 
 - **Cómo se ordena.** Cada modelo (`proveedor:modelo`) suma tareas, tests y coste de todos los duelos donde aparece. Se compara la **proporción** de tareas resueltas, después la de tests y después el coste por intento (solo si todos tienen precio en la misma moneda). Con totales, un modelo ganaría solo por jugar más duelos. Los empates comparten posición.
 - **Mira el nº de duelos.** Un modelo con un solo duelo es una señal débil, igual que una sola ejecución.
