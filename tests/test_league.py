@@ -369,7 +369,9 @@ def test_contraste_aa_de_toda_la_paleta_sobre_todos_fondos(make_task):
     screen = _css_vars(_css_block(html, ":root {"))
     printed = {**screen, **_css_vars(html.split("@media print")[1].split("}")[0])}
     colors = set(ALL_SIDES) | {"text", "muted"}
-    assert set(screen) == colors | {"bg", "panel", "line"}  # nada sin revisar
+    # Nada sin revisar. «h2h-dimmed» no es de texto: solo atenúa líneas y flechas del grafo de
+    # enfrentamientos mientras otra cosa está resaltada (la información sigue en panel y tabla).
+    assert set(screen) == colors | {"bg", "panel", "line", "h2h-dimmed"}
     for theme, bgs in ((screen, ("bg", "panel")), (printed, ("bg", "panel"))):
         for name in colors:
             for bg in bgs:

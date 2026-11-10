@@ -79,7 +79,7 @@ def test_task_score_resolver_pesa_mas_que_los_tests_y_sin_intentos_es_none():
     assert task_score([attempt(False, 7)], 1) == (0, 7)
     # Con --runs 2 solo está resuelta si lo está en las dos ejecuciones (y las tiene todas).
     assert task_score([attempt(True, 8), attempt(False, 6)], 2) == (0, 14)
-    assert task_score([attempt(True, 8)], 2) == (0, 8)
+    assert task_score([attempt(True, 8)], 2) is None  # le falta una ejecución: no cuenta
     assert task_score([attempt(True, 8), attempt(True, 8)], 2) == (1, 16)
 
 
@@ -110,14 +110,17 @@ def test_runs_suma_tests_y_exige_todas_las_ejecuciones():
         [
             # A resuelve una de dos ejecuciones (13 tests); B no resuelve ninguna pero suma 14.
             ("x", {"a": [attempt(True, 8), attempt(False, 5)], "b": [attempt(False, 7)] * 2}),
-            # B solo tiene una de las dos ejecuciones: no cuenta como resuelta.
+            # B solo tiene una de las dos ejecuciones (duelo a medias): la tarea no cuenta, porque
+            # sumaría la mitad de tests (revisión final).
             ("y", {"a": [attempt(True, 8), attempt(True, 8)], "b": [attempt(True, 8)]}),
+            ("z", {"a": [attempt(False, 3), attempt(False, 3)], "b": [attempt(False, 7)] * 2}),
         ],
         runs=2,
     )
     pair = head_to_head(data).pair(0, 1)
-    assert [m.winner for m in pair.meetings] == ["j", "i"]
-    assert pair.leader is None and score_text(pair) == "1–1"
+    assert [m.title for m in pair.meetings] == ["x", "z"] and pair.unknown == 1
+    assert [m.winner for m in pair.meetings] == ["j", "j"]
+    assert pair.leader == 1 and score_text(pair) == "2–0"
 
 
 def score_text(pair: Pair) -> str:
@@ -253,8 +256,11 @@ def test_grafo_con_n_nodos_focusables_y_etiquetados(n):
     box = re.search(r'<svg class="h2h-graph[^"]*" viewBox="0 0 (\d+) (\d+)"', html)
     assert box
     width, height = map(float, box.groups())
-    for x, y in re.findall(r'<text class="(?:name|rec)" x="([\d.]+)" y="([\d.]+)"', html):
-        assert 0 < float(x) < width and 14 < float(y) < height
+    texts = re.findall(r'<text class="(?:name|rec)" x="([\d.]+)"[^>]*\by="([\d.]+)"', html)
+    assert len(texts) == 2 * n
+    for x, y in texts:
+        # Línea base con margen para la letra de 17 px del lienzo denso (revisión final).
+        assert 0 < float(x) < width and 20 <= float(y) < height
 
 
 def test_la_flecha_apunta_al_que_pierde():
@@ -274,6 +280,18 @@ def test_sin_enfrentamientos_no_hay_arista_y_la_tabla_lo_dice():
     html = render_h2h(synthetic(3, played=False), intro="")
     assert not with_class(html, "h2h-edge")
     assert html.count("sin enfrentamientos</span>") == 6
+
+
+def test_con_un_solo_modelo_no_hay_grafo_ni_tabla():
+    html = render_h2h(synthetic(1), intro="")
+    assert "Hacen falta al menos dos modelos" in html
+    assert "h2h-graph" not in html and "h2h-matrix" not in html
+
+
+def test_en_la_clasificacion_la_posicion_va_detras_del_nombre():
+    h2h = synthetic(2)
+    assert pair_sentence(h2h, h2h.pair(0, 1)).startswith("modelo-0 (1.º) contra modelo-1 (2.º)")
+    assert 'aria-label="modelo-0 (1.º): 1 tarea ganada' in render_h2h(h2h, intro="")
 
 
 def test_mas_de_ocho_modelos_solo_tabla():

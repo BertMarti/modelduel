@@ -62,14 +62,14 @@ def _plural(n: int, one: str, many: str) -> str:
 def task_score(attempts: list[dict], runs: int) -> tuple[int, int] | None:
     """Puntuación de un contendiente en una tarea: ``(resuelta, tests superados)``.
 
-    ``None`` si no hay intentos (duelo incompleto). Resuelta = todas las ejecuciones con todos
-    los tests en verde (el mismo criterio que la clasificación); los tests se suman entre
-    ejecuciones. Las tuplas se comparan en ese orden: resolver pesa más que los tests sueltos.
+    ``None`` si faltan ejecuciones (duelo incompleto): con menos de ``runs`` intentos el lado
+    sumaría menos tests y saldría perjudicado, así que esa tarea no cuenta. Resuelta = todas las
+    ejecuciones con todos los tests en verde (el mismo criterio que la clasificación); los tests
+    se suman entre ejecuciones. Las tuplas se comparan en ese orden: resolver pesa más.
     """
-    if not attempts:
+    if not attempts or len(attempts) < runs:
         return None
-    solved = len(attempts) >= runs and all(a["solved"] for a in attempts)
-    return int(solved), sum(int(a["passed"]) for a in attempts)
+    return int(all(a["solved"] for a in attempts)), sum(int(a["passed"]) for a in attempts)
 
 
 @dataclass
@@ -241,6 +241,9 @@ def aggregate_head_to_head(
 
 
 def _name(node: Node) -> str:
+    """«A alfa» en los informes; en la clasificación «alfa (1.º)», para no leer «1 alfa»."""
+    if node.css == "n":
+        return f"{node.label} ({node.badge}.º)"
     return f"{node.badge} {node.label}"
 
 
@@ -309,7 +312,9 @@ def _layout(n: int) -> _Layout:
     if n == 2:
         return _Layout(560, 170, 280.0, 70.0, [(110.0, 70.0), (450.0, 70.0)])
     width, radius = (560, 170.0) if n == 3 else (760, 180.0)
-    cx, cy = width / 2, 250.0
+    # Con 4 o más el polígono es mayor: el centro baja para que el nombre del nodo de arriba
+    # (línea base en y - 58) quede con margen dentro del lienzo.
+    cx, cy = width / 2, (250.0 if n == 3 else 262.0)
     points = []
     for k in range(n):
         angle = -math.pi / 2 + 2 * math.pi * k / n
@@ -546,7 +551,14 @@ def render_h2h(h2h: HeadToHead, *, intro: str) -> str:
     """Contenido de la sección «Enfrentamientos directos» (la plantilla pone el título)."""
     n = len(h2h.nodes)
     parts = [f'<p class="h2h-intro">{_e(intro)}</p>']
-    if 2 <= n <= MAX_GRAPH_NODES:
+    if n < 2:
+        # Sin parejas no hay nada que enfrentar (p. ej. una clasificación con un solo modelo).
+        parts.append(
+            '<p class="h2h-many">Hacen falta al menos dos modelos para ver enfrentamientos '
+            "directos.</p>"
+        )
+        return "".join(parts)
+    if n <= MAX_GRAPH_NODES:
         parts.append(_LEGEND)
         parts.append(f'<div class="h2h-stage">{_svg(h2h)}{_panel(h2h)}</div>')
     elif n > MAX_GRAPH_NODES:
@@ -575,7 +587,7 @@ def h2h_css(n: int) -> str:
     rules = [
         "/* Enfrentamientos directos: reglas por índice (generadas en h2h.py) */",
         f".h2h:has({_ACTIVE}) .h2h-hint{{display:none}}",
-        f".h2h-graph:has({_ACTIVE}) .h2h-edge{{--h2h-dim:#3a3a41}}",
+        f".h2h-graph:has({_ACTIVE}) .h2h-edge{{--h2h-dim:var(--h2h-dimmed)}}",
         f".h2h-graph:has(.h2h-edge:is(:hover,:focus)) .h2h-edge:is(:hover,:focus){_ON}",
     ]
     for i in range(n):

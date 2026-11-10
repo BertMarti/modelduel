@@ -10,6 +10,7 @@
   --d: #ffb833;
   --e: #b79cff;
   --f: #ff8a65;
+  --h2h-dimmed: #3a3a41; /* enfrentamientos directos: lo no resaltado (sin opacity) */
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -197,7 +198,7 @@ table.ranking tr.first td, table.ranking tr.first th.rk { border-bottom-color: v
 .h2h-legend .lg-box { white-space: nowrap; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 6px; border-radius: 3px; }
 .h2h-stage { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; align-items: start; }
 .h2h-graph { display: block; width: 100%; height: auto; max-height: 540px; }
-.h2h-edge, .h2h-node { cursor: default; }
+.h2h-edge, .h2h-node { cursor: pointer; } /* Safari de iOS solo emula :hover al tocar si es «clicable» */
 .h2h-node:focus, .h2h-edge:focus { outline: none; } /* el foco se ve con .ring y .hit */
 .h2h-edge { --h2h-col: var(--text); }
 .h2h-edge.win-a { --h2h-col: var(--a); } .h2h-edge.win-b { --h2h-col: var(--b); }
